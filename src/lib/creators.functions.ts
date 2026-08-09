@@ -17,27 +17,16 @@ export const listCreators = createServerFn({ method: "GET" })
     return { rows: (data ?? []) as Array<Record<string, Json>> };
   });
 
-// Idempotent one-time seed from the client's SEED_CREATORS array. Only inserts
-// when the table is empty — so it can safely be called on every app boot.
+// DISABLED: the legacy hard-coded roster (ST-INF-001–250) must never be
+// re-inserted into the live creators table. This function is retained as a
+// no-op so any stale caller cannot repopulate archived records.
 export const seedCreatorsFromStatic = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: { rows: CreatorDBRow[] }) => {
-    if (!data || !Array.isArray(data.rows)) throw new Error("rows required");
-    return data;
-  })
-  .handler(async ({ data, context }) => {
-    if (data.rows.length === 0) return { inserted: 0, existing: 0 };
-    const { count: beforeCount } = await context.supabase
-      .from("creators")
-      .select("id", { count: "exact", head: true });
-    if ((beforeCount ?? 0) > 0) return { inserted: 0, existing: beforeCount ?? 0 };
-
-    const { error } = await context.supabase
-      .from("creators")
-      .upsert(data.rows as never, { onConflict: "id", ignoreDuplicates: true });
-    if (error) throw new Error(error.message);
-    return { inserted: data.rows.length, existing: 0 };
+  .inputValidator((data: { rows: CreatorDBRow[] }) => data ?? { rows: [] })
+  .handler(async () => {
+    return { inserted: 0, existing: 0, disabled: true as const };
   });
+
 
 export type CreatorImportRow = {
   code: string | null;

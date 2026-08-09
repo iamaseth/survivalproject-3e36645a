@@ -467,6 +467,162 @@ export type Database = {
         }
         Relationships: []
       }
+      creators_archive: {
+        Row: {
+          amazon: string | null
+          amazon_confidence: string | null
+          code: string | null
+          contact_confidence: string | null
+          contact_method: string | null
+          contact_route: string | null
+          contacted_date: string | null
+          created_at: string
+          creator_code: string | null
+          email: string | null
+          facebook: string | null
+          followers_signal: string | null
+          full_verification: string | null
+          geography: string | null
+          geography_confidence: string | null
+          id: string
+          imported_by: string | null
+          instagram: string | null
+          last_researched: string | null
+          monetization: string | null
+          name: string
+          normalized_domain: string | null
+          offer_confidence: string | null
+          offer_reasoning: string | null
+          other_platform: string | null
+          outreach_owner: string | null
+          partnership_tier: string | null
+          perry_comments: string | null
+          primary_platforms: string | null
+          primary_source: string | null
+          priority: string | null
+          reach_signal: string | null
+          recent_activity_check: string | null
+          recommended_offer: string | null
+          rena_notes: string | null
+          research_notes: string | null
+          research_status: string | null
+          response_followup: string | null
+          sample_status: string | null
+          segment: string | null
+          seth_next_action: string | null
+          target_audience: string | null
+          technical_notes: string | null
+          tiktok: string | null
+          tuan_affiliate_status: string | null
+          updated_at: string
+          verification_date: string | null
+          verification_evidence: string | null
+          youtube: string | null
+        }
+        Insert: {
+          amazon?: string | null
+          amazon_confidence?: string | null
+          code?: string | null
+          contact_confidence?: string | null
+          contact_method?: string | null
+          contact_route?: string | null
+          contacted_date?: string | null
+          created_at?: string
+          creator_code?: string | null
+          email?: string | null
+          facebook?: string | null
+          followers_signal?: string | null
+          full_verification?: string | null
+          geography?: string | null
+          geography_confidence?: string | null
+          id: string
+          imported_by?: string | null
+          instagram?: string | null
+          last_researched?: string | null
+          monetization?: string | null
+          name: string
+          normalized_domain?: string | null
+          offer_confidence?: string | null
+          offer_reasoning?: string | null
+          other_platform?: string | null
+          outreach_owner?: string | null
+          partnership_tier?: string | null
+          perry_comments?: string | null
+          primary_platforms?: string | null
+          primary_source?: string | null
+          priority?: string | null
+          reach_signal?: string | null
+          recent_activity_check?: string | null
+          recommended_offer?: string | null
+          rena_notes?: string | null
+          research_notes?: string | null
+          research_status?: string | null
+          response_followup?: string | null
+          sample_status?: string | null
+          segment?: string | null
+          seth_next_action?: string | null
+          target_audience?: string | null
+          technical_notes?: string | null
+          tiktok?: string | null
+          tuan_affiliate_status?: string | null
+          updated_at?: string
+          verification_date?: string | null
+          verification_evidence?: string | null
+          youtube?: string | null
+        }
+        Update: {
+          amazon?: string | null
+          amazon_confidence?: string | null
+          code?: string | null
+          contact_confidence?: string | null
+          contact_method?: string | null
+          contact_route?: string | null
+          contacted_date?: string | null
+          created_at?: string
+          creator_code?: string | null
+          email?: string | null
+          facebook?: string | null
+          followers_signal?: string | null
+          full_verification?: string | null
+          geography?: string | null
+          geography_confidence?: string | null
+          id?: string
+          imported_by?: string | null
+          instagram?: string | null
+          last_researched?: string | null
+          monetization?: string | null
+          name?: string
+          normalized_domain?: string | null
+          offer_confidence?: string | null
+          offer_reasoning?: string | null
+          other_platform?: string | null
+          outreach_owner?: string | null
+          partnership_tier?: string | null
+          perry_comments?: string | null
+          primary_platforms?: string | null
+          primary_source?: string | null
+          priority?: string | null
+          reach_signal?: string | null
+          recent_activity_check?: string | null
+          recommended_offer?: string | null
+          rena_notes?: string | null
+          research_notes?: string | null
+          research_status?: string | null
+          response_followup?: string | null
+          sample_status?: string | null
+          segment?: string | null
+          seth_next_action?: string | null
+          target_audience?: string | null
+          technical_notes?: string | null
+          tiktok?: string | null
+          tuan_affiliate_status?: string | null
+          updated_at?: string
+          verification_date?: string | null
+          verification_evidence?: string | null
+          youtube?: string | null
+        }
+        Relationships: []
+      }
       email_templates: {
         Row: {
           active: boolean
