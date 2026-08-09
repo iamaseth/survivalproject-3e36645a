@@ -429,23 +429,8 @@ export async function hydrateCreatorsFromDB(): Promise<void> {
   if (creatorsHydrated || typeof window === "undefined") return;
   creatorsHydrated = true;
   try {
-    const [{ listCreators, seedCreatorsFromStatic }] = await Promise.all([
-      import("./creators.functions"),
-    ]);
-    // Bootstrap DB with static seed the first time any teammate signs in.
-    const seedPayload = CREATORS.map((c) => ({
-      id: c.id, name: c.name, code: c.creatorCode, segment: c.segment,
-      primary_platforms: c.primaryPlatforms, email: c.email, amazon: c.amazon,
-      priority: c.priority, outreach_owner: c.outreachOwner,
-      research_notes: c.researchNotes, last_researched: c.lastResearched,
-      contacted_date: c.contactedDate, contact_method: c.contactMethod,
-      response_followup: c.responseFollowup, sample_status: c.sampleStatus,
-      rena_notes: c.renaNotes, perry_comments: c.perryComments,
-      recommended_offer: c.recommendedOffer,
-    }));
-    try { await seedCreatorsFromStatic({ data: { rows: seedPayload as never } }); }
-    catch (e) { console.error("[creators] seed failed", e); }
-
+    const { listCreators } = await import("./creators.functions");
+    // NOTE: no static seeding here — the database is the only source of truth.
     const { rows } = await listCreators();
     const existingIds = new Set(CREATORS.map((c) => c.id));
     let added = 0;
@@ -457,6 +442,7 @@ export async function hydrateCreatorsFromDB(): Promise<void> {
       added++;
     }
     if (added > 0) bumpRoster();
+
   } catch (e) {
     console.error("[creators] hydrateCreatorsFromDB failed", e);
   }
