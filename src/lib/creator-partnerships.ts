@@ -173,8 +173,11 @@ function buildHistory(r: {
   return events;
 }
 
-// ------------ Load & normalize seed ------------
-export const CREATORS: CreatorRow[] = (SEED_CREATORS as any[]).map((r) => {
+// ------------ Legacy seed (reference only) ------------
+// The hard-coded ST-INF-001–250 roster is kept for historical reference ONLY.
+// It is never pushed into the database and never rendered in the live CRM.
+// The live roster is hydrated exclusively from the `creators` table.
+export const LEGACY_SEED_CREATORS: CreatorRow[] = (SEED_CREATORS as any[]).map((r) => {
   const owner = (r.outreachOwner ?? null) as OutreachOwner;
   const priority = (r.priority ?? null) as CreatorPriority | null;
   const nextFollowUpDate =
@@ -193,6 +196,10 @@ export const CREATORS: CreatorRow[] = (SEED_CREATORS as any[]).map((r) => {
     outreachHistory: buildHistory(r),
   } as CreatorRow;
 });
+
+// Database is the single source of truth — starts empty, filled by hydrateCreatorsFromDB().
+export const CREATORS: CreatorRow[] = [];
+
 
 export const creatorById = (id: string) => CREATORS.find((c) => c.id === id);
 
