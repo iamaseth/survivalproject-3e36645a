@@ -27,7 +27,6 @@ export const seedCreatorsFromStatic = createServerFn({ method: "POST" })
     return { inserted: 0, existing: 0, disabled: true as const };
   });
 
-
 export type CreatorImportRow = {
   code: string | null;
   normalized_domain: string | null;
@@ -121,9 +120,6 @@ export const importCreators = createServerFn({ method: "POST" })
     return { inserted: toInsert.length, skipped, total: incoming.length };
   });
 
-// AI-research upsert — used by the research flow to add a newly discovered
-// creator to the team-shared roster. Insert-only, dedup by code first then
-// normalized website domain. Returns the id of the created or existing row.
 export type ResearchCreatorInput = {
   name: string;
   code?: string | null;
@@ -200,4 +196,31 @@ export const upsertCreatorFromResearch = createServerFn({ method: "POST" })
       .upsert(insertRow as never, { onConflict: "id", ignoreDuplicates: true });
     if (insErr) throw new Error(insErr.message);
     return { id, created: true };
+  });
+
+// KISS workflow updater used by the one-page creator pipeline.
+export const updateCreatorWorkflow = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: {
+    id: string;
+    contacted_date?: string | null;
+    contact_method?: string | null;
+    response_followup?: string | null;
+    sample_status?: string | null;
+    rena_notes?: string | null;
+  }) => {
+    if (!data?.id) throw new Error("Creator id required");
+    return data;
+  })
+  .handler(async ({ data, context }) => {
+    const { id, ...patch } = data;
+    const cleanPatch = Object.fromEntries(
+      Object.entries(patch).filter(([, value]) => value !== undefined),
+    );
+    const { error } = await context.supabase
+      .from("creators")
+      .update(cleanPatch as never)
+      .eq("id", id);
+    if (error) throw new Error(error.message);
+    return { updated: true };
   });

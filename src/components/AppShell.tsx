@@ -7,8 +7,6 @@ import {
   Megaphone,
   MessageSquare,
   FileText,
-  BookOpen,
-  FolderOpen,
   BarChart3,
   Settings as SettingsIcon,
   Search,
@@ -26,14 +24,12 @@ import { TestModeBanner } from "@/components/TestModeBanner";
 
 const nav = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard, exact: true },
-  { to: "/creators", label: "Creator Partnerships", icon: Users },
+  { to: "/creators", label: "Creators", icon: Users },
   { to: "/amazon-creators", label: "Amazon Creators", icon: ShoppingBag },
-  { to: "/amazon-discovery", label: "Amazon Discovery", icon: Search },
+  { to: "/amazon-discovery", label: "Find Creators", icon: Search },
   { to: "/campaigns", label: "Campaigns", icon: Megaphone },
-  { to: "/communications", label: "Communications", icon: MessageSquare },
+  { to: "/communications", label: "Messages", icon: MessageSquare },
   { to: "/templates", label: "Templates", icon: FileText },
-  { to: "/knowledge", label: "Knowledge Center", icon: BookOpen },
-  { to: "/content", label: "Content", icon: FolderOpen },
   { to: "/analytics", label: "Analytics", icon: BarChart3 },
   { to: "/settings", label: "Settings", icon: SettingsIcon },
 ];
@@ -63,9 +59,6 @@ export function AppShell() {
   }, [auth.status, auth.profile?.role]);
 
   // Gmail background polling is intentionally disabled here.
-  // The Lovable runtime currently lacks SUPABASE_SERVICE_ROLE_KEY for the
-  // Gmail app-user connector's admin client. Gmail is nonessential to app
-  // boot, so it must never blank-screen Creator/Amazon workflows.
   // See docs/HOTFIX-2026-08-12-GMAIL-BACKGROUND-POLLING.md before restoring.
 
   if (auth.status === "loading") {
@@ -85,11 +78,11 @@ export function AppShell() {
   }
 
   return (
-    <div className="grid min-h-screen w-full grid-cols-[260px_minmax(0,1fr)] bg-background">
+    <div className="grid min-h-screen w-full grid-cols-[240px_minmax(0,1fr)] bg-background">
       <aside className="sticky top-0 flex h-screen flex-col bg-sidebar text-sidebar-foreground">
-        <div className="border-b border-sidebar-border px-6 py-5">
+        <div className="border-b border-sidebar-border px-5 py-5">
           <div className="text-[10px] uppercase tracking-[0.22em] text-sidebar-primary">Survival Tabs</div>
-          <div className="font-display text-xl leading-tight text-sidebar-foreground">Team Content Hub</div>
+          <div className="font-display text-xl leading-tight text-sidebar-foreground">Creator CRM</div>
         </div>
         <nav className="flex-1 space-y-0.5 overflow-y-auto px-3 py-4">
           {nav.map((item) => {
@@ -111,28 +104,21 @@ export function AppShell() {
             );
           })}
         </nav>
-        <div className="border-t border-sidebar-border px-4 py-4 text-xs text-sidebar-foreground/70">
-          <div className="mb-1 uppercase tracking-[0.18em] text-sidebar-primary">Primary objective</div>
-          <p className="leading-snug">
-            Drive qualified traffic and measurable sales to TheSurvivalTabs.com and approved Amazon listings.
-          </p>
-        </div>
       </aside>
 
       <div className="flex min-w-0 flex-col">
         <TestModeBanner />
-        <header className="sticky top-0 z-10 flex items-center gap-4 border-b border-border bg-background/85 px-8 py-4 backdrop-blur">
+        <header className="sticky top-0 z-10 flex items-center gap-4 border-b border-border bg-background/85 px-8 py-3 backdrop-blur">
           <div className="relative min-w-0 flex-1">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <input
               type="search"
-              placeholder="Search assets, leads, tasks…"
-              className="w-full max-w-md rounded-md border border-input bg-card py-2 pl-9 pr-3 text-sm outline-none focus:border-ring focus:ring-2 focus:ring-ring/30"
+              placeholder="Search…"
+              className="w-full max-w-sm rounded-md border border-input bg-card py-2 pl-9 pr-3 text-sm outline-none focus:border-ring focus:ring-2 focus:ring-ring/30"
             />
           </div>
           <button className="relative rounded-md border border-border bg-card p-2 hover:bg-secondary">
             <Bell className="h-4 w-4" />
-            <span className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-[color:var(--gold)]" />
           </button>
           <ProfileMenu
             fullName={auth.profile.fullName}
@@ -143,7 +129,7 @@ export function AppShell() {
             onSignOut={auth.signOut}
           />
         </header>
-        <main className="min-w-0 flex-1 px-8 py-8">
+        <main className="min-w-0 flex-1 px-6 py-6">
           <Outlet />
         </main>
       </div>
