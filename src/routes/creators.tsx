@@ -99,7 +99,7 @@ function CreatorPipeline() {
         </div>
         <div className="flex gap-2">
           <Link to="/amazon-creators" className="rounded-md border border-input bg-background px-3 py-2 text-sm hover:bg-secondary">Amazon creators</Link>
-          <Link to="/amazon-discovery" className="rounded-md border border-input bg-background px-3 py-2 text-sm hover:bg-secondary">Find creators</Link>
+          
         </div>
       </div>
 
