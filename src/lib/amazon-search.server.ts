@@ -1,6 +1,6 @@
 const AMAZON_HOSTS = new Set(["amazon.com", "www.amazon.com"]);
 
-export type CandidateType = "video" | "storefront" | "profile" | "related_content";
+export type CandidateType = "video" | "storefront" | "profile";
 export type DiscoveryCandidate = { url: string; type: CandidateType };
 
 export const DEFAULT_KEYWORDS = [
@@ -25,15 +25,11 @@ export function normalizeAmazonUrl(raw: string): string | null {
       .replace(/\\\//g, "/")
       .replace(/&amp;/g, "&")
       .replace(/^"|"$/g, "");
-    const url = cleaned.startsWith("http")
-      ? new URL(cleaned)
-      : new URL(cleaned, "https://www.amazon.com");
+    const url = cleaned.startsWith("http") ? new URL(cleaned) : new URL(cleaned, "https://www.amazon.com");
     if (!AMAZON_HOSTS.has(url.hostname.toLowerCase())) return null;
     url.hash = "";
     for (const key of [...url.searchParams.keys()]) {
-      if (["tag", "ref", "ref_", "linkCode", "psc", "dib", "keywords", "qid", "sprefix"].includes(key)) {
-        url.searchParams.delete(key);
-      }
+      if (["tag", "ref", "ref_", "linkCode", "psc", "dib", "keywords", "qid", "sprefix"].includes(key)) url.searchParams.delete(key);
     }
     return url.toString();
   } catch {
@@ -41,17 +37,25 @@ export function normalizeAmazonUrl(raw: string): string | null {
   }
 }
 
+/**
+ * Be deliberately strict. Amazon Live pages contain navigation URLs such as
+ * /live/info and /live/channel. Those are not creators and previously leaked
+ * into the CRM as rows named "Info" and "Channel".
+ */
 export function classify(url: string): CandidateType | null {
   try {
-    const p = new URL(url).pathname.toLowerCase();
-    if (p.includes("/live/video/")) return "video";
-    if (p.includes("/shop/")) return "storefront";
-    if (p.includes("/influencer/") || p.includes("/creator/") || p.includes("/profile/")) return "profile";
-    if (p.includes("/live/") || p.includes("/videos/")) return "related_content";
+    const p = new URL(url).pathname.toLowerCase().replace(/\/+$/, "");
+    if (/^\/live\/video\/[a-z0-9_-]+$/i.test(p)) return "video";
+    if (/^\/shop\/[^/]+/i.test(p)) return "storefront";
+    if (/^\/(?:influencer|creator|profile)\/[^/]+/i.test(p)) return "profile";
     return null;
   } catch {
     return null;
   }
+}
+
+export function isUsefulAmazonCandidate(url: string): boolean {
+  return classify(url) !== null;
 }
 
 export function extractAmazonCandidates(html: string, seedUrl: string): DiscoveryCandidate[] {
@@ -91,8 +95,7 @@ export async function fetchAmazonHtml(url: string): Promise<{ ok: boolean; statu
     const response = await fetch(url, {
       redirect: "follow",
       headers: {
-        "user-agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151 Safari/537.36",
+        "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151 Safari/537.36",
         "accept-language": "en-US,en;q=0.9",
         accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
       },
