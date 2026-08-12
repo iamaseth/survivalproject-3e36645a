@@ -4,6 +4,7 @@ import { useServerFn } from "@tanstack/react-start";
 import {
   LayoutDashboard,
   Users,
+  ShoppingBag,
   Megaphone,
   MessageSquare,
   FileText,
@@ -29,6 +30,7 @@ import { GmailHealthBanner } from "@/components/GmailHealthBanner";
 const nav = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard, exact: true },
   { to: "/creators", label: "Creator Partnerships", icon: Users },
+  { to: "/amazon-creators", label: "Amazon Creators", icon: ShoppingBag },
   { to: "/campaigns", label: "Campaigns", icon: Megaphone },
   { to: "/communications", label: "Communications", icon: MessageSquare },
   { to: "/templates", label: "Templates", icon: FileText },
