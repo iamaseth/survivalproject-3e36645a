@@ -1,0 +1,58 @@
+name: Amazon Creator Crawl
+
+on:
+  workflow_dispatch:
+    inputs:
+      keywords:
+        description: "Keywords separated by |"
+        required: false
+        default: "emergency food|survival food|preparedness|prepper|bug out bag|camping food|food storage|emergency kit|survival gear"
+      seed_url:
+        description: "Optional Amazon creator/video seed"
+        required: false
+        default: "https://www.amazon.com/live/video/03c6133b0f7a41fab0ead7f9c7b30019"
+  schedule:
+    - cron: "17 2 * * 1,4"
+
+permissions:
+  contents: read
+
+jobs:
+  discover:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: tools/amazon-discovery-crawler
+    env:
+      AMAZON_KEYWORDS: ${{ github.event.inputs.keywords || 'emergency food|survival food|preparedness|prepper|bug out bag|camping food|food storage|emergency kit|survival gear' }}
+      AMAZON_SEED_URL: ${{ github.event.inputs.seed_url || 'https://www.amazon.com/live/video/03c6133b0f7a41fab0ead7f9c7b30019' }}
+      SUPABASE_URL: ${{ secrets.AMAZON_CRAWLER_SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.AMAZON_CRAWLER_SUPABASE_SERVICE_ROLE_KEY }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: tools/amazon-discovery-crawler/package.json
+
+      - name: Install crawler
+        run: npm install
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Crawl Amazon creator pages
+        run: npm run crawl
+
+      - name: Save crawl report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: amazon-creator-discovery
+          path: tools/amazon-discovery-crawler/amazon-discovery.json
+          if-no-files-found: ignore
+          retention-days: 7
