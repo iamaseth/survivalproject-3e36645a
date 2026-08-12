@@ -2,23 +2,56 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { ExternalLink, Plus, Search, Video, ShoppingBag, Sparkles, RefreshCw } from "lucide-react";
-import { PageHeader } from "@/components/PageHeader";
+import {
+  ChevronDown,
+  ChevronRight,
+  ExternalLink,
+  Mail,
+  Plus,
+  Search,
+  ShoppingBag,
+  Sparkles,
+  Youtube,
+} from "lucide-react";
 import { addAmazonCreator, listAmazonCreators } from "@/lib/amazon-creators.functions";
+import { findAmazonCreators } from "@/lib/amazon-search.functions";
+import {
+  listAmazonDiscoveryCandidates,
+  promoteAmazonDiscoveryCandidate,
+  setAmazonDiscoveryStatus,
+} from "@/lib/amazon-discovery.functions";
+import { updateCreatorWorkflow } from "@/lib/creators.functions";
 
 export const Route = createFileRoute("/amazon-creators")({
   component: AmazonCreatorsPage,
-  head: () => ({ meta: [
-    { title: "Amazon Creators — Survival Tabs Hub" },
-    { name: "description", content: "Discover and qualify Amazon Live and shoppable-video creators for Survival Tabs." },
-  ] }),
+  head: () => ({
+    meta: [
+      { title: "Amazon Creators — Survival Tabs" },
+      { name: "description", content: "Find Amazon creators and run outreach in one simple workflow." },
+      { property: "og:title", content: "Amazon Creators — Survival Tabs" },
+      { property: "og:description", content: "Find Amazon creators and run outreach in one simple workflow." },
+    ],
+  }),
 });
+
+const DEFAULT_CHIPS = [
+  "emergency food",
+  "survival food",
+  "preparedness",
+  "prepper",
+  "bug out bag",
+  "camping food",
+  "food storage",
+  "emergency kit",
+  "survival gear",
+];
 
 type AmazonCreatorRow = {
   id: string;
   name: string;
   segment?: string | null;
   reach_signal?: string | null;
+  followers_signal?: string | null;
   email?: string | null;
   contact_route?: string | null;
   youtube?: string | null;
@@ -27,191 +60,464 @@ type AmazonCreatorRow = {
   amazon_storefront_url?: string | null;
   amazon_video_url?: string | null;
   amazon_discovery_source?: string | null;
-  amazon_reviewed_survival_tabs?: boolean | null;
-  amazon_shoppable_video?: boolean | null;
-  amazon_fit_score?: number | null;
   amazon_content_analysis?: string | null;
+  contacted_date?: string | null;
+  contact_method?: string | null;
+  response_followup?: string | null;
+  sample_status?: string | null;
+  next_follow_up?: string | null;
 };
 
-type Draft = {
-  name: string;
-  storefront: string;
-  video: string;
-  source: string;
-  reviewed: boolean;
-  shoppable: boolean;
-  fit: string;
-  segment: string;
-  reach: string;
-  email: string;
-  contact: string;
-  youtube: string;
-  instagram: string;
-  tiktok: string;
-  analysis: string;
+type Candidate = {
+  id: string;
+  candidate_url: string;
+  candidate_type: string;
+  creator_name?: string | null;
+  source_label: string;
+  status: "new" | "review" | "promoted" | "skipped";
 };
 
-const EMPTY: Draft = {
-  name: "", storefront: "", video: "", source: "Explore related content",
-  reviewed: false, shoppable: true, fit: "", segment: "", reach: "", email: "",
-  contact: "", youtube: "", instagram: "", tiktok: "", analysis: "",
-};
+type StageKey = "found" | "contacted" | "follow_up" | "responded" | "sample";
 
-const REFERENCE_VIDEO = "https://www.amazon.com/live/video/03c6133b0f7a41fab0ead7f9c7b30019";
+const STAGES: Array<{ key: StageKey; step: number; label: string; hint: string }> = [
+  { key: "found", step: 1, label: "Found / not contacted", hint: "New creators to review and reach out to." },
+  { key: "contacted", step: 2, label: "Contacted / waiting", hint: "Waiting for a reply." },
+  { key: "follow_up", step: 3, label: "Follow up", hint: "No reply after 5 days." },
+  { key: "responded", step: 4, label: "Responded", hint: "Handle replies and move interested creators to sample." },
+  { key: "sample", step: 5, label: "Sample / creating content", hint: "Sample sent, content in progress." },
+];
+
+function daysSince(date?: string | null) {
+  if (!date) return null;
+  const start = new Date(`${date}T00:00:00`);
+  if (Number.isNaN(start.getTime())) return null;
+  return Math.max(0, Math.floor((Date.now() - start.getTime()) / 86_400_000));
+}
+
+function stageFor(row: AmazonCreatorRow): StageKey {
+  const sample = (row.sample_status ?? "").toLowerCase();
+  if (sample && !sample.includes("not sent") && !sample.includes("refused")) return "sample";
+  const response = (row.response_followup ?? "").toLowerCase();
+  if (response.includes("replied") || response.includes("interested") || response.includes("declined")) return "responded";
+  if (!row.contacted_date) return "found";
+  return (daysSince(row.contacted_date) ?? 0) >= 5 ? "follow_up" : "contacted";
+}
 
 function AmazonCreatorsPage() {
   const listFn = useServerFn(listAmazonCreators);
+  const findFn = useServerFn(findAmazonCreators);
+  const candidatesFn = useServerFn(listAmazonDiscoveryCandidates);
   const addFn = useServerFn(addAmazonCreator);
+
   const [rows, setRows] = useState<AmazonCreatorRow[]>([]);
+  const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [loading, setLoading] = useState(true);
-  const [adding, setAdding] = useState(false);
-  const [open, setOpen] = useState(false);
-  const [q, setQ] = useState("");
-  const [draft, setDraft] = useState<Draft>(EMPTY);
+  const [finding, setFinding] = useState(false);
+  const [query, setQuery] = useState("");
+  const [terms, setTerms] = useState<string[]>(DEFAULT_CHIPS.slice(0, 4));
+  const [newTerm, setNewTerm] = useState("");
+  const [addOpen, setAddOpen] = useState(false);
+  const [openStages, setOpenStages] = useState<Record<StageKey, boolean>>({
+    found: true, contacted: true, follow_up: true, responded: true, sample: true,
+  });
 
   const refresh = async () => {
     setLoading(true);
     try {
-      const result = await listFn();
-      setRows((result.rows ?? []) as AmazonCreatorRow[]);
+      const [creators, queue] = await Promise.all([listFn(), candidatesFn()]);
+      setRows((creators.rows ?? []) as AmazonCreatorRow[]);
+      setCandidates(((queue.rows ?? []) as Candidate[]).filter((c) => c.status === "new" || c.status === "review"));
     } catch (e: any) {
       toast.error(e?.message ?? "Could not load Amazon creators");
-    } finally { setLoading(false); }
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => { void refresh(); }, []);
 
-  const filtered = useMemo(() => {
-    const needle = q.trim().toLowerCase();
-    if (!needle) return rows;
-    return rows.filter((r) => [r.name, r.segment, r.amazon_discovery_source, r.amazon_content_analysis, r.email]
-      .some((v) => String(v ?? "").toLowerCase().includes(needle)));
-  }, [rows, q]);
-
-  const counts = useMemo(() => ({
-    total: rows.length,
-    reviewed: rows.filter((r) => r.amazon_reviewed_survival_tabs).length,
-    shoppable: rows.filter((r) => r.amazon_shoppable_video).length,
-    highFit: rows.filter((r) => (r.amazon_fit_score ?? 0) >= 75).length,
-  }), [rows]);
-
-  const save = async () => {
-    if (!draft.name.trim()) { toast.error("Creator name is required"); return; }
-    if (!draft.video.trim() && !draft.storefront.trim()) { toast.error("Add the Amazon video or storefront URL"); return; }
-    const fit = draft.fit.trim() === "" ? null : Number(draft.fit);
-    if (fit != null && (!Number.isFinite(fit) || fit < 0 || fit > 100)) { toast.error("Fit score must be 0–100"); return; }
-    setAdding(true);
+  const find = async () => {
+    setFinding(true);
     try {
-      const result = await addFn({ data: {
-        name: draft.name.trim(),
-        amazon_storefront_url: draft.storefront || null,
-        amazon_video_url: draft.video || null,
-        amazon_discovery_source: draft.source || "Amazon discovery",
-        amazon_reviewed_survival_tabs: draft.reviewed,
-        amazon_shoppable_video: draft.shoppable,
-        amazon_fit_score: fit,
-        amazon_content_analysis: draft.analysis || null,
-        segment: draft.segment || null,
-        reach_signal: draft.reach || null,
-        email: draft.email || null,
-        contact_route: draft.contact || null,
-        youtube: draft.youtube || null,
-        instagram: draft.instagram || null,
-        tiktok: draft.tiktok || null,
-      } });
-      toast.success(result.created ? "Amazon creator added" : `Already in CRM: ${result.name}`);
-      setDraft(EMPTY);
-      setOpen(false);
+      const result = await findFn({ data: { keywords: terms, includeSeed: true } });
+      if (result.blocked) toast.warning(result.message);
+      else if (result.added > 0) toast.success(result.message);
+      else toast.info(result.message);
       await refresh();
     } catch (e: any) {
-      toast.error(e?.message ?? "Could not save creator");
-    } finally { setAdding(false); }
+      toast.error(e?.message ?? "Search failed");
+    } finally {
+      setFinding(false);
+    }
   };
 
-  return <div>
-    <PageHeader
-      eyebrow="Creator discovery · Amazon"
-      title="Amazon Creators"
-      description="Find Amazon Live and shoppable-video creators, capture related-content discoveries, and learn which video formats can be repeated for Survival Tabs."
-      actions={<div className="flex flex-wrap gap-2">
-        <Link to="/creators" className="rounded-md border border-input bg-background px-3 py-2 text-sm hover:bg-secondary">All creator partnerships</Link>
-        <button onClick={() => setOpen(true)} className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"><Plus className="h-4 w-4" /> Add Amazon creator</button>
-      </div>}
-    />
+  const filteredRows = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    if (!needle) return rows;
+    return rows.filter((r) => [r.name, r.email, r.segment, r.reach_signal, r.youtube, r.amazon_storefront_url]
+      .some((v) => String(v ?? "").toLowerCase().includes(needle)));
+  }, [rows, query]);
 
-    <section className="mb-4 rounded-lg border border-border bg-card p-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
+  const grouped = useMemo(() => {
+    const out: Record<StageKey, AmazonCreatorRow[]> = { found: [], contacted: [], follow_up: [], responded: [], sample: [] };
+    filteredRows.forEach((r) => out[stageFor(r)].push(r));
+    return out;
+  }, [filteredRows]);
+
+  const toggleTerm = (term: string) =>
+    setTerms((current) => current.includes(term) ? current.filter((t) => t !== term) : [...current, term]);
+
+  return (
+    <div className="mx-auto max-w-[1500px]">
+      <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
         <div>
-          <div className="text-[11px] uppercase tracking-[0.18em] text-[color:var(--gold)]">Reference video</div>
-          <h2 className="mt-1 font-medium">Survival Tabs Amazon review that started this discovery channel</h2>
-          <p className="mt-1 max-w-3xl text-sm text-muted-foreground">Use the creator's “Explore related content” area as a discovery path. Add each relevant creator here, then enrich their public contact routes and analyze the repeatable video structure.</p>
+          <div className="text-[11px] uppercase tracking-[0.18em] text-[color:var(--gold)]">Amazon outreach</div>
+          <h1 className="font-display text-3xl text-foreground">Amazon Creators</h1>
         </div>
-        <a href={REFERENCE_VIDEO} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-md border border-input px-3 py-2 text-sm hover:bg-secondary"><Video className="h-4 w-4" /> Open reference video <ExternalLink className="h-3.5 w-3.5" /></a>
+        <div className="flex gap-2">
+          <Link to="/creators" className="rounded-md border border-input bg-background px-3 py-2 text-sm hover:bg-secondary">All creators</Link>
+          <button onClick={() => setAddOpen(true)} className="inline-flex items-center gap-1.5 rounded-md border border-input bg-background px-3 py-2 text-sm hover:bg-secondary"><Plus className="h-4 w-4" /> Add manually</button>
+        </div>
       </div>
-    </section>
 
-    <section className="mb-4 grid grid-cols-2 gap-2 md:grid-cols-4">
-      <Metric label="Amazon creators" value={counts.total} />
-      <Metric label="Reviewed Survival Tabs" value={counts.reviewed} />
-      <Metric label="Shoppable video" value={counts.shoppable} />
-      <Metric label="Fit score 75+" value={counts.highFit} />
-    </section>
+      <section className="mb-4 rounded-xl border border-border bg-card p-4">
+        <div className="mb-2 font-semibold">Find Amazon creators</div>
+        <div className="flex flex-wrap gap-1.5">
+          {[...new Set([...DEFAULT_CHIPS, ...terms])].map((chip) => (
+            <button
+              key={chip}
+              onClick={() => toggleTerm(chip)}
+              className={`rounded-full border px-3 py-1 text-xs ${terms.includes(chip) ? "border-primary bg-primary text-primary-foreground" : "border-input bg-background hover:bg-secondary"}`}
+            >
+              {chip}
+            </button>
+          ))}
+        </div>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <input
+            value={newTerm}
+            onChange={(e) => setNewTerm(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && newTerm.trim()) {
+                setTerms((c) => [...new Set([...c, newTerm.trim()])]);
+                setNewTerm("");
+              }
+            }}
+            placeholder="Add your own topic and press Enter"
+            className="min-w-[240px] flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm"
+          />
+          <button
+            onClick={() => void find()}
+            disabled={finding || terms.length === 0}
+            className="inline-flex items-center gap-1.5 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+          >
+            <Sparkles className="h-4 w-4" /> {finding ? "Searching…" : "Find Creators"}
+          </button>
+        </div>
+      </section>
 
-    <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-border bg-card p-3">
-      <div className="relative min-w-[260px] flex-1">
+      <div className="mb-4 relative">
         <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search name, category, source, notes…" className="w-full rounded-md border border-input bg-background py-2 pl-9 pr-3 text-sm" />
+        <input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search creator, email, topic…"
+          className="w-full max-w-xl rounded-md border border-input bg-card py-2.5 pl-9 pr-3 text-sm"
+        />
       </div>
-      <button onClick={() => void refresh()} disabled={loading} className="inline-flex items-center gap-1.5 rounded-md border border-input px-3 py-2 text-sm hover:bg-secondary disabled:opacity-50"><RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} /> Refresh</button>
-    </div>
 
-    <div className="overflow-x-auto rounded-lg border border-border bg-card">
-      <table className="w-full min-w-[1150px] text-sm">
-        <thead className="border-b border-border bg-secondary/40 text-left text-xs text-muted-foreground">
-          <tr><th className="px-3 py-2">Creator</th><th className="px-3 py-2">Amazon</th><th className="px-3 py-2">Source</th><th className="px-3 py-2">Survival Tabs</th><th className="px-3 py-2">Fit</th><th className="px-3 py-2">Contact</th><th className="px-3 py-2">Video intelligence</th><th className="px-3 py-2">CRM</th></tr>
-        </thead>
-        <tbody>
-          {loading ? <tr><td colSpan={8} className="px-3 py-8 text-center text-muted-foreground">Loading Amazon creators…</td></tr> : null}
-          {!loading && filtered.length === 0 ? <tr><td colSpan={8} className="px-3 py-8 text-center text-muted-foreground">No Amazon creators yet. Start with creators shown under Explore related content.</td></tr> : null}
-          {filtered.map((r) => <tr key={r.id} className="border-b border-border align-top last:border-0">
-            <td className="px-3 py-3"><div className="font-medium">{r.name}</div><div className="mt-1 text-xs text-muted-foreground">{r.segment || "Category not set"}</div><div className="text-xs text-muted-foreground">{r.reach_signal || "Reach not checked"}</div></td>
-            <td className="px-3 py-3"><div className="flex flex-col gap-1">{r.amazon_storefront_url ? <Out href={r.amazon_storefront_url} label="Storefront" /> : null}{r.amazon_video_url ? <Out href={r.amazon_video_url} label="Video" /> : null}{r.amazon_shoppable_video ? <Tag>Shoppable</Tag> : null}</div></td>
-            <td className="px-3 py-3 text-xs">{r.amazon_discovery_source || "Amazon"}</td>
-            <td className="px-3 py-3">{r.amazon_reviewed_survival_tabs ? <Tag>Reviewed</Tag> : <span className="text-xs text-muted-foreground">Prospect</span>}</td>
-            <td className="px-3 py-3"><span className="font-semibold">{r.amazon_fit_score ?? "—"}</span><span className="text-xs text-muted-foreground"> / 100</span></td>
-            <td className="px-3 py-3 text-xs"><div>{r.email || r.contact_route || "Not researched"}</div><div className="mt-1 flex gap-2">{r.youtube ? <Out href={r.youtube} label="YouTube" /> : null}{r.instagram ? <Out href={r.instagram} label="IG" /> : null}{r.tiktok ? <Out href={r.tiktok} label="TikTok" /> : null}</div></td>
-            <td className="max-w-[320px] px-3 py-3 text-xs leading-relaxed text-muted-foreground">{r.amazon_content_analysis || "Analyze hook → demo → reaction → proof → CTA."}</td>
-            <td className="px-3 py-3"><Link to="/creators/$id" params={{ id: r.id }} className="text-xs font-medium underline underline-offset-4">Open creator</Link></td>
-          </tr>)}
-        </tbody>
-      </table>
-    </div>
+      <div className="space-y-3">
+        {STAGES.map((stage) => (
+          <StageSection
+            key={stage.key}
+            stage={stage}
+            count={grouped[stage.key].length + (stage.key === "found" ? candidates.length : 0)}
+            open={openStages[stage.key]}
+            toggle={() => setOpenStages((s) => ({ ...s, [stage.key]: !s[stage.key] }))}
+          >
+            {stage.key === "found"
+              ? candidates.map((candidate) => (
+                  <CandidateLine key={candidate.id} candidate={candidate} onDone={refresh} />
+                ))
+              : null}
+            {grouped[stage.key].map((row) => (
+              <CreatorLine key={row.id} row={row} stage={stage.key} onDone={refresh} />
+            ))}
+            {grouped[stage.key].length === 0 && (stage.key !== "found" || candidates.length === 0) ? (
+              <div className="px-4 py-5 text-sm text-muted-foreground">{loading ? "Loading…" : "Nothing here."}</div>
+            ) : null}
+          </StageSection>
+        ))}
+      </div>
 
-    {open ? <AddDrawer draft={draft} setDraft={setDraft} save={save} close={() => setOpen(false)} busy={adding} /> : null}
-  </div>;
+      {addOpen ? <AddDrawer close={() => setAddOpen(false)} addFn={addFn} onDone={refresh} /> : null}
+    </div>
+  );
 }
 
-function Metric({ label, value }: { label: string; value: number }) {
-  return <div className="rounded-lg border border-border bg-card p-3"><div className="text-xs text-muted-foreground">{label}</div><div className="mt-1 text-2xl font-semibold">{value}</div></div>;
+function StageSection({
+  stage, count, open, toggle, children,
+}: {
+  stage: { key: StageKey; step: number; label: string; hint: string };
+  count: number;
+  open: boolean;
+  toggle: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="overflow-hidden rounded-xl border border-border bg-card">
+      <button onClick={toggle} className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-secondary/40">
+        {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+        <div className="grid h-7 w-7 place-items-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">{stage.step}</div>
+        <div className="min-w-0 flex-1">
+          <div className="font-semibold">{stage.label} <span className="ml-1 text-sm font-normal text-muted-foreground">({count})</span></div>
+          <div className="text-xs text-muted-foreground">{stage.hint}</div>
+        </div>
+      </button>
+      {open ? <div className="border-t border-border">{children}</div> : null}
+    </section>
+  );
 }
-function Tag({ children }: { children: React.ReactNode }) { return <span className="inline-flex w-fit rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-medium text-emerald-800">{children}</span>; }
-function Out({ href, label }: { href: string; label: string }) { return <a href={href} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs underline underline-offset-4">{label}<ExternalLink className="h-3 w-3" /></a>; }
 
-function AddDrawer({ draft, setDraft, save, close, busy }: { draft: Draft; setDraft: (d: Draft) => void; save: () => void; close: () => void; busy: boolean }) {
-  const F = (key: keyof Draft, label: string, placeholder = "") => <label className="block text-xs"><span className="text-muted-foreground">{label}</span><input value={String(draft[key] ?? "")} onChange={(e) => setDraft({ ...draft, [key]: e.target.value } as Draft)} placeholder={placeholder} className="mt-1 w-full rounded-md border border-input bg-background px-2 py-1.5 text-sm" /></label>;
-  return <div className="fixed inset-0 z-50 flex" onClick={close}><div className="flex-1 bg-black/40"/><div className="h-full w-full max-w-2xl overflow-y-auto border-l border-border bg-background shadow-2xl" onClick={(e) => e.stopPropagation()}>
-    <div className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-background px-5 py-4"><div><div className="text-[11px] uppercase tracking-[0.18em] text-[color:var(--gold)]">Amazon discovery</div><h2 className="font-semibold">Add Amazon creator</h2></div><button onClick={close}>Close</button></div>
-    <div className="grid gap-3 p-5 md:grid-cols-2">
-      {F("name", "Creator name *", "Creator display name")}{F("source", "Discovery source", "Explore related content")}
-      {F("storefront", "Amazon storefront URL", "https://www.amazon.com/shop/...")}{F("video", "Amazon Live / video URL", REFERENCE_VIDEO)}
-      {F("segment", "Content category", "Preparedness · food · camping")}{F("reach", "Reach / followers", "e.g. 18K YouTube")}
-      {F("fit", "Survival Tabs fit score (0–100)", "85")}{F("email", "Public business email", "")}
-      {F("contact", "Best public contact route", "Instagram DM / website form")}{F("youtube", "YouTube URL", "")}
-      {F("instagram", "Instagram URL", "")}{F("tiktok", "TikTok URL", "")}
-      <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={draft.reviewed} onChange={(e) => setDraft({ ...draft, reviewed: e.target.checked })}/> Already reviewed Survival Tabs</label>
-      <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={draft.shoppable} onChange={(e) => setDraft({ ...draft, shoppable: e.target.checked })}/> Amazon Live / shoppable-video creator</label>
-      <label className="md:col-span-2 block text-xs"><span className="text-muted-foreground">Video intelligence / notes</span><textarea rows={6} value={draft.analysis} onChange={(e) => setDraft({ ...draft, analysis: e.target.value })} placeholder="Hook; problem framed; product demonstration; taste/reaction; benefits mentioned; objections; CTA; setting; video length; what we should repeat in future Survival Tabs creator briefs." className="mt-1 w-full rounded-md border border-input bg-background p-2 text-sm" /></label>
+function labelForCandidate(candidate: Candidate) {
+  if (candidate.creator_name) return candidate.creator_name;
+  try {
+    const path = new URL(candidate.candidate_url).pathname.split("/").filter(Boolean);
+    const slug = path.find((part) => !["shop", "live", "video", "influencer", "creator", "profile"].includes(part));
+    if (slug && !/^[0-9a-f]{16,}$/i.test(slug)) return decodeURIComponent(slug).replace(/[-_]/g, " ");
+  } catch { /* ignore */ }
+  return candidate.candidate_type === "storefront" ? "New Amazon storefront" : "New Amazon creator video";
+}
+
+function CandidateLine({ candidate, onDone }: { candidate: Candidate; onDone: () => Promise<void> }) {
+  const keepFn = useServerFn(promoteAmazonDiscoveryCandidate);
+  const skipFn = useServerFn(setAmazonDiscoveryStatus);
+  const [busy, setBusy] = useState(false);
+
+  const act = async (fn: () => Promise<unknown>, message: string) => {
+    setBusy(true);
+    try {
+      await fn();
+      toast.success(message);
+      await onDone();
+    } catch (e: any) {
+      toast.error(e?.message ?? "Could not update");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="flex flex-wrap items-center gap-3 border-b border-border bg-secondary/10 px-4 py-3 last:border-0">
+      <div className="min-w-0 flex-1">
+        <div className="truncate font-medium capitalize">{labelForCandidate(candidate)}</div>
+        <a href={candidate.candidate_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 truncate text-xs text-muted-foreground underline underline-offset-4">
+          Amazon page <ExternalLink className="h-3 w-3" />
+        </a>
+      </div>
+      <div className="flex gap-2">
+        <button disabled={busy} onClick={() => void act(() => keepFn({ data: { id: candidate.id } }), "Added to your creators")} className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground disabled:opacity-50">Keep</button>
+        <button disabled={busy} onClick={() => void act(() => skipFn({ data: { id: candidate.id, status: "skipped" } }), "Skipped")} className="rounded-md border border-input px-3 py-1.5 text-xs hover:bg-secondary disabled:opacity-50">Skip</button>
+      </div>
     </div>
-    <div className="sticky bottom-0 flex justify-end gap-2 border-t border-border bg-background px-5 py-3"><button onClick={close} className="rounded-md border border-input px-3 py-2 text-sm">Cancel</button><button disabled={busy} onClick={save} className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"><ShoppingBag className="h-4 w-4" />{busy ? "Saving…" : "Save Amazon creator"}</button></div>
-  </div></div>;
+  );
+}
+
+function CreatorLine({ row, stage, onDone }: { row: AmazonCreatorRow; stage: StageKey; onDone: () => Promise<void> }) {
+  const updateFn = useServerFn(updateCreatorWorkflow);
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const days = daysSince(row.contacted_date);
+  const amazonUrl = row.amazon_storefront_url || row.amazon_video_url;
+
+  const update = async (patch: Record<string, string | null>) => {
+    setBusy(true);
+    try {
+      await updateFn({ data: { id: row.id, ...patch } as any });
+      toast.success("Updated");
+      await onDone();
+    } catch (e: any) {
+      toast.error(e?.message ?? "Could not update creator");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const today = () => new Date().toISOString().slice(0, 10);
+
+  return (
+    <div className="border-b border-border last:border-0">
+      <div className="grid items-center gap-2 px-4 py-3 md:grid-cols-[minmax(180px,1.5fr)_110px_170px_150px_80px_150px_150px_34px]">
+        <div className="min-w-0">
+          <div className="truncate font-medium">{row.name}</div>
+          <div className="truncate text-xs text-muted-foreground">{row.segment || "Amazon creator"}</div>
+        </div>
+
+        <div>
+          <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Followers</div>
+          <div className="truncate font-semibold">{row.followers_signal || row.reach_signal || "—"}</div>
+        </div>
+
+        <div className="flex flex-wrap gap-1">
+          {amazonUrl ? (
+            <a href={amazonUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 rounded-md border border-input px-2 py-1 text-xs hover:bg-secondary"><ShoppingBag className="h-3.5 w-3.5" /> Amazon</a>
+          ) : null}
+          {row.youtube ? (
+            <a href={row.youtube} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 rounded-md border border-input px-2 py-1 text-xs hover:bg-secondary"><Youtube className="h-3.5 w-3.5" /> YouTube</a>
+          ) : null}
+        </div>
+
+        <div>
+          {row.email ? (
+            <a href={`mailto:${row.email}?subject=${encodeURIComponent("Survival Tabs creator collaboration")}`} className="inline-flex items-center gap-1 rounded-md bg-primary px-2.5 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90"><Mail className="h-3.5 w-3.5" /> Write email</a>
+          ) : row.contact_route?.startsWith("http") ? (
+            <a href={row.contact_route} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs underline">Contact <ExternalLink className="h-3 w-3" /></a>
+          ) : <span className="text-xs text-muted-foreground">No email</span>}
+        </div>
+
+        <div>
+          <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Days</div>
+          <div>{days == null ? "—" : days}</div>
+        </div>
+
+        <div>
+          <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Response</div>
+          <div className="truncate text-sm">{row.response_followup || (row.contacted_date ? "Waiting" : "—")}</div>
+        </div>
+
+        <div>
+          <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Sample / next</div>
+          <div className="truncate text-sm">{row.sample_status || row.next_follow_up || "—"}</div>
+        </div>
+
+        <button onClick={() => setOpen((v) => !v)} className="rounded-md p-1 hover:bg-secondary" aria-label="Show creator details">
+          {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+        </button>
+      </div>
+
+      {open ? (
+        <div className="border-t border-border bg-secondary/20 px-4 py-4">
+          <div className="grid gap-4 lg:grid-cols-[1fr_1fr_auto]">
+            <div className="space-y-1 text-sm">
+              <Detail label="Email" value={row.email} />
+              <Detail label="Contact route" value={row.contact_route} />
+              <Detail label="Storefront" value={row.amazon_storefront_url} link />
+              <Detail label="Amazon video" value={row.amazon_video_url} link />
+              <Detail label="Instagram" value={row.instagram} link />
+              <Detail label="TikTok" value={row.tiktok} link />
+            </div>
+            <div className="space-y-1 text-sm">
+              <Detail label="Found via" value={row.amazon_discovery_source} />
+              <Detail label="Contacted" value={row.contacted_date} />
+              <Detail label="Method" value={row.contact_method} />
+              <Detail label="Content notes" value={row.amazon_content_analysis} />
+            </div>
+            <div className="flex min-w-[210px] flex-col gap-2">
+              {stage === "found" ? (
+                <button disabled={busy} onClick={() => void update({ contacted_date: today(), contact_method: row.email ? "Email" : "DM", response_followup: "Waiting reply" })} className="rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50">Mark contacted today</button>
+              ) : null}
+              {stage === "contacted" || stage === "follow_up" ? (
+                <>
+                  <button disabled={busy} onClick={() => void update({ contacted_date: today(), response_followup: "Follow-up sent — waiting reply" })} className="rounded-md border border-input bg-background px-3 py-2 text-sm hover:bg-secondary disabled:opacity-50">Follow-up sent today</button>
+                  <button disabled={busy} onClick={() => void update({ response_followup: "Replied — Interested" })} className="rounded-md border border-input bg-background px-3 py-2 text-sm hover:bg-secondary disabled:opacity-50">Interested response</button>
+                  <button disabled={busy} onClick={() => void update({ response_followup: "Replied — Declined" })} className="rounded-md border border-input bg-background px-3 py-2 text-sm hover:bg-secondary disabled:opacity-50">Declined response</button>
+                </>
+              ) : null}
+              {stage === "responded" ? (
+                <button disabled={busy} onClick={() => void update({ sample_status: "Awaiting Address" })} className="rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50">Start sample</button>
+              ) : null}
+              {stage === "sample" ? (
+                <>
+                  <button disabled={busy} onClick={() => void update({ sample_status: "Shipped" })} className="rounded-md border border-input bg-background px-3 py-2 text-sm hover:bg-secondary disabled:opacity-50">Mark shipped</button>
+                  <button disabled={busy} onClick={() => void update({ sample_status: "Delivered" })} className="rounded-md border border-input bg-background px-3 py-2 text-sm hover:bg-secondary disabled:opacity-50">Mark delivered</button>
+                </>
+              ) : null}
+              <Link to="/creators/$id" params={{ id: row.id }} className="text-center text-xs text-muted-foreground underline underline-offset-4">Full details</Link>
+            </div>
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function Detail({ label, value, link = false }: { label: string; value?: string | null; link?: boolean }) {
+  if (!value) return null;
+  return (
+    <div className="flex gap-2">
+      <span className="w-28 shrink-0 text-xs text-muted-foreground">{label}</span>
+      {link && value.startsWith("http")
+        ? <a href={value} target="_blank" rel="noreferrer" className="break-all underline underline-offset-4">{value}</a>
+        : <span className="break-words">{value}</span>}
+    </div>
+  );
+}
+
+function AddDrawer({
+  close, addFn, onDone,
+}: {
+  close: () => void;
+  addFn: (args: { data: any }) => Promise<any>;
+  onDone: () => Promise<void>;
+}) {
+  const [name, setName] = useState("");
+  const [amazon, setAmazon] = useState("");
+  const [email, setEmail] = useState("");
+  const [youtube, setYoutube] = useState("");
+  const [reach, setReach] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const save = async () => {
+    if (!name.trim()) { toast.error("Creator name is required"); return; }
+    if (!amazon.trim()) { toast.error("Add the Amazon link"); return; }
+    setBusy(true);
+    try {
+      const isVideo = amazon.includes("/live/") || amazon.includes("/video");
+      const result = await addFn({ data: {
+        name: name.trim(),
+        amazon_video_url: isVideo ? amazon.trim() : null,
+        amazon_storefront_url: isVideo ? null : amazon.trim(),
+        email: email.trim() || null,
+        youtube: youtube.trim() || null,
+        reach_signal: reach.trim() || null,
+      } });
+      toast.success(result?.created ? "Creator added" : `Already in your list: ${result?.name}`);
+      close();
+      await onDone();
+    } catch (e: any) {
+      toast.error(e?.message ?? "Could not save creator");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const field = (label: string, value: string, set: (v: string) => void, placeholder = "") => (
+    <label className="block text-xs">
+      <span className="text-muted-foreground">{label}</span>
+      <input value={value} onChange={(e) => set(e.target.value)} placeholder={placeholder} className="mt-1 w-full rounded-md border border-input bg-background px-2 py-1.5 text-sm" />
+    </label>
+  );
+
+  return (
+    <div className="fixed inset-0 z-50 flex" onClick={close}>
+      <div className="flex-1 bg-black/40" />
+      <div className="h-full w-full max-w-md overflow-y-auto border-l border-border bg-background shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between border-b border-border px-5 py-4">
+          <h2 className="font-semibold">Add Amazon creator</h2>
+          <button onClick={close} className="text-sm text-muted-foreground">Close</button>
+        </div>
+        <div className="grid gap-3 p-5">
+          {field("Creator name", name, setName)}
+          {field("Amazon link", amazon, setAmazon, "https://www.amazon.com/shop/…")}
+          {field("Followers / reach", reach, setReach, "e.g. 18K YouTube")}
+          {field("Email", email, setEmail)}
+          {field("YouTube", youtube, setYoutube)}
+        </div>
+        <div className="flex justify-end gap-2 border-t border-border px-5 py-3">
+          <button onClick={close} className="rounded-md border border-input px-3 py-2 text-sm">Cancel</button>
+          <button disabled={busy} onClick={() => void save()} className="rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50">{busy ? "Saving…" : "Save creator"}</button>
+        </div>
+      </div>
+    </div>
+  );
 }

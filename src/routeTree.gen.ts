@@ -29,6 +29,8 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AssetsRouteImport } from './routes/assets'
 import { Route as ArchiveRouteImport } from './routes/archive'
 import { Route as AnalyticsRouteImport } from './routes/analytics'
+import { Route as AmazonDiscoveryRouteImport } from './routes/amazon-discovery'
+import { Route as AmazonCreatorsRouteImport } from './routes/amazon-creators'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as KnowledgeIdRouteImport } from './routes/knowledge.$id'
@@ -135,6 +137,16 @@ const AnalyticsRoute = AnalyticsRouteImport.update({
   path: '/analytics',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AmazonDiscoveryRoute = AmazonDiscoveryRouteImport.update({
+  id: '/amazon-discovery',
+  path: '/amazon-discovery',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AmazonCreatorsRoute = AmazonCreatorsRouteImport.update({
+  id: '/amazon-creators',
+  path: '/amazon-creators',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AdminRoute = AdminRouteImport.update({
   id: '/admin',
   path: '/admin',
@@ -164,6 +176,8 @@ const AssetsIdRoute = AssetsIdRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
+  '/amazon-creators': typeof AmazonCreatorsRoute
+  '/amazon-discovery': typeof AmazonDiscoveryRoute
   '/analytics': typeof AnalyticsRoute
   '/archive': typeof ArchiveRoute
   '/assets': typeof AssetsRouteWithChildren
@@ -191,6 +205,8 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
+  '/amazon-creators': typeof AmazonCreatorsRoute
+  '/amazon-discovery': typeof AmazonDiscoveryRoute
   '/analytics': typeof AnalyticsRoute
   '/archive': typeof ArchiveRoute
   '/assets': typeof AssetsRouteWithChildren
@@ -219,6 +235,8 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
+  '/amazon-creators': typeof AmazonCreatorsRoute
+  '/amazon-discovery': typeof AmazonDiscoveryRoute
   '/analytics': typeof AnalyticsRoute
   '/archive': typeof ArchiveRoute
   '/assets': typeof AssetsRouteWithChildren
@@ -248,6 +266,8 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/admin'
+    | '/amazon-creators'
+    | '/amazon-discovery'
     | '/analytics'
     | '/archive'
     | '/assets'
@@ -275,6 +295,8 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/admin'
+    | '/amazon-creators'
+    | '/amazon-discovery'
     | '/analytics'
     | '/archive'
     | '/assets'
@@ -302,6 +324,8 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/admin'
+    | '/amazon-creators'
+    | '/amazon-discovery'
     | '/analytics'
     | '/archive'
     | '/assets'
@@ -330,6 +354,8 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AdminRoute: typeof AdminRoute
+  AmazonCreatorsRoute: typeof AmazonCreatorsRoute
+  AmazonDiscoveryRoute: typeof AmazonDiscoveryRoute
   AnalyticsRoute: typeof AnalyticsRoute
   ArchiveRoute: typeof ArchiveRoute
   AssetsRoute: typeof AssetsRouteWithChildren
@@ -494,6 +520,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AnalyticsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/amazon-discovery': {
+      id: '/amazon-discovery'
+      path: '/amazon-discovery'
+      fullPath: '/amazon-discovery'
+      preLoaderRoute: typeof AmazonDiscoveryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/amazon-creators': {
+      id: '/amazon-creators'
+      path: '/amazon-creators'
+      fullPath: '/amazon-creators'
+      preLoaderRoute: typeof AmazonCreatorsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/admin': {
       id: '/admin'
       path: '/admin'
@@ -570,6 +610,8 @@ const KnowledgeRouteWithChildren = KnowledgeRoute._addFileChildren(
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRoute,
+  AmazonCreatorsRoute: AmazonCreatorsRoute,
+  AmazonDiscoveryRoute: AmazonDiscoveryRoute,
   AnalyticsRoute: AnalyticsRoute,
   ArchiveRoute: ArchiveRoute,
   AssetsRoute: AssetsRouteWithChildren,
@@ -594,13 +636,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

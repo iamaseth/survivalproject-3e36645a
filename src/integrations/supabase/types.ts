@@ -53,6 +53,51 @@ export type Database = {
         }
         Relationships: []
       }
+      amazon_discovery_candidates: {
+        Row: {
+          candidate_type: string
+          candidate_url: string
+          creator_name: string | null
+          discovered_at: string
+          discovered_by: string | null
+          id: string
+          notes: string | null
+          promoted_creator_id: string | null
+          reviewed_at: string | null
+          seed_url: string
+          source_label: string
+          status: string
+        }
+        Insert: {
+          candidate_type?: string
+          candidate_url: string
+          creator_name?: string | null
+          discovered_at?: string
+          discovered_by?: string | null
+          id?: string
+          notes?: string | null
+          promoted_creator_id?: string | null
+          reviewed_at?: string | null
+          seed_url: string
+          source_label?: string
+          status?: string
+        }
+        Update: {
+          candidate_type?: string
+          candidate_url?: string
+          creator_name?: string | null
+          discovered_at?: string
+          discovered_by?: string | null
+          id?: string
+          notes?: string | null
+          promoted_creator_id?: string | null
+          reviewed_at?: string | null
+          seed_url?: string
+          source_label?: string
+          status?: string
+        }
+        Relationships: []
+      }
       app_user_connections: {
         Row: {
           connection_key_ciphertext: string
@@ -315,6 +360,13 @@ export type Database = {
         Row: {
           amazon: string | null
           amazon_confidence: string | null
+          amazon_content_analysis: string | null
+          amazon_discovery_source: string | null
+          amazon_fit_score: number | null
+          amazon_reviewed_survival_tabs: boolean | null
+          amazon_shoppable_video: boolean | null
+          amazon_storefront_url: string | null
+          amazon_video_url: string | null
           code: string | null
           contact_confidence: string | null
           contact_method: string | null
@@ -366,6 +418,13 @@ export type Database = {
         Insert: {
           amazon?: string | null
           amazon_confidence?: string | null
+          amazon_content_analysis?: string | null
+          amazon_discovery_source?: string | null
+          amazon_fit_score?: number | null
+          amazon_reviewed_survival_tabs?: boolean | null
+          amazon_shoppable_video?: boolean | null
+          amazon_storefront_url?: string | null
+          amazon_video_url?: string | null
           code?: string | null
           contact_confidence?: string | null
           contact_method?: string | null
@@ -417,6 +476,13 @@ export type Database = {
         Update: {
           amazon?: string | null
           amazon_confidence?: string | null
+          amazon_content_analysis?: string | null
+          amazon_discovery_source?: string | null
+          amazon_fit_score?: number | null
+          amazon_reviewed_survival_tabs?: boolean | null
+          amazon_shoppable_video?: boolean | null
+          amazon_storefront_url?: string | null
+          amazon_video_url?: string | null
           code?: string | null
           contact_confidence?: string | null
           contact_method?: string | null
