@@ -1,19 +1,14 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
-type CandidateType = "video" | "storefront" | "profile" | "related_content";
-
+type CandidateType = "video" | "storefront" | "profile";
 type DiscoveryCandidate = { url: string; type: CandidateType };
 
 const AMAZON_HOSTS = new Set(["amazon.com", "www.amazon.com"]);
 
 function normalizeAmazonUrl(raw: string): string | null {
   try {
-    const cleaned = raw
-      .replace(/\\u002F/g, "/")
-      .replace(/\\\//g, "/")
-      .replace(/&amp;/g, "&")
-      .replace(/^\"|\"$/g, "");
+    const cleaned = raw.replace(/\\u002F/g, "/").replace(/\\\//g, "/").replace(/&amp;/g, "&").replace(/^\"|\"$/g, "");
     const url = cleaned.startsWith("http") ? new URL(cleaned) : new URL(cleaned, "https://www.amazon.com");
     if (!AMAZON_HOSTS.has(url.hostname.toLowerCase())) return null;
     url.hash = "";
@@ -25,12 +20,13 @@ function normalizeAmazonUrl(raw: string): string | null {
 }
 
 function classify(url: string): CandidateType | null {
-  const p = new URL(url).pathname.toLowerCase();
-  if (p.includes("/live/video/")) return "video";
-  if (p.startsWith("/shop/") || p.includes("/shop/")) return "storefront";
-  if (p.includes("/influencer/") || p.includes("/creator/") || p.includes("/profile/")) return "profile";
-  if (p.includes("/live/") || p.includes("/videos/")) return "related_content";
-  return null;
+  try {
+    const p = new URL(url).pathname.toLowerCase().replace(/\/+$/, "");
+    if (/^\/live\/video\/[a-z0-9_-]+$/i.test(p)) return "video";
+    if (/^\/shop\/[^/]+/i.test(p)) return "storefront";
+    if (/^\/(?:influencer|creator|profile)\/[^/]+/i.test(p)) return "profile";
+    return null;
+  } catch { return null; }
 }
 
 function extractAmazonCandidates(html: string, seedUrl: string): DiscoveryCandidate[] {
@@ -82,7 +78,7 @@ export const runAmazonDiscovery = createServerFn({ method: "POST" })
     });
     if (!response.ok) return { fetched: false, status: response.status, found: 0, inserted: 0, blocked: response.status === 429 || response.status === 503, message: `Amazon returned HTTP ${response.status}. Use the Crawlee fallback when direct discovery is blocked.` };
     const candidates = extractAmazonCandidates(await response.text(), data.seedUrl);
-    if (candidates.length === 0) return { fetched: true, status: response.status, found: 0, inserted: 0, blocked: false, message: "The page loaded, but related creator/video links were not present in server-rendered HTML. Use the Crawlee browser fallback for this seed." };
+    if (candidates.length === 0) return { fetched: true, status: response.status, found: 0, inserted: 0, blocked: false, message: "Amazon loaded, but no actual creator/video links were available in the page HTML. Generic Amazon navigation links are intentionally ignored." };
     const rows = candidates.map((candidate) => ({ seed_url: data.seedUrl, candidate_url: candidate.url, candidate_type: candidate.type, source_label: "Amazon Explore related content", status: "new", discovered_by: context.userId }));
     const { data: inserted, error } = await context.supabase.from("amazon_discovery_candidates").upsert(rows as never, { onConflict: "seed_url,candidate_url", ignoreDuplicates: true }).select("id");
     if (error) throw new Error(error.message);
@@ -94,7 +90,10 @@ export const listAmazonDiscoveryCandidates = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     const { data, error } = await context.supabase.from("amazon_discovery_candidates").select("*").order("discovered_at", { ascending: false });
     if (error) throw new Error(error.message);
-    return { rows: data ?? [] };
+    // Old versions accidentally stored Amazon navigation pages such as /live/info and /live/channel.
+    // Filter them at read time so the user only sees real creator storefronts/profiles/videos.
+    const rows = (data ?? []).filter((row: any) => typeof row.candidate_url === "string" && classify(row.candidate_url));
+    return { rows };
   });
 
 export const setAmazonDiscoveryStatus = createServerFn({ method: "POST" })
@@ -110,16 +109,13 @@ export const promoteAmazonDiscoveryCandidate = createServerFn({ method: "POST" }
   .middleware([requireSupabaseAuth])
   .inputValidator((data: { id: string }) => { if (!data?.id) throw new Error("Candidate id required."); return data; })
   .handler(async ({ data, context }) => {
-    const { data: candidate, error: candidateError } = await context.supabase
-      .from("amazon_discovery_candidates")
-      .select("*")
-      .eq("id", data.id)
-      .single();
+    const { data: candidate, error: candidateError } = await context.supabase.from("amazon_discovery_candidates").select("*").eq("id", data.id).single();
     if (candidateError) throw new Error(candidateError.message);
 
     const url = candidate.candidate_url as string;
-    const type = candidate.candidate_type as string;
-    const videoUrl = type === "video" || type === "related_content" ? url : null;
+    const type = classify(url);
+    if (!type) throw new Error("This is an Amazon navigation page, not a creator. It cannot be added.");
+    const videoUrl = type === "video" ? url : null;
     const storefrontUrl = type === "storefront" || type === "profile" ? url : null;
 
     const filters: string[] = [];
@@ -154,10 +150,7 @@ export const promoteAmazonDiscoveryCandidate = createServerFn({ method: "POST" }
       if (error) throw new Error(error.message);
     }
 
-    const { error: updateError } = await context.supabase
-      .from("amazon_discovery_candidates")
-      .update({ status: "promoted", promoted_creator_id: creatorId, reviewed_at: new Date().toISOString() } as never)
-      .eq("id", data.id);
+    const { error: updateError } = await context.supabase.from("amazon_discovery_candidates").update({ status: "promoted", promoted_creator_id: creatorId, reviewed_at: new Date().toISOString() } as never).eq("id", data.id);
     if (updateError) throw new Error(updateError.message);
     return { creatorId };
   });
