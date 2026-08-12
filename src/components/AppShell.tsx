@@ -1,6 +1,5 @@
 import { Link, Outlet, useRouterState, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
-import { useServerFn } from "@tanstack/react-start";
 import {
   LayoutDashboard,
   Users,
@@ -23,14 +22,13 @@ import { useAuth } from "@/lib/current-user";
 import { setCurrentActor, hydrateWorkspaceFromDB } from "@/lib/creator-workspace";
 import { hydrateCreatorsFromDB } from "@/lib/creator-partnerships";
 import { SignInCard } from "@/routes/auth";
-import { pollGmailForReplies } from "@/lib/gmail.functions";
 import { TestModeBanner } from "@/components/TestModeBanner";
-import { GmailHealthBanner } from "@/components/GmailHealthBanner";
 
 const nav = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard, exact: true },
   { to: "/creators", label: "Creator Partnerships", icon: Users },
   { to: "/amazon-creators", label: "Amazon Creators", icon: ShoppingBag },
+  { to: "/amazon-discovery", label: "Amazon Discovery", icon: Search },
   { to: "/campaigns", label: "Campaigns", icon: Megaphone },
   { to: "/communications", label: "Communications", icon: MessageSquare },
   { to: "/templates", label: "Templates", icon: FileText },
@@ -44,8 +42,6 @@ export function AppShell() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const auth = useAuth();
 
-  // Push authenticated identity into the workspace store so every activity /
-  // update auto-populates created_by, last_modified_by, actor name & role.
   useEffect(() => {
     if (auth.status === "authenticated" && auth.profile.teamId) {
       setCurrentActor({
@@ -59,8 +55,6 @@ export function AppShell() {
     }
   }, [auth]);
 
-  // Hydrate team-shared workspace state from Supabase once per session; the
-  // helper also runs the one-time localStorage → DB migration on first boot.
   useEffect(() => {
     if (auth.status === "authenticated" && auth.profile.role) {
       void hydrateWorkspaceFromDB();
@@ -68,19 +62,11 @@ export function AppShell() {
     }
   }, [auth.status, auth.profile?.role]);
 
-  // Background Gmail poller — checks every 3 minutes for new creator replies
-  // once the user is signed in with a role. Silently skipped if Gmail isn't
-  // connected (the server fn returns { polled: false, reason: "not_connected" }).
-  const poll = useServerFn(pollGmailForReplies);
-  useEffect(() => {
-    if (auth.status !== "authenticated" || !auth.profile.role) return;
-    let cancelled = false;
-    const tick = () => { if (!cancelled) void poll().catch(() => {}); };
-    // Kick off ~10s after mount, then every 3 minutes.
-    const initial = window.setTimeout(tick, 10_000);
-    const interval = window.setInterval(tick, 3 * 60_000);
-    return () => { cancelled = true; window.clearTimeout(initial); window.clearInterval(interval); };
-  }, [auth.status, auth.profile?.role, poll]);
+  // Gmail background polling is intentionally disabled here.
+  // The Lovable runtime currently lacks SUPABASE_SERVICE_ROLE_KEY for the
+  // Gmail app-user connector's admin client. Gmail is nonessential to app
+  // boot, so it must never blank-screen Creator/Amazon workflows.
+  // See docs/HOTFIX-2026-08-12-GMAIL-BACKGROUND-POLLING.md before restoring.
 
   if (auth.status === "loading") {
     return (
@@ -94,14 +80,12 @@ export function AppShell() {
     return <InlineSignIn auth={auth} />;
   }
 
-  // Signed in but no role assignment on the allow-list.
   if (!auth.profile.role) {
     return <NoAccess email={auth.profile.email} onSignOut={auth.signOut} />;
   }
 
   return (
     <div className="grid min-h-screen w-full grid-cols-[260px_minmax(0,1fr)] bg-background">
-      {/* Sidebar */}
       <aside className="sticky top-0 flex h-screen flex-col bg-sidebar text-sidebar-foreground">
         <div className="border-b border-sidebar-border px-6 py-5">
           <div className="text-[10px] uppercase tracking-[0.22em] text-sidebar-primary">Survival Tabs</div>
@@ -135,10 +119,8 @@ export function AppShell() {
         </div>
       </aside>
 
-      {/* Main */}
       <div className="flex min-w-0 flex-col">
         <TestModeBanner />
-        <GmailHealthBanner />
         <header className="sticky top-0 z-10 flex items-center gap-4 border-b border-border bg-background/85 px-8 py-4 backdrop-blur">
           <div className="relative min-w-0 flex-1">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -265,7 +247,6 @@ function ProfileMenu({
           <div className="py-1">
             <MenuItem icon={UserIcon} label="Profile" onClick={() => { setOpen(false); navigate({ to: "/settings" }); }} />
             <MenuItem icon={SettingsIcon} label="Settings" onClick={() => { setOpen(false); navigate({ to: "/settings" }); }} />
-
           </div>
           <div className="border-t border-border pt-1">
             <MenuItem
