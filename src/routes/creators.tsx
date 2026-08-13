@@ -1,28 +1,43 @@
 import { createFileRoute, Link, Outlet, useRouterState } from "@tanstack/react-router";
-import { useServerFn } from "@tanstack/react-start";
 import { useMemo, useState } from "react";
-import { toast } from "sonner";
-import {
-  ChevronDown,
-  ChevronRight,
-  ExternalLink,
-  Mail,
-  Search,
-  Youtube,
-} from "lucide-react";
 import {
   CREATORS,
+  isOverdue,
+  isReadyForOutreach,
+  needsPerryApproval,
+  priorityTone,
+  ownerTone,
+  perryTone,
+  sampleTone,
+  responseTone,
+  amazonStatus,
+  amazonTone,
+  SHEET_HEADERS,
   type CreatorRow,
+  type OutreachOwner,
+  type AmazonStatus,
   useCreatorsVersion,
 } from "@/lib/creator-partnerships";
-import { updateCreatorWorkflow } from "@/lib/creators.functions";
+import { useDashboardCounts, getWorkspace, isWaitingForReply, isTestCreatorId } from "@/lib/creator-workspace";
+import { useTestCreators, testCreatorToRow } from "@/lib/test-creators";
+import { useCurrentTeamMember } from "@/lib/current-team-member";
+import { PageHeader } from "@/components/PageHeader";
+import { PersonalizedDashboard } from "@/components/creators/PersonalizedDashboard";
+import { ExternalLink, Search, Download, AlertCircle, Clock, Mail, Truck, ShieldCheck, Users, CalendarClock, Package, Handshake, Beaker, Sparkles, DollarSign, TrendingUp, Flag, Star, FileDown } from "lucide-react";
+import { ResearchDrawer } from "@/components/creators/ResearchDrawer";
+import { rollupRoi } from "@/lib/creator-workspace";
+import { exportCreatorsCsv, exportShippingCsv } from "@/lib/csv-export";
 
 export const Route = createFileRoute("/creators")({
   component: CreatorsLayout,
   head: () => ({
     meta: [
-      { title: "Creators — Survival Tabs" },
-      { name: "description", content: "Simple creator outreach workflow." },
+      { title: "Creator Partnerships — Survival Tabs Hub" },
+      { name: "description", content: "Rena-led outreach CRM for Survival Tabs creator partnerships: assignments, follow-ups, shipping, and Perry approvals." },
+      { property: "og:title", content: "Creator Partnerships — Survival Tabs Hub" },
+      { property: "og:description", content: "Rena-led outreach CRM: assignments, follow-ups, shipping, and Perry approvals." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
     ],
   }),
 });
@@ -30,265 +45,438 @@ export const Route = createFileRoute("/creators")({
 function CreatorsLayout() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   if (pathname !== "/creators") return <Outlet />;
-  return <CreatorPipeline />;
+  return <CreatorsList />;
 }
 
-type StageKey = "not_contacted" | "contacted" | "follow_up" | "responded" | "sample";
+type QueueKey = "all" | "rena" | "waiting" | "overdue" | "perry" | "shipping" | "ready" | "second_look" | "important";
 
-const STAGES: Array<{ key: StageKey; step: number; label: string; hint: string }> = [
-  { key: "not_contacted", step: 1, label: "Not contacted", hint: "Pick a creator and send the first message." },
-  { key: "contacted", step: 2, label: "Contacted / waiting", hint: "Waiting for a reply." },
-  { key: "follow_up", step: 3, label: "Follow up", hint: "No reply after 5 days." },
-  { key: "responded", step: 4, label: "Responded", hint: "Handle the response and move interested creators to sample." },
-  { key: "sample", step: 5, label: "Sample", hint: "Track address, shipping and delivery." },
+const QUEUES: { key: QueueKey; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
+  { key: "all", label: "All creators", icon: Search },
+  { key: "ready", label: "Ready for outreach", icon: Mail },
+  { key: "second_look", label: "Flagged for Second Look", icon: Flag },
+  { key: "important", label: "Flagged Important", icon: Star },
+  { key: "rena", label: "Rena queue", icon: Mail },
+  { key: "waiting", label: "Waiting for reply", icon: Clock },
+  { key: "overdue", label: "Overdue follow-ups", icon: AlertCircle },
+  { key: "perry", label: "Needs Perry approval", icon: ShieldCheck },
+  { key: "shipping", label: "Shipping", icon: Truck },
 ];
 
-function daysSince(date: string | null) {
-  if (!date) return null;
-  const start = new Date(`${date}T00:00:00`);
-  if (Number.isNaN(start.getTime())) return null;
-  return Math.max(0, Math.floor((Date.now() - start.getTime()) / 86_400_000));
-}
+function CreatorsList() {
+  const ops = useDashboardCounts();
+  const member = useCurrentTeamMember();
+  const [q, setQ] = useState("");
+  const [queue, setQueue] = useState<QueueKey>("all");
+  const [ownerFilter, setOwnerFilter] = useState<"All" | "RENA" | "Unassigned">(
+    member.id === "RENA" ? member.id : "All",
+  );
+  const [amazonFilter, setAmazonFilter] = useState<"All" | AmazonStatus>("All");
+  const [showImport, setShowImport] = useState(false);
+  const [showResearch, setShowResearch] = useState(false);
+  const testCreators = useTestCreators();
 
-function stageFor(c: CreatorRow): StageKey {
-  if (c.normalizedSampleStatus !== "Not Sent" && c.normalizedSampleStatus !== "Refused") return "sample";
-  if (c.responseState === "Replied — Interested" || c.responseState === "Replied — Declined") return "responded";
-  if (!c.contactedDate) return "not_contacted";
-  const days = daysSince(c.contactedDate) ?? 0;
-  if (days >= 5) return "follow_up";
-  return "contacted";
-}
-
-function CreatorPipeline() {
-  const version = useCreatorsVersion();
-  const [query, setQuery] = useState("");
-  const [openStages, setOpenStages] = useState<Record<StageKey, boolean>>({
-    not_contacted: true,
-    contacted: true,
-    follow_up: true,
-    responded: true,
-    sample: true,
-  });
-
-  const creators = useMemo(() => {
-    const needle = query.trim().toLowerCase();
-    const rows = [...CREATORS];
-    if (!needle) return rows;
-    return rows.filter((c) => [
-      c.name, c.followersSignal, c.reachSignal, c.email, c.youtube,
-      c.instagram, c.tiktok, c.segment, c.responseFollowup, c.sampleStatus,
-    ].some((v) => String(v ?? "").toLowerCase().includes(needle)));
-    // version forces refresh after DB hydration.
+  const creatorsVersion = useCreatorsVersion();
+  const allCreators = useMemo(() => {
+    const testRows = testCreators.map(testCreatorToRow);
+    return [...testRows, ...CREATORS];
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [query, version]);
+  }, [testCreators, creatorsVersion]);
 
-  const grouped = useMemo(() => {
-    const out: Record<StageKey, CreatorRow[]> = {
-      not_contacted: [], contacted: [], follow_up: [], responded: [], sample: [],
-    };
-    creators.forEach((c) => out[stageFor(c)].push(c));
-    return out;
-  }, [creators]);
+  const filtered = useMemo(() => {
+    const needle = q.trim().toLowerCase();
+    return allCreators.filter((c) => {
+      const ws = getWorkspace(c);
+      if (queue === "rena" && c.outreachOwner !== "RENA") return false;
+      if (queue === "waiting" && !isWaitingForReply(c, ws)) return false;
+      if (queue === "overdue" && !isOverdue(c)) return false;
+      if (queue === "perry" && !needsPerryApproval(c)) return false;
+      if (queue === "shipping" && !["Awaiting Address", "Address Received", "Shipped", "Delivered"].includes(c.normalizedSampleStatus)) return false;
+      if (queue === "ready" && !isReadyForOutreach(c)) return false;
+      if (queue === "second_look" && ws.reviewStatus !== "Flagged for Second Look") return false;
+      if (queue === "important" && !ws.importantFlag) return false;
+      if (ownerFilter === "RENA" && c.outreachOwner !== "RENA") return false;
+      if (ownerFilter === "Unassigned" && c.outreachOwner !== null) return false;
+      const amazon = amazonStatus(c.amazon);
+      if (amazonFilter !== "All" && amazon !== amazonFilter) return false;
+      if (!needle) return true;
+      return (
+        c.name.toLowerCase().includes(needle) ||
+        (c.segment ?? "").toLowerCase().includes(needle) ||
+        (c.email ?? "").toLowerCase().includes(needle) ||
+        c.id.toLowerCase().includes(needle) ||
+        amazon.toLowerCase().includes(needle)
+      );
+    });
+  }, [allCreators, q, queue, ownerFilter, amazonFilter]);
+
+  const counts = useMemo(() => ({
+    total: allCreators.length,
+    rena: allCreators.filter((c) => c.outreachOwner === "RENA").length,
+    waiting: ops.waiting,
+    overdue: allCreators.filter(isOverdue).length,
+    perry: allCreators.filter(needsPerryApproval).length,
+    shipping: allCreators.filter((c) =>
+      ["Awaiting Address", "Address Received", "Shipped", "Delivered"].includes(c.normalizedSampleStatus)
+    ).length,
+    ready: allCreators.filter(isReadyForOutreach).length,
+    second_look: allCreators.filter((c) => getWorkspace(c).reviewStatus === "Flagged for Second Look").length,
+    important: allCreators.filter((c) => getWorkspace(c).importantFlag).length,
+  }), [allCreators, ops.waiting]);
+  const roi = useMemo(() => rollupRoi(), [allCreators]);
 
   return (
-    <div className="mx-auto max-w-[1500px]">
-      <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <div className="text-[11px] uppercase tracking-[0.18em] text-[color:var(--gold)]">Creator outreach</div>
-          <h1 className="font-display text-3xl text-foreground">Creators</h1>
+    <div>
+      <PageHeader
+        eyebrow="CRM · Rena supervises & executes"
+        title="Creator Partnerships"
+        description="Live mirror of the Survival Tabs Influencer Operating System — 250 creators, real sheet columns, assignment queues, outreach history, shipping, and Perry approval."
+        actions={
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => setShowResearch(true)}
+              className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+            >
+              <Sparkles className="h-3.5 w-3.5" /> Research new creator
+            </button>
+            <button
+              onClick={() => exportCreatorsCsv(filtered, `creators-${queue}`)}
+              disabled={filtered.length === 0}
+              title="Download the rows currently shown (queue + filters + search) as CSV"
+              className="inline-flex items-center gap-1.5 rounded-md border border-input bg-background px-3 py-2 text-sm hover:bg-secondary disabled:opacity-50"
+            >
+              <FileDown className="h-3.5 w-3.5" /> Export CSV ({filtered.length})
+            </button>
+            <button
+              onClick={() => exportShippingCsv(filtered)}
+              disabled={filtered.length === 0}
+              title="Shipping-only columns for pick & pack"
+              className="inline-flex items-center gap-1.5 rounded-md border border-input bg-background px-3 py-2 text-sm hover:bg-secondary disabled:opacity-50"
+            >
+              <Truck className="h-3.5 w-3.5" /> Export shipping list
+            </button>
+            <button
+              onClick={() => setShowImport((v) => !v)}
+              className="inline-flex items-center gap-1.5 rounded-md border border-input bg-background px-3 py-2 text-sm hover:bg-secondary"
+            >
+              <Download className="h-3.5 w-3.5" /> Import from Google Sheet
+            </button>
+          </div>
+        }
+      />
+
+      <ResearchDrawer open={showResearch} onClose={() => setShowResearch(false)} />
+      <PersonalizedDashboard />
+
+      <section className="mb-3">
+        <div className="mb-2 text-[11px] uppercase tracking-[0.22em] text-[color:var(--gold)]">Operations dashboard</div>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">
+          <OpsCard icon={<Mail className="h-3.5 w-3.5" />} label="Ready for outreach" value={ops.readyForOutreach} tone="ready" />
+          <OpsCard icon={<Users className="h-3.5 w-3.5" />} label="Assigned to Rena" value={ops.rena} />
+          <OpsCard icon={<Clock className="h-3.5 w-3.5" />} label="Waiting for reply" value={ops.waiting} tone="warn" />
+          <OpsCard icon={<CalendarClock className="h-3.5 w-3.5" />} label="Follow-up due today" value={ops.followUpDueToday} tone="alert" />
+          <OpsCard icon={<Package className="h-3.5 w-3.5" />} label="Sample pending" value={ops.samplePending} />
+          <OpsCard icon={<Handshake className="h-3.5 w-3.5" />} label="Active partnerships" value={ops.activePartnerships} tone="ready" />
+          <OpsCard icon={<DollarSign className="h-3.5 w-3.5" />} label="Total spend" value={Math.round(roi.totalSpend)} />
+          <OpsCard icon={<TrendingUp className="h-3.5 w-3.5" />} label="Avg ROI %" value={roi.avgRoi === null ? 0 : Math.round(roi.avgRoi * 100)} tone={roi.avgRoi && roi.avgRoi >= 1 ? "ready" : undefined} />
         </div>
-        <div className="flex gap-2">
-          <Link to="/amazon-creators" className="rounded-md border border-input bg-background px-3 py-2 text-sm hover:bg-secondary">Amazon creators</Link>
-          
-        </div>
+      </section>
+
+      <section className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-8">
+        <SummaryCard label="Total" value={counts.total} />
+        <SummaryCard label="Ready for outreach" value={counts.ready} tone="ready" />
+        <SummaryCard label="Rena" value={counts.rena} />
+        <SummaryCard label="Waiting reply" value={counts.waiting} tone="warn" />
+        <SummaryCard label="Overdue" value={counts.overdue} tone="alert" />
+        <SummaryCard label="Perry approval" value={counts.perry} tone="warn" />
+        <SummaryCard label="In shipping" value={counts.shipping} />
+      </section>
+
+      {showImport ? <ImportPanel onClose={() => setShowImport(false)} /> : null}
+
+      <div className="mb-3 flex flex-wrap gap-1 rounded-lg border border-border bg-card p-1">
+        {QUEUES.map((q0) => {
+          const active = queue === q0.key;
+          const Icon = q0.icon;
+          const n = (counts as any)[q0.key === "all" ? "total" : q0.key];
+          return (
+            <button
+              key={q0.key}
+              onClick={() => {
+                setQueue(q0.key);
+                if (q0.key === "rena" && ownerFilter !== "RENA") setOwnerFilter("All");
+              }}
+              className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium ${
+                active ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-secondary"
+              }`}
+            >
+              <Icon className="h-3.5 w-3.5" /> {q0.label}
+              <span className={`ml-1 rounded px-1.5 py-0.5 text-[10px] ${active ? "bg-primary-foreground/20" : "bg-secondary"}`}>{n}</span>
+            </button>
+          );
+        })}
       </div>
 
-      <div className="mb-4 relative">
-        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-        <input
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search creator, followers, email…"
-          className="w-full max-w-xl rounded-md border border-input bg-card py-2.5 pl-9 pr-3 text-sm"
-        />
-      </div>
-
-      <div className="space-y-3">
-        {STAGES.map((stage) => (
-          <StageSection
-            key={stage.key}
-            stage={stage}
-            rows={grouped[stage.key]}
-            open={openStages[stage.key]}
-            toggle={() => setOpenStages((s) => ({ ...s, [stage.key]: !s[stage.key] }))}
+      <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-border bg-card p-3">
+        <div className="relative min-w-[220px] flex-1">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Search creator, segment, email, ST-INF-###…"
+            className="w-full rounded-md border border-input bg-background py-2 pl-9 pr-3 text-sm outline-none focus:border-ring focus:ring-2 focus:ring-ring/30"
           />
-        ))}
+        </div>
+        <label className="flex items-center gap-2 text-xs text-muted-foreground">
+          <span className="uppercase tracking-wider">Owner</span>
+          <select
+            value={ownerFilter}
+            onChange={(e) => {
+              const v = e.target.value as "All" | "RENA" | "Unassigned";
+              setOwnerFilter(v);
+              if (v === "Unassigned" && queue === "rena") setQueue("all");
+            }}
+            className="rounded-md border border-input bg-background px-2 py-1.5 text-sm text-foreground"
+          >
+            <option value="All">All</option>
+            <option value="RENA">Rena</option>
+            <option value="Unassigned">Unassigned</option>
+          </select>
+        </label>
+        <label className="flex items-center gap-2 text-xs text-muted-foreground">
+          <span className="uppercase tracking-wider">Amazon</span>
+          <select
+            value={amazonFilter}
+            onChange={(e) => setAmazonFilter(e.target.value as "All" | AmazonStatus)}
+            className="rounded-md border border-input bg-background px-2 py-1.5 text-sm text-foreground"
+          >
+            <option value="All">All</option>
+            <option value="Yes">✅ Yes</option>
+            <option value="No">❌ No</option>
+            <option value="Unknown">❓ Unknown</option>
+          </select>
+        </label>
+        <div className="text-xs text-muted-foreground">
+          Showing {filtered.length} of {CREATORS.length}
+        </div>
       </div>
+
+      <div className="overflow-x-auto rounded-lg border border-border bg-card">
+        <table className="w-full min-w-[1300px] text-sm">
+          <thead className="border-b border-border bg-secondary/60 text-left text-xs uppercase tracking-wider text-muted-foreground">
+            <tr>
+              <th className="px-3 py-3 font-medium">Creator</th>
+              <th className="px-3 py-3 font-medium">Priority</th>
+              <th className="px-3 py-3 font-medium">Amazon</th>
+              <th className="px-3 py-3 font-medium">Owner</th>
+              <th className="px-3 py-3 font-medium">Perry</th>
+              <th className="px-3 py-3 font-medium">Contact</th>
+              <th className="px-3 py-3 font-medium">Response</th>
+              <th className="px-3 py-3 font-medium">Sample</th>
+              <th className="px-3 py-3 font-medium">Next follow-up</th>
+              <th className="px-3 py-3 font-medium">Route</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-border">
+            {filtered.map((c) => (
+              <Row key={c.id} c={c} />
+            ))}
+            {filtered.length === 0 ? (
+              <tr>
+                <td colSpan={10} className="px-3 py-10 text-center text-sm text-muted-foreground">
+                  No creators match this queue.
+                </td>
+              </tr>
+            ) : null}
+          </tbody>
+        </table>
+      </div>
+
+      <p className="mt-3 text-[11px] text-muted-foreground">
+        Supervisor: <strong>Rena</strong> across all rows. Owner column reflects the current relationship owner (Rena) as recorded in the master sheet.
+      </p>
     </div>
   );
 }
 
-function StageSection({
-  stage, rows, open, toggle,
-}: {
-  stage: { key: StageKey; step: number; label: string; hint: string };
-  rows: CreatorRow[];
-  open: boolean;
-  toggle: () => void;
-}) {
+function Row({ c }: { c: CreatorRow }) {
+  const overdue = isOverdue(c);
   return (
-    <section className="overflow-hidden rounded-xl border border-border bg-card">
-      <button onClick={toggle} className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-secondary/40">
-        {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-        <div className="grid h-7 w-7 place-items-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">{stage.step}</div>
-        <div className="min-w-0 flex-1">
-          <div className="font-semibold">{stage.label} <span className="ml-1 text-sm font-normal text-muted-foreground">({rows.length})</span></div>
-          <div className="text-xs text-muted-foreground">{stage.hint}</div>
+    <tr className="align-top hover:bg-secondary/40">
+      <td className="px-3 py-3">
+        <div className="flex items-center gap-1.5">
+          <Link to="/creators/$id" params={{ id: c.id }} className="font-medium hover:text-primary">
+            {c.name}
+          </Link>
+          {isTestCreatorId(c.id, c.name) ? (
+            <span className="inline-flex rounded bg-amber-200 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-amber-900">
+              Test
+            </span>
+          ) : null}
         </div>
-      </button>
-
-      {open ? (
-        <div className="border-t border-border">
-          {rows.length === 0 ? <div className="px-4 py-5 text-sm text-muted-foreground">Nothing here.</div> : null}
-          {rows.map((creator) => <CreatorLine key={creator.id} creator={creator} />)}
-        </div>
-      ) : null}
-    </section>
+        <div className="text-[11px] text-muted-foreground">{c.id} · {c.segment ?? "—"}</div>
+        {c.followersSignal ? <div className="text-[11px] text-muted-foreground">{c.followersSignal}</div> : null}
+      </td>
+      <td className="px-3 py-3">
+        <span className={`inline-flex rounded px-2 py-0.5 text-[11px] ${priorityTone(c.priority)}`}>
+          {c.priority ?? "—"}
+        </span>
+      </td>
+      <td className="px-3 py-3">
+        <AmazonBadge amazon={c.amazon} />
+      </td>
+      <td className="px-3 py-3">
+        <OwnerBadge o={c.outreachOwner} />
+      </td>
+      <td className="px-3 py-3">
+        <span className={`inline-flex rounded px-2 py-0.5 text-[11px] ${perryTone(c.perryApproval)}`}>
+          {c.perryApproval}
+        </span>
+      </td>
+      <td className="px-3 py-3 text-xs">
+        {c.contactedDate ? (
+          <>
+            <div>{c.contactedDate}</div>
+            <div className="text-[11px] text-muted-foreground">{c.contactMethod ?? "—"}</div>
+          </>
+        ) : (
+          <span className="text-muted-foreground">Not contacted</span>
+        )}
+      </td>
+      <td className="px-3 py-3">
+        <span className={`inline-flex rounded px-2 py-0.5 text-[11px] ${responseTone(c.responseState)}`}>
+          {c.responseState}
+        </span>
+      </td>
+      <td className="px-3 py-3">
+        <span className={`inline-flex rounded px-2 py-0.5 text-[11px] ${sampleTone(c.normalizedSampleStatus)}`}>
+          {c.normalizedSampleStatus}
+        </span>
+      </td>
+      <td className="px-3 py-3 text-xs">
+        {c.nextFollowUpDate ? (
+          <span className={overdue ? "font-semibold text-red-700" : ""}>
+            {c.nextFollowUpDate}
+            {overdue ? " · OVERDUE" : ""}
+          </span>
+        ) : (
+          <span className="text-muted-foreground">—</span>
+        )}
+      </td>
+      <td className="px-3 py-3">
+        {c.contactRoute ? (
+          <a
+            href={c.contactRoute}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+          >
+            Open <ExternalLink className="h-3 w-3" />
+          </a>
+        ) : (
+          <span className="text-xs text-muted-foreground">—</span>
+        )}
+      </td>
+    </tr>
   );
 }
 
-function CreatorLine({ creator }: { creator: CreatorRow }) {
-  const updateFn = useServerFn(updateCreatorWorkflow);
-  const [open, setOpen] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const followers = creator.followersSignal || creator.reachSignal || "—";
-  const days = daysSince(creator.contactedDate);
-  const stage = stageFor(creator);
+function OwnerBadge({ o }: { o: OutreachOwner }) {
+  return (
+    <span className={`inline-flex rounded px-2 py-0.5 text-[11px] font-medium ${ownerTone(o)}`}>
+      {o ?? "Unassigned"}
+    </span>
+  );
+}
 
-  const update = async (patch: Parameters<typeof updateCreatorWorkflow>[0] extends never ? never : any) => {
-    setBusy(true);
-    try {
-      await updateFn({ data: { id: creator.id, ...patch } });
-      toast.success("Updated");
-      window.location.reload();
-    } catch (e: any) {
-      toast.error(e?.message ?? "Could not update creator");
-    } finally { setBusy(false); }
+function AmazonBadge({ amazon }: { amazon: string | null }) {
+  const status = amazonStatus(amazon);
+  return (
+    <span className={`inline-flex rounded px-2 py-0.5 text-[11px] font-medium ${amazonTone(status)}`}>
+      {status === "Yes" ? "✅ Yes" : status === "No" ? "❌ No" : "❓ Unknown"}
+    </span>
+  );
+}
+
+function SummaryCard({ label, value, tone }: { label: string; value: number; tone?: "warn" | "alert" | "ready" }) {
+  const border =
+    tone === "alert" ? "border-red-300 bg-red-50/50" : tone === "warn" ? "border-amber-300 bg-amber-50/50" : tone === "ready" ? "border-emerald-300 bg-emerald-50/50" : "border-border bg-card";
+  return (
+    <div className={`rounded-lg border p-3 ${border}`}>
+      <div className="font-display text-2xl leading-none text-foreground">{value}</div>
+      <div className="mt-1 text-[11px] text-muted-foreground">{label}</div>
+    </div>
+  );
+}
+
+function OpsCard({ icon, label, value, tone }: { icon: React.ReactNode; label: string; value: number; tone?: "warn" | "alert" | "ready" }) {
+  const border =
+    tone === "alert" ? "border-red-300 bg-red-50/50" : tone === "warn" ? "border-amber-300 bg-amber-50/50" : tone === "ready" ? "border-emerald-300 bg-emerald-50/50" : "border-border bg-card";
+  return (
+    <div className={`rounded-lg border p-3 ${border}`}>
+      <div className="mb-1 flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-muted-foreground">{icon}{label}</div>
+      <div className="font-display text-2xl leading-none text-foreground">{value}</div>
+    </div>
+  );
+}
+
+function ImportPanel({ onClose }: { onClose: () => void }) {
+  const [text, setText] = useState("");
+  const [result, setResult] = useState<{ rows: number; missing: string[] } | null>(null);
+
+  const parse = () => {
+    const lines = text.trim().split(/\r?\n/);
+    if (lines.length < 2) return setResult({ rows: 0, missing: SHEET_HEADERS });
+    const headers = lines[0].split("\t").length > 1 ? lines[0].split("\t") : lines[0].split(",");
+    const cleaned = headers.map((h) => h.trim().replace(/^"|"$/g, ""));
+    const missing = SHEET_HEADERS.filter((h) => !cleaned.includes(h));
+    setResult({ rows: lines.length - 1, missing });
   };
 
-  const emailHref = creator.email
-    ? `mailto:${creator.email}?subject=${encodeURIComponent("Survival Tabs creator collaboration")}`
-    : null;
-
   return (
-    <div className="border-b border-border last:border-0">
-      <div className="grid items-center gap-2 px-4 py-3 md:grid-cols-[minmax(180px,1.5fr)_110px_110px_150px_100px_160px_140px_34px]">
-        <div className="min-w-0">
-          <div className="truncate font-medium">{creator.name}</div>
-          <div className="truncate text-xs text-muted-foreground">{creator.segment || creator.primaryPlatforms || "Creator"}</div>
-        </div>
-
+    <div className="mb-4 rounded-lg border border-border bg-card p-4">
+      <div className="mb-2 flex items-start justify-between gap-4">
         <div>
-          <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Followers</div>
-          <div className="font-semibold">{followers}</div>
+          <h3 className="font-display text-lg">Import from Google Sheet</h3>
+          <p className="text-xs text-muted-foreground">
+            Paste rows (tab-separated from Google Sheets, or CSV). We validate against the exact 44-column Master Database headers.
+          </p>
         </div>
-
-        <div className="flex flex-wrap gap-1">
-          {creator.youtube ? (
-            <a href={creator.youtube} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 rounded-md border border-input px-2 py-1 text-xs hover:bg-secondary">
-              <Youtube className="h-3.5 w-3.5" /> YouTube
-            </a>
-          ) : <span className="text-xs text-muted-foreground">No YouTube</span>}
-        </div>
-
-        <div>
-          {emailHref ? (
-            <a href={emailHref} className="inline-flex items-center gap-1 rounded-md bg-primary px-2.5 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90">
-              <Mail className="h-3.5 w-3.5" /> Write email
-            </a>
-          ) : creator.contactRoute?.startsWith("http") ? (
-            <a href={creator.contactRoute} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs underline">Contact <ExternalLink className="h-3 w-3" /></a>
-          ) : <span className="text-xs text-muted-foreground">No email</span>}
-        </div>
-
-        <div>
-          <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Days</div>
-          <div>{days == null ? "—" : days}</div>
-        </div>
-
-        <div>
-          <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Response</div>
-          <div className="truncate text-sm">{creator.responseState === "No Response" ? "Waiting" : creator.responseState.replace("Replied — ", "")}</div>
-        </div>
-
-        <div>
-          <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Sample / next</div>
-          <div className="truncate text-sm">{creator.normalizedSampleStatus !== "Not Sent" ? creator.normalizedSampleStatus : creator.nextFollowUpDate || "—"}</div>
-        </div>
-
-        <button onClick={() => setOpen((v) => !v)} className="rounded-md p-1 hover:bg-secondary" aria-label="Show creator details">
-          {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-        </button>
+        <button onClick={onClose} className="text-xs text-muted-foreground hover:text-foreground">Close</button>
       </div>
-
-      {open ? (
-        <div className="border-t border-border bg-secondary/20 px-4 py-4">
-          <div className="grid gap-4 lg:grid-cols-[1fr_1fr_auto]">
-            <div className="space-y-1 text-sm">
-              <Detail label="Email" value={creator.email} />
-              <Detail label="Instagram" value={creator.instagram} link />
-              <Detail label="TikTok" value={creator.tiktok} link />
-              <Detail label="Contact route" value={creator.contactRoute} />
-              <Detail label="Contacted" value={creator.contactedDate} />
-              <Detail label="Method" value={creator.contactMethod} />
+      <textarea
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        placeholder={"Paste including the header row.\nFirst row must contain: " + SHEET_HEADERS.slice(0, 6).join(", ") + ", …"}
+        className="h-32 w-full rounded-md border border-input bg-background p-2 font-mono text-xs"
+      />
+      <div className="mt-2 flex items-center gap-2">
+        <button
+          onClick={parse}
+          className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90"
+        >
+          Validate paste
+        </button>
+        <details className="text-xs">
+          <summary className="cursor-pointer text-muted-foreground">Show expected 44 headers</summary>
+          <ol className="mt-2 grid grid-cols-2 gap-x-4 gap-y-0.5 pl-4 text-[11px] text-muted-foreground">
+            {SHEET_HEADERS.map((h, i) => (
+              <li key={h}>{i + 1}. {h}</li>
+            ))}
+          </ol>
+        </details>
+      </div>
+      {result ? (
+        <div className="mt-3 rounded-md border border-border bg-secondary/40 p-3 text-xs">
+          <div><strong>{result.rows}</strong> data rows detected.</div>
+          {result.missing.length ? (
+            <div className="mt-1 text-red-700">
+              Missing headers ({result.missing.length}): {result.missing.join(", ")}
             </div>
-            <div className="space-y-1 text-sm">
-              <Detail label="Response / follow-up" value={creator.responseFollowup} />
-              <Detail label="Sample" value={creator.sampleStatus} />
-              <Detail label="Notes" value={creator.renaNotes || creator.researchNotes} />
-              <Detail label="Audience" value={creator.targetAudience} />
-              <Detail label="Location" value={creator.geography} />
-            </div>
-            <div className="flex min-w-[210px] flex-col gap-2">
-              {stage === "not_contacted" ? (
-                <button disabled={busy} onClick={() => update({ contacted_date: new Date().toISOString().slice(0, 10), contact_method: creator.email ? "Email" : "DM", response_followup: "Waiting reply" })} className="rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50">Mark contacted today</button>
-              ) : null}
-
-              {(stage === "contacted" || stage === "follow_up") ? (
-                <>
-                  <button disabled={busy} onClick={() => update({ contacted_date: new Date().toISOString().slice(0, 10), response_followup: "Follow-up sent — waiting reply" })} className="rounded-md border border-input bg-background px-3 py-2 text-sm hover:bg-secondary disabled:opacity-50">Follow-up sent today</button>
-                  <button disabled={busy} onClick={() => update({ response_followup: "Replied — Interested" })} className="rounded-md border border-input bg-background px-3 py-2 text-sm hover:bg-secondary disabled:opacity-50">Interested response</button>
-                  <button disabled={busy} onClick={() => update({ response_followup: "Replied — Declined" })} className="rounded-md border border-input bg-background px-3 py-2 text-sm hover:bg-secondary disabled:opacity-50">Declined response</button>
-                </>
-              ) : null}
-
-              {stage === "responded" && creator.responseState === "Replied — Interested" ? (
-                <button disabled={busy} onClick={() => update({ sample_status: "Awaiting Address" })} className="rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50">Start sample</button>
-              ) : null}
-
-              {stage === "sample" ? (
-                <>
-                  <button disabled={busy} onClick={() => update({ sample_status: "Address Received" })} className="rounded-md border border-input bg-background px-3 py-2 text-sm hover:bg-secondary disabled:opacity-50">Address received</button>
-                  <button disabled={busy} onClick={() => update({ sample_status: "Shipped" })} className="rounded-md border border-input bg-background px-3 py-2 text-sm hover:bg-secondary disabled:opacity-50">Mark shipped</button>
-                  <button disabled={busy} onClick={() => update({ sample_status: "Delivered" })} className="rounded-md border border-input bg-background px-3 py-2 text-sm hover:bg-secondary disabled:opacity-50">Mark delivered</button>
-                </>
-              ) : null}
-
-              <Link to="/creators/$id" params={{ id: creator.id }} className="text-center text-xs text-muted-foreground underline underline-offset-4">Full details</Link>
-            </div>
-          </div>
+          ) : (
+            <div className="mt-1 text-emerald-700">✓ All 44 headers present — ready to import (backend hookup pending).</div>
+          )}
         </div>
       ) : null}
-    </div>
-  );
-}
-
-function Detail({ label, value, link = false }: { label: string; value: string | null; link?: boolean }) {
-  if (!value) return null;
-  return (
-    <div className="flex gap-2">
-      <span className="w-28 shrink-0 text-xs text-muted-foreground">{label}</span>
-      {link && value.startsWith("http") ? <a href={value} target="_blank" rel="noreferrer" className="break-all underline underline-offset-4">{value}</a> : <span className="break-words">{value}</span>}
     </div>
   );
 }
