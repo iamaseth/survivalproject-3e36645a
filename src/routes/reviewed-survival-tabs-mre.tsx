@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { ChevronDown, ChevronRight, ExternalLink, Mail, Search, Youtube } from "lucide-react";
 import { CREATORS, type CreatorRow, useCreatorsVersion } from "@/lib/creator-partnerships";
+import { externalLinkProps } from "@/lib/external-link";
 
 export const Route = createFileRoute("/reviewed-survival-tabs-mre")({
   component: ReviewedSurvivalTabsMre,
