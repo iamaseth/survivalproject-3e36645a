@@ -1,3 +1,5 @@
+import type { MouseEvent } from "react";
+
 /**
  * Opens a URL as a true top-level external navigation, breaking out of any
  * embedded preview/iframe context (Lovable preview blocks framed youtube.com).
@@ -31,7 +33,7 @@ export function externalLinkProps(url: string | null | undefined) {
     href: url ?? undefined,
     target: "_blank" as const,
     rel: "noopener noreferrer external",
-    onClick: (e: React.MouseEvent) => {
+    onClick: (e: MouseEvent) => {
       e.preventDefault();
       e.stopPropagation();
       openExternal(url);
