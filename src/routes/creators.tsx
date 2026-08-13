@@ -57,6 +57,11 @@ function stageFor(c: CreatorRow): StageKey {
   return (daysSince(c.contactedDate) ?? 0) >= 5 ? "follow_up" : "contacted";
 }
 
+function openExternalTab(url: string) {
+  const opened = window.open(url, "_blank", "noopener,noreferrer");
+  if (opened) opened.opener = null;
+}
+
 function CreatorPipeline() {
   const version = useCreatorsVersion();
   const [query, setQuery] = useState("");
@@ -193,7 +198,17 @@ function CreatorLine({ creator }: { creator: CreatorRow }) {
 
         <div className="flex flex-wrap gap-1">
           {creator.youtube ? (
-            <a href={creator.youtube} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 rounded-md border border-input px-2 py-1 text-xs hover:bg-secondary">
+            <a
+              href={creator.youtube}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                openExternalTab(creator.youtube!);
+              }}
+              className="inline-flex items-center gap-1 rounded-md border border-input px-2 py-1 text-xs hover:bg-secondary"
+            >
               <Youtube className="h-3.5 w-3.5" /> YouTube
             </a>
           ) : <span className="text-xs text-muted-foreground">No YouTube</span>}
