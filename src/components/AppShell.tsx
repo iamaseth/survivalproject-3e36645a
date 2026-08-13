@@ -14,7 +14,6 @@ import {
   ChevronDown,
   LogOut,
   User as UserIcon,
-  BadgeCheck,
 } from "lucide-react";
 
 import { useAuth } from "@/lib/current-user";
@@ -26,7 +25,6 @@ import { TestModeBanner } from "@/components/TestModeBanner";
 const nav = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard, exact: true },
   { to: "/creators", label: "Creators", icon: Users },
-  { to: "/reviewed-survival-tabs-mre", label: "Reviewed Survival Tabs & MRE", icon: BadgeCheck },
   { to: "/amazon-creators", label: "Amazon Creators", icon: ShoppingBag },
   { to: "/campaigns", label: "Campaigns", icon: Megaphone },
   { to: "/communications", label: "Messages", icon: MessageSquare },
