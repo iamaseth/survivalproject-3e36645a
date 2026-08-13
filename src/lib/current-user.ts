@@ -18,6 +18,7 @@ const PERMANENT_TEAM: Record<string, { role: AppRole; name: string }> = {
   "atp@globenetcapitalgroup.com": { role: "executive", name: "Perry" },
   "ellezolie@gmail.com":          { role: "executive", name: "Perry" },
   "thenxyz@gmail.com":            { role: "research_manager", name: "Seth" },
+  "2phabulous@gmail.com":         { role: "research_manager", name: "Thu" },
   "renas1503@gmail.com":          { role: "partnership_manager", name: "Rena" },
   "vinapanda777@gmail.com":       { role: "partnership_coordinator", name: "Vina" },
   "alvisslohasfarms@gmail.com":   { role: "shopify_content_editor", name: "Tuan (Alvis)" },
