@@ -1,7 +1,8 @@
 // Real authenticated-user hook.
-// Reads the Supabase session + user_roles + profiles rows and exposes a
-// stable shape the app can render (name, email, avatar, role, permissions,
-// legacy team id used by the creator workspace overlay).
+// Permanent team access is email-roster based. On every authenticated load we
+// ask Supabase to repair the user's role, then read the profile/role normally.
+// A local roster fallback prevents the UI from locking out a known team member
+// during a brief DB-sync/migration gap; database RLS is separately roster-aware.
 import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -13,6 +14,16 @@ import {
   type TeamMemberId,
 } from "./permissions";
 
+const PERMANENT_TEAM: Record<string, { role: AppRole; name: string }> = {
+  "atp@globenetcapitalgroup.com": { role: "executive", name: "Perry" },
+  "ellezolie@gmail.com":          { role: "executive", name: "Perry" },
+  "thenxyz@gmail.com":            { role: "research_manager", name: "Seth" },
+  "renas1503@gmail.com":          { role: "partnership_manager", name: "Rena" },
+  "vinapanda777@gmail.com":       { role: "partnership_coordinator", name: "Vina" },
+  "alvisslohasfarms@gmail.com":   { role: "shopify_content_editor", name: "Tuan (Alvis)" },
+  "hoanglohasfarms@gmail.com":    { role: "shopify_content_editor", name: "Hoang" },
+};
+
 export interface AuthProfile {
   userId: string;
   email: string;
@@ -21,7 +32,7 @@ export interface AuthProfile {
   initials: string;
   role: AppRole | null;
   roleLabel: string;
-  teamId: TeamMemberId | null; // legacy id used by workspace overlay
+  teamId: TeamMemberId | null;
   online: boolean;
 }
 
@@ -37,12 +48,32 @@ type State =
   | { status: "unauthenticated"; profile: null }
   | { status: "authenticated"; profile: AuthProfile };
 
+async function repairCurrentTeamAccess() {
+  // Generated types may lag this new RPC by one migration, so call it through
+  // a narrow compatibility cast. A missing RPC is non-fatal because the local
+  // roster fallback below still prevents a false "not on team list" screen.
+  try {
+    const rpc = supabase.rpc.bind(supabase) as (fn: string) => Promise<unknown>;
+    await rpc("ensure_current_team_access");
+  } catch {
+    // Best-effort self-heal. Never turn an RPC/version mismatch into lockout.
+  }
+}
+
 async function fetchProfile(userId: string, email: string, meta: Record<string, unknown>): Promise<AuthProfile> {
+  const normalizedEmail = email.trim().toLowerCase();
+  const roster = PERMANENT_TEAM[normalizedEmail];
+
+  await repairCurrentTeamAccess();
+
   const [{ data: profileRow }, { data: roleRow }] = await Promise.all([
     supabase.from("profiles").select("full_name, avatar_url, email").eq("id", userId).maybeSingle(),
     supabase.from("user_roles").select("role").eq("user_id", userId).maybeSingle(),
   ]);
+
+  const role = ((roleRow?.role as AppRole | undefined) ?? roster?.role) ?? null;
   const fullName =
+    roster?.name ??
     profileRow?.full_name ??
     (meta.full_name as string | undefined) ??
     (meta.name as string | undefined) ??
@@ -52,15 +83,15 @@ async function fetchProfile(userId: string, email: string, meta: Record<string, 
     (meta.avatar_url as string | undefined) ??
     (meta.picture as string | undefined) ??
     null;
-  const role = (roleRow?.role as AppRole | undefined) ?? null;
-  // Best-effort presence ping (ignore failure).
+
   void supabase.from("profiles").update({ last_seen_at: new Date().toISOString() }).eq("id", userId);
+
   return {
     userId,
-    email: profileRow?.email ?? email,
+    email: profileRow?.email ?? normalizedEmail,
     fullName,
     avatarUrl,
-    initials: initialsFrom(fullName, email),
+    initials: initialsFrom(fullName, normalizedEmail),
     role,
     roleLabel: role ? ROLE_LABEL[role] : "No role assigned",
     teamId: roleToTeamId(role),
@@ -81,6 +112,7 @@ export function useAuth(): State & {
       setState({ status: "unauthenticated", profile: null });
       return;
     }
+
     const profile = await fetchProfile(
       data.user.id,
       data.user.email ?? "",
@@ -90,10 +122,10 @@ export function useAuth(): State & {
   }, []);
 
   useEffect(() => {
-    load();
+    void load();
     const { data: sub } = supabase.auth.onAuthStateChange((event) => {
-      if (event === "SIGNED_IN" || event === "SIGNED_OUT" || event === "USER_UPDATED") {
-        load();
+      if (event === "SIGNED_IN" || event === "SIGNED_OUT" || event === "USER_UPDATED" || event === "TOKEN_REFRESHED") {
+        void load();
       }
     });
     return () => sub.subscription.unsubscribe();
