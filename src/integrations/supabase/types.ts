@@ -1000,7 +1000,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      ensure_current_team_access: {
+        Args: never
+        Returns: Database["public"]["Enums"]["app_role"]
+      }
     }
     Enums: {
       app_role:

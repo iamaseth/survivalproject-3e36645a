@@ -15,6 +15,7 @@ import { Route as TemplatesRouteImport } from './routes/templates'
 import { Route as TeamActionsRouteImport } from './routes/team-actions'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as SeoRouteImport } from './routes/seo'
+import { Route as ReviewedSurvivalTabsMreRouteImport } from './routes/reviewed-survival-tabs-mre'
 import { Route as ReviewRouteImport } from './routes/review'
 import { Route as LeadsRouteImport } from './routes/leads'
 import { Route as KnowledgeRouteImport } from './routes/knowledge'
@@ -65,6 +66,11 @@ const SettingsRoute = SettingsRouteImport.update({
 const SeoRoute = SeoRouteImport.update({
   id: '/seo',
   path: '/seo',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ReviewedSurvivalTabsMreRoute = ReviewedSurvivalTabsMreRouteImport.update({
+  id: '/reviewed-survival-tabs-mre',
+  path: '/reviewed-survival-tabs-mre',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ReviewRoute = ReviewRouteImport.update({
@@ -192,6 +198,7 @@ export interface FileRoutesByFullPath {
   '/knowledge': typeof KnowledgeRouteWithChildren
   '/leads': typeof LeadsRoute
   '/review': typeof ReviewRoute
+  '/reviewed-survival-tabs-mre': typeof ReviewedSurvivalTabsMreRoute
   '/seo': typeof SeoRoute
   '/settings': typeof SettingsRoute
   '/team-actions': typeof TeamActionsRoute
@@ -221,6 +228,7 @@ export interface FileRoutesByTo {
   '/knowledge': typeof KnowledgeRouteWithChildren
   '/leads': typeof LeadsRoute
   '/review': typeof ReviewRoute
+  '/reviewed-survival-tabs-mre': typeof ReviewedSurvivalTabsMreRoute
   '/seo': typeof SeoRoute
   '/settings': typeof SettingsRoute
   '/team-actions': typeof TeamActionsRoute
@@ -251,6 +259,7 @@ export interface FileRoutesById {
   '/knowledge': typeof KnowledgeRouteWithChildren
   '/leads': typeof LeadsRoute
   '/review': typeof ReviewRoute
+  '/reviewed-survival-tabs-mre': typeof ReviewedSurvivalTabsMreRoute
   '/seo': typeof SeoRoute
   '/settings': typeof SettingsRoute
   '/team-actions': typeof TeamActionsRoute
@@ -282,6 +291,7 @@ export interface FileRouteTypes {
     | '/knowledge'
     | '/leads'
     | '/review'
+    | '/reviewed-survival-tabs-mre'
     | '/seo'
     | '/settings'
     | '/team-actions'
@@ -311,6 +321,7 @@ export interface FileRouteTypes {
     | '/knowledge'
     | '/leads'
     | '/review'
+    | '/reviewed-survival-tabs-mre'
     | '/seo'
     | '/settings'
     | '/team-actions'
@@ -340,6 +351,7 @@ export interface FileRouteTypes {
     | '/knowledge'
     | '/leads'
     | '/review'
+    | '/reviewed-survival-tabs-mre'
     | '/seo'
     | '/settings'
     | '/team-actions'
@@ -370,6 +382,7 @@ export interface RootRouteChildren {
   KnowledgeRoute: typeof KnowledgeRouteWithChildren
   LeadsRoute: typeof LeadsRoute
   ReviewRoute: typeof ReviewRoute
+  ReviewedSurvivalTabsMreRoute: typeof ReviewedSurvivalTabsMreRoute
   SeoRoute: typeof SeoRoute
   SettingsRoute: typeof SettingsRoute
   TeamActionsRoute: typeof TeamActionsRoute
@@ -420,6 +433,13 @@ declare module '@tanstack/react-router' {
       path: '/seo'
       fullPath: '/seo'
       preLoaderRoute: typeof SeoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reviewed-survival-tabs-mre': {
+      id: '/reviewed-survival-tabs-mre'
+      path: '/reviewed-survival-tabs-mre'
+      fullPath: '/reviewed-survival-tabs-mre'
+      preLoaderRoute: typeof ReviewedSurvivalTabsMreRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/review': {
@@ -626,6 +646,7 @@ const rootRouteChildren: RootRouteChildren = {
   KnowledgeRoute: KnowledgeRouteWithChildren,
   LeadsRoute: LeadsRoute,
   ReviewRoute: ReviewRoute,
+  ReviewedSurvivalTabsMreRoute: ReviewedSurvivalTabsMreRoute,
   SeoRoute: SeoRoute,
   SettingsRoute: SettingsRoute,
   TeamActionsRoute: TeamActionsRoute,
@@ -636,3 +657,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
