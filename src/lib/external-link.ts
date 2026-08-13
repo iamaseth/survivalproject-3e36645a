@@ -1,10 +1,14 @@
+import type { MouseEvent } from "react";
+
 /**
- * Opens a URL as a true top-level external navigation, breaking out of any
- * embedded preview/iframe context (Lovable preview blocks framed youtube.com).
+ * Opens a URL as a true external navigation. This avoids sites such as
+ * YouTube being loaded inside Lovable's embedded preview iframe, where they
+ * refuse to render and return ERR_BLOCKED_BY_RESPONSE.
  */
 export function openExternal(url: string | null | undefined) {
   if (!url) return;
   const href = /^https?:\/\//i.test(url) ? url : `https://${url}`;
+
   try {
     const win = window.open(href, "_blank", "noopener,noreferrer");
     if (win) {
@@ -12,17 +16,18 @@ export function openExternal(url: string | null | undefined) {
       return;
     }
   } catch {
-    /* fall through */
+    // Fall through to top-level navigation.
   }
+
   try {
-    // Fallback: navigate the top-most browsing context.
     if (window.top && window.top !== window.self) {
       window.top.location.href = href;
       return;
     }
   } catch {
-    /* cross-origin top: fall through */
+    // Cross-origin iframe: fall through to current-window navigation.
   }
+
   window.location.href = href;
 }
 
@@ -31,9 +36,9 @@ export function externalLinkProps(url: string | null | undefined) {
     href: url ?? undefined,
     target: "_blank" as const,
     rel: "noopener noreferrer external",
-    onClick: (e: React.MouseEvent) => {
-      e.preventDefault();
-      e.stopPropagation();
+    onClick: (event: MouseEvent<HTMLAnchorElement>) => {
+      event.preventDefault();
+      event.stopPropagation();
       openExternal(url);
     },
   };
