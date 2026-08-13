@@ -49,12 +49,10 @@ type State =
   | { status: "authenticated"; profile: AuthProfile };
 
 async function repairCurrentTeamAccess() {
-  // Generated types may lag this new RPC by one migration, so call it through
-  // a narrow compatibility cast. A missing RPC is non-fatal because the local
-  // roster fallback below still prevents a false "not on team list" screen.
+  // Generated types can lag a new RPC by one migration. Use a compatibility
+  // cast so deployment is not blocked by stale generated Supabase types.
   try {
-    const rpc = supabase.rpc.bind(supabase) as (fn: string) => Promise<unknown>;
-    await rpc("ensure_current_team_access");
+    await (supabase as any).rpc("ensure_current_team_access");
   } catch {
     // Best-effort self-heal. Never turn an RPC/version mismatch into lockout.
   }
