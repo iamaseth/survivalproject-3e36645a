@@ -1,24 +1,8 @@
--- Permanent Survival Tabs team roster.
--- Keeps the email allow-list in Supabase as the source of truth and repairs
--- roles for team members who authenticated before their email was mapped.
+-- Permanent Survival Tabs team access.
+-- The email roster is the source of truth. Existing users are repaired now,
+-- every authenticated team member can repair their own role on each app load,
+-- and RLS recognizes roster members even if user_roles is temporarily stale.
 
--- Ensure the role enum supports technical/content team access.
-DO $$
-BEGIN
-  IF NOT EXISTS (
-    SELECT 1
-    FROM pg_enum e
-    JOIN pg_type t ON t.oid = e.enumtypid
-    JOIN pg_namespace n ON n.oid = t.typnamespace
-    WHERE n.nspname = 'public'
-      AND t.typname = 'app_role'
-      AND e.enumlabel = 'shopify_content_editor'
-  ) THEN
-    ALTER TYPE public.app_role ADD VALUE 'shopify_content_editor';
-  END IF;
-END $$;
-
--- Upsert the authoritative Survival Tabs OS roster.
 INSERT INTO public.team_role_assignments (email, role, display_name) VALUES
   ('atp@globenetcapitalgroup.com', 'executive',               'Perry'),
   ('ellezolie@gmail.com',          'executive',               'Perry'),
@@ -31,44 +15,145 @@ ON CONFLICT (email) DO UPDATE SET
   role = EXCLUDED.role,
   display_name = EXCLUDED.display_name;
 
--- Backfill/repair profiles + roles for users who already signed in before
--- their permanent email assignment existed.
+-- Remove obsolete placeholder addresses so there is only one canonical roster.
+DELETE FROM public.team_role_assignments
+WHERE lower(email) IN (
+  'perry@survivaltabs.com',
+  'seth@survivaltabs.com',
+  'rena@survivaltabs.com',
+  'vina@survivaltabs.com'
+);
+
+-- RLS must not depend solely on user_roles. A person on the permanent email
+-- roster is a team member even if their user_roles row was lost or predates
+-- the roster correction.
+CREATE OR REPLACE FUNCTION private.is_team_member(_user_id uuid)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT EXISTS (
+    SELECT 1
+    FROM public.user_roles ur
+    WHERE ur.user_id = _user_id
+  ) OR EXISTS (
+    SELECT 1
+    FROM auth.users u
+    JOIN public.team_role_assignments a
+      ON lower(a.email) = lower(coalesce(u.email, u.raw_user_meta_data->>'email'))
+    WHERE u.id = _user_id
+  )
+$$;
+
+REVOKE ALL ON FUNCTION private.is_team_member(uuid) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION private.is_team_member(uuid) TO authenticated, service_role;
+
+-- Role checks also fall back to the authoritative email roster. This prevents
+-- executive/manager functionality from failing when a stale user_roles row is
+-- the only problem.
+CREATE OR REPLACE FUNCTION private.has_role(_user_id uuid, _role public.app_role)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT EXISTS (
+    SELECT 1
+    FROM public.user_roles ur
+    WHERE ur.user_id = _user_id AND ur.role = _role
+  ) OR EXISTS (
+    SELECT 1
+    FROM auth.users u
+    JOIN public.team_role_assignments a
+      ON lower(a.email) = lower(coalesce(u.email, u.raw_user_meta_data->>'email'))
+    WHERE u.id = _user_id AND a.role = _role
+  )
+$$;
+
+REVOKE ALL ON FUNCTION private.has_role(uuid, public.app_role) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION private.has_role(uuid, public.app_role) TO authenticated, service_role;
+
+-- Backfill all existing auth users who are already on the permanent roster.
 INSERT INTO public.profiles (id, email, full_name, avatar_url)
 SELECT
   u.id,
   lower(coalesce(u.email, u.raw_user_meta_data->>'email')),
-  coalesce(
-    a.display_name,
-    u.raw_user_meta_data->>'full_name',
-    u.raw_user_meta_data->>'name'
-  ),
+  coalesce(a.display_name, u.raw_user_meta_data->>'full_name', u.raw_user_meta_data->>'name'),
   coalesce(u.raw_user_meta_data->>'avatar_url', u.raw_user_meta_data->>'picture')
 FROM auth.users u
 JOIN public.team_role_assignments a
-  ON a.email = lower(coalesce(u.email, u.raw_user_meta_data->>'email'))
+  ON lower(a.email) = lower(coalesce(u.email, u.raw_user_meta_data->>'email'))
 ON CONFLICT (id) DO UPDATE SET
   email = EXCLUDED.email,
   full_name = COALESCE(EXCLUDED.full_name, public.profiles.full_name),
   avatar_url = COALESCE(EXCLUDED.avatar_url, public.profiles.avatar_url),
   updated_at = now();
 
--- One permanent app role per team user. If a previous role exists, replace it
--- with the role from the authoritative email roster.
 DELETE FROM public.user_roles ur
 USING auth.users u, public.team_role_assignments a
 WHERE ur.user_id = u.id
-  AND a.email = lower(coalesce(u.email, u.raw_user_meta_data->>'email'))
+  AND lower(a.email) = lower(coalesce(u.email, u.raw_user_meta_data->>'email'))
   AND ur.role IS DISTINCT FROM a.role;
 
 INSERT INTO public.user_roles (user_id, role)
 SELECT u.id, a.role
 FROM auth.users u
 JOIN public.team_role_assignments a
-  ON a.email = lower(coalesce(u.email, u.raw_user_meta_data->>'email'))
+  ON lower(a.email) = lower(coalesce(u.email, u.raw_user_meta_data->>'email'))
 ON CONFLICT (user_id, role) DO NOTHING;
 
--- Make sign-in self-healing: every new auth user is matched against the
--- permanent email roster, and the correct role is restored automatically.
+-- Explicit repair RPC. The app calls this on EVERY authenticated load. This is
+-- the key permanent fix for users who existed before their email was mapped.
+CREATE OR REPLACE FUNCTION public.ensure_current_team_access()
+RETURNS public.app_role
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  _uid      uuid := auth.uid();
+  _email    text := lower(coalesce(auth.jwt()->>'email', ''));
+  _role     public.app_role;
+  _display  text;
+BEGIN
+  IF _uid IS NULL OR _email = '' THEN
+    RETURN NULL;
+  END IF;
+
+  SELECT role, display_name
+    INTO _role, _display
+  FROM public.team_role_assignments
+  WHERE lower(email) = _email;
+
+  IF _role IS NULL THEN
+    RETURN NULL;
+  END IF;
+
+  INSERT INTO public.profiles (id, email, full_name)
+  VALUES (_uid, _email, _display)
+  ON CONFLICT (id) DO UPDATE SET
+    email = EXCLUDED.email,
+    full_name = COALESCE(EXCLUDED.full_name, public.profiles.full_name),
+    updated_at = now();
+
+  DELETE FROM public.user_roles
+  WHERE user_id = _uid AND role IS DISTINCT FROM _role;
+
+  INSERT INTO public.user_roles (user_id, role)
+  VALUES (_uid, _role)
+  ON CONFLICT (user_id, role) DO NOTHING;
+
+  RETURN _role;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.ensure_current_team_access() FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.ensure_current_team_access() TO authenticated;
+
+-- New users are still assigned immediately at account creation.
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER
 LANGUAGE plpgsql
@@ -82,10 +167,9 @@ DECLARE
   _assigned    public.app_role;
   _display     text;
 BEGIN
-  SELECT role, display_name
-    INTO _assigned, _display
+  SELECT role, display_name INTO _assigned, _display
   FROM public.team_role_assignments
-  WHERE email = _email;
+  WHERE lower(email) = _email;
 
   INSERT INTO public.profiles (id, email, full_name, avatar_url)
   VALUES (NEW.id, _email, coalesce(_display, _full_name), _avatar)
@@ -97,8 +181,7 @@ BEGIN
 
   IF _assigned IS NOT NULL THEN
     DELETE FROM public.user_roles
-    WHERE user_id = NEW.id
-      AND role IS DISTINCT FROM _assigned;
+    WHERE user_id = NEW.id AND role IS DISTINCT FROM _assigned;
 
     INSERT INTO public.user_roles (user_id, role)
     VALUES (NEW.id, _assigned)
@@ -109,7 +192,7 @@ BEGIN
 END;
 $$;
 
--- Also repair the role whenever Supabase updates an existing auth user.
+-- Existing users are also repaired whenever Supabase updates their auth row.
 CREATE OR REPLACE FUNCTION public.sync_team_role_from_email()
 RETURNS TRIGGER
 LANGUAGE plpgsql
@@ -121,10 +204,9 @@ DECLARE
   _assigned    public.app_role;
   _display     text;
 BEGIN
-  SELECT role, display_name
-    INTO _assigned, _display
+  SELECT role, display_name INTO _assigned, _display
   FROM public.team_role_assignments
-  WHERE email = _email;
+  WHERE lower(email) = _email;
 
   IF _assigned IS NULL THEN
     RETURN NEW;
@@ -144,8 +226,7 @@ BEGIN
     updated_at = now();
 
   DELETE FROM public.user_roles
-  WHERE user_id = NEW.id
-    AND role IS DISTINCT FROM _assigned;
+  WHERE user_id = NEW.id AND role IS DISTINCT FROM _assigned;
 
   INSERT INTO public.user_roles (user_id, role)
   VALUES (NEW.id, _assigned)
