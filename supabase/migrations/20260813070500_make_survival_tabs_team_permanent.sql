@@ -21,12 +21,12 @@ END $$;
 -- Upsert the authoritative Survival Tabs OS roster.
 INSERT INTO public.team_role_assignments (email, role, display_name) VALUES
   ('atp@globenetcapitalgroup.com', 'executive',               'Perry'),
-  ('ellezolie@atp.com',            'executive',               'Perry'),
-  ('thenxyz@gmail.com',             'research_manager',        'Seth'),
-  ('renas1503@gmail.com',           'partnership_manager',     'Rena'),
-  ('vinapanda777@gmail.com',        'partnership_coordinator', 'Vina'),
-  ('alvisslohasfarms@gmail.com',    'shopify_content_editor',  'Tuan (Alvis)'),
-  ('hoanglohasfarms@gmail.com',     'shopify_content_editor',  'Hoang')
+  ('ellezolie@gmail.com',          'executive',               'Perry'),
+  ('thenxyz@gmail.com',            'research_manager',        'Seth'),
+  ('renas1503@gmail.com',          'partnership_manager',     'Rena'),
+  ('vinapanda777@gmail.com',       'partnership_coordinator', 'Vina'),
+  ('alvisslohasfarms@gmail.com',   'shopify_content_editor',  'Tuan (Alvis)'),
+  ('hoanglohasfarms@gmail.com',    'shopify_content_editor',  'Hoang')
 ON CONFLICT (email) DO UPDATE SET
   role = EXCLUDED.role,
   display_name = EXCLUDED.display_name;
