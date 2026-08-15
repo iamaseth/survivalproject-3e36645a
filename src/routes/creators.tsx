@@ -33,21 +33,28 @@ function CreatorPipeline() {
 }
 function StageSection({stage,rows,open,toggle}:{stage:{key:StageKey;step:number;label:string;hint:string};rows:CreatorRow[];open:boolean;toggle:()=>void}) { return <section className="overflow-hidden rounded-xl border border-border bg-card"><button onClick={toggle} className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-secondary/40">{open?<ChevronDown className="h-4 w-4"/>:<ChevronRight className="h-4 w-4"/>}<div className="grid h-7 w-7 place-items-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">{stage.step}</div><div className="min-w-0 flex-1"><div className="font-semibold">{stage.label} <span className="ml-1 text-sm font-normal text-muted-foreground">({rows.length})</span></div><div className="text-xs text-muted-foreground">{stage.hint}</div></div></button>{open?<div className="border-t border-border">{rows.length===0?<div className="px-4 py-5 text-sm text-muted-foreground">Nothing here.</div>:null}{rows.map((creator)=><CreatorLine key={creator.id} creator={creator}/>)}</div>:null}</section>; }
 
-function ExternalButton({href,children,className}:{href:string;children:React.ReactNode;className?:string}) {
-  return <a {...externalLinkProps(href)} className={className}>{children}</a>;
-}
+function ExternalButton({href,children,className}:{href:string;children:React.ReactNode;className?:string}) { return <a {...externalLinkProps(href)} className={className}>{children}</a>; }
 
 function CreatorLine({ creator }: { creator: CreatorRow }) {
-  const updateFn = useServerFn(updateCreatorWorkflow); const [open,setOpen]=useState(false); const [busy,setBusy]=useState(false);
+  const updateFn = useServerFn(updateCreatorWorkflow);
+  const [open,setOpen]=useState(false); const [busy,setBusy]=useState(false);
+  const [manualMethod,setManualMethod]=useState(""); const [manualNote,setManualNote]=useState("");
   const followers=creator.followersSignal||creator.reachSignal||"—"; const days=daysSince(creator.contactedDate); const stage=stageFor(creator);
   const update=async(patch:any)=>{setBusy(true);try{await updateFn({data:{id:creator.id,...patch}});toast.success("Updated");window.location.reload();}catch(e:any){toast.error(e?.message??"Could not update creator");}finally{setBusy(false);}};
   const emailHref=creator.email?`mailto:${creator.email}?subject=${encodeURIComponent("Survival Tabs creator collaboration")}`:null;
+  const markManualContacted=()=>{
+    if(!manualMethod){toast.error("Choose how you contacted the creator");return;}
+    if(!manualNote.trim()){toast.error("Add a short contact note before marking contacted");return;}
+    const existing=(creator.renaNotes||"").trim();
+    const dated=`${new Date().toISOString().slice(0,10)} — ${manualMethod}: ${manualNote.trim()}`;
+    update({contacted_date:new Date().toISOString().slice(0,10),contact_method:manualMethod,response_followup:"Waiting reply",rena_notes:existing?`${existing}\n${dated}`:dated});
+  };
   return <div className="border-b border-border last:border-0">
     <div className="grid items-center gap-2 px-4 py-3 md:grid-cols-[minmax(190px,1.6fr)_120px_110px_150px_90px_150px_140px_34px]">
       <div className="min-w-0"><Link to="/creators/$id" params={{id:creator.id}} className="block truncate font-medium hover:text-primary hover:underline hover:underline-offset-4">{creator.name}</Link><div className="truncate text-xs text-muted-foreground">{creator.segment||creator.primaryPlatforms||"Creator"}</div></div>
       <div><div className="text-[10px] uppercase tracking-wide text-muted-foreground">Followers</div><div className="font-semibold">{followers}</div></div>
       <div className="flex flex-wrap gap-1">{creator.youtube?<ExternalButton href={creator.youtube} className="inline-flex items-center gap-1 rounded-md border border-input px-2 py-1 text-xs hover:bg-secondary"><Youtube className="h-3.5 w-3.5"/> YouTube <ExternalLink className="h-3 w-3"/></ExternalButton>:<span className="text-xs text-muted-foreground">No YouTube</span>}</div>
-      <div>{emailHref?<a href={emailHref} className="inline-flex items-center gap-1 rounded-md bg-primary px-2.5 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90"><Mail className="h-3.5 w-3.5"/> Write email</a>:creator.contactRoute?.startsWith("http")?<ExternalButton href={creator.contactRoute} className="inline-flex items-center gap-1 text-xs underline">Contact <ExternalLink className="h-3 w-3"/></ExternalButton>:<span className="text-xs text-muted-foreground">No email</span>}</div>
+      <div>{emailHref?<a href={emailHref} className="inline-flex items-center gap-1 rounded-md bg-primary px-2.5 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90"><Mail className="h-3.5 w-3.5"/> Write email</a>:creator.contactRoute?.startsWith("http")?<ExternalButton href={creator.contactRoute} className="inline-flex items-center gap-1 text-xs underline">Contact <ExternalLink className="h-3 w-3"/></ExternalButton>:<span className="text-xs text-muted-foreground">Manual contact</span>}</div>
       <div><div className="text-[10px] uppercase tracking-wide text-muted-foreground">Days</div><div>{days==null?"—":days}</div></div>
       <div><div className="text-[10px] uppercase tracking-wide text-muted-foreground">Response</div><div className="truncate text-sm">{creator.responseState==="No Response"?"Waiting":creator.responseState.replace("Replied — ","")}</div></div>
       <div><div className="text-[10px] uppercase tracking-wide text-muted-foreground">Sample / next</div><div className="truncate text-sm">{creator.normalizedSampleStatus!=="Not Sent"?creator.normalizedSampleStatus:creator.nextFollowUpDate||"—"}</div></div>
@@ -56,8 +63,17 @@ function CreatorLine({ creator }: { creator: CreatorRow }) {
     {open?<div className="border-t border-border bg-secondary/20 px-4 py-4"><div className="grid gap-4 lg:grid-cols-[1fr_1fr_auto]">
       <div className="space-y-1 text-sm"><Detail label="Email" value={creator.email}/><Detail label="Instagram" value={creator.instagram} link/><Detail label="Facebook" value={creator.facebook} link/><Detail label="TikTok" value={creator.tiktok} link/><Detail label="YouTube" value={creator.youtube} link/><Detail label="Contact route" value={creator.contactRoute} link/><Detail label="Contacted" value={creator.contactedDate}/><Detail label="Method" value={creator.contactMethod}/></div>
       <div className="space-y-1 text-sm"><Detail label="Response / follow-up" value={creator.responseFollowup}/><Detail label="Sample" value={creator.sampleStatus}/><Detail label="Notes" value={creator.renaNotes||creator.researchNotes}/><Detail label="Audience" value={creator.targetAudience}/><Detail label="Location" value={creator.geography}/></div>
-      <div className="flex min-w-[210px] flex-col gap-2">
-        {stage==="not_contacted"?<button disabled={busy} onClick={()=>update({contacted_date:new Date().toISOString().slice(0,10),contact_method:creator.email?"Email":"DM",response_followup:"Waiting reply"})} className="rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50">Mark contacted today</button>:null}
+      <div className="flex min-w-[240px] flex-col gap-2">
+        {stage==="not_contacted"&&creator.email?<button disabled={busy} onClick={()=>update({contacted_date:new Date().toISOString().slice(0,10),contact_method:"Email",response_followup:"Waiting reply"})} className="rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50">Mark contacted today</button>:null}
+        {stage==="not_contacted"&&!creator.email?<div className="rounded-md border border-border bg-background p-3 space-y-2">
+          <div className="text-xs font-semibold">Manual contact</div>
+          <select value={manualMethod} onChange={(e)=>setManualMethod(e.target.value)} className="w-full rounded-md border border-input bg-background px-2 py-2 text-sm">
+            <option value="">Choose method…</option><option>Contact Form</option><option>Instagram DM</option><option>Facebook DM</option><option>TikTok DM</option><option>YouTube Comment</option><option>Other</option>
+          </select>
+          <textarea value={manualNote} onChange={(e)=>setManualNote(e.target.value)} placeholder="Required note: what did you send / where?" rows={3} className="w-full rounded-md border border-input bg-background px-2 py-2 text-sm"/>
+          <button disabled={busy||!manualMethod||!manualNote.trim()} onClick={markManualContacted} className="w-full rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50">Mark contacted today</button>
+          <div className="text-[11px] text-muted-foreground">For non-email outreach, method + note are required.</div>
+        </div>:null}
         {(stage==="contacted"||stage==="follow_up")?<><button disabled={busy} onClick={()=>update({contacted_date:new Date().toISOString().slice(0,10),response_followup:"Follow-up sent — waiting reply"})} className="rounded-md border border-input bg-background px-3 py-2 text-sm hover:bg-secondary disabled:opacity-50">Follow-up sent today</button><button disabled={busy} onClick={()=>update({response_followup:"Replied — Interested"})} className="rounded-md border border-input bg-background px-3 py-2 text-sm hover:bg-secondary disabled:opacity-50">Interested response</button><button disabled={busy} onClick={()=>update({response_followup:"Replied — Declined"})} className="rounded-md border border-input bg-background px-3 py-2 text-sm hover:bg-secondary disabled:opacity-50">Declined response</button></>:null}
         {stage==="responded"&&creator.responseState==="Replied — Interested"?<button disabled={busy} onClick={()=>update({sample_status:"Awaiting Address"})} className="rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50">Start sample</button>:null}
         {stage==="sample"?<><button disabled={busy} onClick={()=>update({sample_status:"Address Received"})} className="rounded-md border border-input bg-background px-3 py-2 text-sm hover:bg-secondary disabled:opacity-50">Address received</button><button disabled={busy} onClick={()=>update({sample_status:"Shipped"})} className="rounded-md border border-input bg-background px-3 py-2 text-sm hover:bg-secondary disabled:opacity-50">Mark shipped</button><button disabled={busy} onClick={()=>update({sample_status:"Delivered"})} className="rounded-md border border-input bg-background px-3 py-2 text-sm hover:bg-secondary disabled:opacity-50">Mark delivered</button></>:null}
