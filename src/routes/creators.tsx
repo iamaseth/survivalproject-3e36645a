@@ -33,7 +33,7 @@ function CreatorPipeline() {
 function StageSection({stage,rows,open,toggle}:{stage:{key:StageKey;step:number;label:string;hint:string};rows:CreatorRow[];open:boolean;toggle:()=>void}) { return <section className="overflow-hidden rounded-xl border border-border bg-card"><button onClick={toggle} className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-secondary/40">{open?<ChevronDown className="h-4 w-4"/>:<ChevronRight className="h-4 w-4"/>}<div className="grid h-7 w-7 place-items-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">{stage.step}</div><div className="min-w-0 flex-1"><div className="font-semibold">{stage.label} <span className="ml-1 text-sm font-normal text-muted-foreground">({rows.length})</span></div><div className="text-xs text-muted-foreground">{stage.hint}</div></div></button>{open?<div className="border-t border-border">{rows.length===0?<div className="px-4 py-5 text-sm text-muted-foreground">Nothing here.</div>:null}{rows.map((creator)=><CreatorLine key={creator.id} creator={creator}/>)}</div>:null}</section>; }
 
 function ExternalButton({href,children,className}:{href:string;children:React.ReactNode;className?:string}) {
-  return <a href={href} target="_blank" rel="noopener noreferrer" referrerPolicy="no-referrer" className={className} onClick={(e)=>e.stopPropagation()}>{children}</a>;
+  return <a {...externalLinkProps(href)} className={className}>{children}</a>;
 }
 
 function CreatorLine({ creator }: { creator: CreatorRow }) {
