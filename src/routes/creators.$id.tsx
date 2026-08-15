@@ -52,6 +52,7 @@ import { purgeTestCreatorArtifacts, listCreatorMessages } from "@/lib/gmail.func
 import { suggestShippingNoteFromThread } from "@/lib/ai-research.functions";
 
 import { useAuth } from "@/lib/current-user";
+import { externalLinkProps } from "@/lib/external-link";
 
 
 export const Route = createFileRoute("/creators/$id")({
@@ -870,9 +871,7 @@ function EmailDrafter({ c }: { c: CreatorRow }) {
         />
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <a
-            href={gmail}
-            target="_blank"
-            rel="noreferrer"
+            {...externalLinkProps(gmail)}
             className={`inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 ${!to ? "pointer-events-none opacity-50" : ""}`}
           >
             <Send className="h-4 w-4" /> Open in Gmail
@@ -1285,7 +1284,7 @@ function KV({ k, v, mono, link }: { k: string; v: string | null | undefined; mon
       <div className={mono ? "font-mono text-xs" : ""}>
         {v ? (
           link ? (
-            <a href={v} target="_blank" rel="noreferrer" className="text-primary hover:underline">{v}</a>
+            <a {...externalLinkProps(v)} className="text-primary hover:underline">{v}</a>
           ) : (
             v
           )
@@ -1300,9 +1299,7 @@ function KV({ k, v, mono, link }: { k: string; v: string | null | undefined; mon
 function PlatformLink({ label, url }: { label: string; url: string }) {
   return (
     <a
-      href={url}
-      target="_blank"
-      rel="noreferrer"
+      {...externalLinkProps(url)}
       className="inline-flex items-center gap-1 rounded-md border border-input bg-background px-2 py-1 text-xs hover:bg-secondary"
     >
       {label} <ExternalLink className="h-3 w-3" />
