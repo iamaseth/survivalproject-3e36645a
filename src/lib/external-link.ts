@@ -1,16 +1,19 @@
 /**
- * KISS external-link behavior used by CRM pages.
- * In Lovable preview the app runs inside an iframe. Using _blank can create
- * another sandboxed frame/tab where sites such as YouTube refuse to load.
- * _top escapes the preview frame on a user click and opens the real external
- * site directly. On the published app it simply navigates the current tab.
+ * External CRM links must remain real anchors so right-click / open-in-new-tab
+ * always works. On a normal left click, explicitly open a new browser tab.
  */
 export function externalLinkProps(url: string | null | undefined) {
   return {
     href: url ?? undefined,
-    target: "_top" as const,
+    target: "_blank" as const,
     rel: "noopener noreferrer",
     referrerPolicy: "no-referrer" as const,
-    onClick: (event: { stopPropagation: () => void }) => event.stopPropagation(),
+    onClick: (event: { preventDefault: () => void; stopPropagation: () => void }) => {
+      event.preventDefault();
+      event.stopPropagation();
+      if (!url) return;
+      const opened = window.open(url, "_blank", "noopener,noreferrer");
+      if (opened) opened.opener = null;
+    },
   };
 }
