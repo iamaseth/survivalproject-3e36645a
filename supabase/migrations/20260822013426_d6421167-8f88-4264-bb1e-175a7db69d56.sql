@@ -1,0 +1,1 @@
+DELETE FROM public.youtube_candidates WHERE channel_id = 'UCtesttesttesttesttest01';

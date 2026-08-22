@@ -40,6 +40,11 @@ function json(body: unknown, status = 200) {
   });
 }
 
+async function sha256Hex(value: string) {
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
+  return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
 function timingSafeEqualStr(a: string, b: string) {
   if (a.length !== b.length) return false;
   let diff = 0;
@@ -57,12 +62,22 @@ export const Route = createFileRoute("/api/public/youtube-candidates")({
   server: {
     handlers: {
       POST: async ({ request }) => {
-        const secret = process.env["YOUTUBE_INGEST_SECRET"];
-        if (!secret) {
-          return json({ error: "Ingestion is not configured (missing YOUTUBE_INGEST_SECRET)." }, 503);
-        }
         const provided = request.headers.get("x-ingest-secret") ?? "";
-        if (!timingSafeEqualStr(provided, secret)) {
+        if (!provided) return json({ error: "Unauthorized" }, 401);
+
+        const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+        // Token is stored only as a SHA-256 hash in a server-only table.
+        const { data: tokenRow, error: tokenErr } = await supabaseAdmin
+          .from("ingest_tokens")
+          .select("token_sha256")
+          .eq("name", "youtube_ingest")
+          .maybeSingle();
+        if (tokenErr) return json({ error: "Auth check failed" }, 500);
+        if (!tokenRow) return json({ error: "Ingestion is not configured (no ingest token)." }, 503);
+
+        const providedHash = await sha256Hex(provided);
+        if (!timingSafeEqualStr(providedHash, String((tokenRow as { token_sha256: string }).token_sha256))) {
           return json({ error: "Unauthorized" }, 401);
         }
 
@@ -77,7 +92,6 @@ export const Route = createFileRoute("/api/public/youtube-candidates")({
           return json({ error: "Invalid payload", issues: parsed.error.issues.slice(0, 10) }, 400);
         }
 
-        const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
         // De-dup within the batch itself (last row per channel wins).
         const byChannel = new Map<string, z.infer<typeof CandidateSchema>>();

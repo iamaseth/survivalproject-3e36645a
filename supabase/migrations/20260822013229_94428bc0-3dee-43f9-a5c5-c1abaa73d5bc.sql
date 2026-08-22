@@ -1,0 +1,1 @@
+DROP FUNCTION IF EXISTS private.verify_ingest_token(text, text);

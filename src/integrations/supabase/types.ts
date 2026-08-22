@@ -878,6 +878,24 @@ export type Database = {
         }
         Relationships: []
       }
+      ingest_tokens: {
+        Row: {
+          created_at: string
+          name: string
+          token_sha256: string
+        }
+        Insert: {
+          created_at?: string
+          name: string
+          token_sha256: string
+        }
+        Update: {
+          created_at?: string
+          name?: string
+          token_sha256?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
