@@ -49,3 +49,23 @@ do $$ begin
       );
   end if;
 end $$;
+
+create or replace function public.email_templates_unapprove_on_edit()
+returns trigger
+language plpgsql
+set search_path to 'public'
+as $function$
+begin
+  if (new.name is distinct from old.name)
+     or (new.segment is distinct from old.segment)
+     or (new.subject is distinct from old.subject)
+     or (new.body is distinct from old.body)
+     or (new.image_url is distinct from old.image_url)
+     or (new.image_alt is distinct from old.image_alt) then
+    new.approved_by := null;
+    new.approved_at := null;
+    new.active := false;
+  end if;
+  return new;
+end;
+$function$;
