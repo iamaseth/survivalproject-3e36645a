@@ -87,7 +87,6 @@ export const Route = createFileRoute("/api/public/youtube-candidates")({
           return json({ error: "Invalid payload", issues: parsed.error.issues.slice(0, 10) }, 400);
         }
 
-        const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
         // De-dup within the batch itself (last row per channel wins).
         const byChannel = new Map<string, z.infer<typeof CandidateSchema>>();
