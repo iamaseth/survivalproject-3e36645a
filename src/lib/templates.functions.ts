@@ -13,6 +13,8 @@ function rowToTemplate(r: Record<string, unknown>): EmailTemplate {
     segment: (r.segment as string | null) ?? null,
     subject: String(r.subject ?? ""),
     body: String(r.body ?? ""),
+    imageUrl: (r.image_url as string | null) ?? null,
+    imageAlt: (r.image_alt as string | null) ?? null,
     createdBy: String(r.created_by ?? ""),
     approvedBy: (r.approved_by as string | null) ?? null,
     approvedAt: (r.approved_at as string | null) ?? null,
@@ -44,6 +46,8 @@ export const upsertEmailTemplate = createServerFn({ method: "POST" })
     segment?: string | null;
     subject: string;
     body: string;
+    imageUrl?: string | null;
+    imageAlt?: string | null;
   }) => {
     if (!input.name?.trim()) throw new Error("Template name is required");
     if (input.name.trim().length > 120) throw new Error("Template name is too long");
@@ -53,41 +57,45 @@ export const upsertEmailTemplate = createServerFn({ method: "POST" })
       segment: input.segment?.trim() || null,
       subject: input.subject ?? "",
       body: input.body ?? "",
+      imageUrl: input.imageUrl?.trim() || null,
+      imageAlt: input.imageAlt?.trim() || null,
     };
   })
   .handler(async ({ data, context }) => {
+    const payload = {
+      name: data.name,
+      segment: data.segment,
+      subject: data.subject,
+      body: data.body,
+      image_url: data.imageUrl,
+      image_alt: data.imageAlt,
+    } as never;
+
     if (data.id) {
-      // Trigger auto-unapproves when name/segment/subject/body change.
       const { data: row, error } = await context.supabase
         .from("email_templates")
-        .update({
-          name: data.name,
-          segment: data.segment,
-          subject: data.subject,
-          body: data.body,
-        })
+        .update(payload)
         .eq("id", data.id)
         .select("*")
         .single();
       if (error) throw error;
       return { template: rowToTemplate(row) };
-    } else {
-      const { data: row, error } = await context.supabase
-        .from("email_templates")
-        .insert({
-          name: data.name,
-          segment: data.segment,
-          subject: data.subject,
-          body: data.body,
-          created_by: context.userId,
-        })
-        .select("*")
-        .single();
-      if (error) throw error;
-      return { template: rowToTemplate(row) };
     }
+
+    const { data: row, error } = await context.supabase
+      .from("email_templates")
+      .insert({
+        ...payload,
+        created_by: context.userId,
+      } as never)
+      .select("*")
+      .single();
+    if (error) throw error;
+    return { template: rowToTemplate(row) };
   });
 
+// Kept for compatibility with the existing Templates UI. Global operating
+// rules require explicit approval before any destructive use of this action.
 export const deleteEmailTemplate = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: { id: string }) => {
@@ -110,22 +118,17 @@ export const approveEmailTemplate = createServerFn({ method: "POST" })
     return input;
   })
   .handler(async ({ data, context }) => {
-    // Verify approver role using the user-scoped client (RLS + role table
-    // read via user_roles own-row policy).
     const { data: roleRows, error: roleErr } = await context.supabase
       .from("user_roles")
       .select("role")
       .eq("user_id", context.userId);
     if (roleErr) throw roleErr;
     const roles = (roleRows ?? []).map((r) => r.role);
-    const canApprove =
-      roles.includes("executive") || roles.includes("partnership_manager");
+    const canApprove = roles.includes("executive") || roles.includes("partnership_manager");
     if (!canApprove) {
       throw new Error("Only Executives or Partnership Managers can approve templates.");
     }
 
-    // Approval-only update: does NOT change name/segment/subject/body, so
-    // the unapprove-on-edit trigger does not fire.
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: row, error } = await supabaseAdmin
       .from("email_templates")
@@ -141,113 +144,69 @@ export const approveEmailTemplate = createServerFn({ method: "POST" })
     return { template: rowToTemplate(row) };
   });
 
-// ---------- Starter templates: AI-generated drafts for the 6 categories ----------
-
-const STARTER_CATEGORIES: Array<{
-  name: string;
-  mode:
-    | "Initial Outreach" | "Follow-up" | "Thank You" | "Shipping"
-    | "Campaign Invitation" | "Collaboration Proposal";
-}> = [
-  { name: "Initial Outreach (starter)", mode: "Initial Outreach" },
-  { name: "Follow-up (starter)", mode: "Follow-up" },
-  { name: "Thank You (starter)", mode: "Thank You" },
-  { name: "Shipping (starter)", mode: "Shipping" },
-  { name: "Campaign Invitation (starter)", mode: "Campaign Invitation" },
-  { name: "Collaboration Proposal (starter)", mode: "Collaboration Proposal" },
+// Starter templates are static so this action never spends Lovable AI credits.
+const STARTERS: Array<{ name: string; subject: string; body: string }> = [
+  {
+    name: "Initial Outreach (starter)",
+    subject: "Survival Tabs × {{creator_name}}",
+    body: "Hi {{creator_name}},\n\nI came across your work on {{platform}} ({{handle}}) and thought Survival Tabs could be a useful fit for your audience. We make compact emergency food tablets with a 25-year shelf life, designed for preparedness, camping and emergency kits.\n\nWe would be happy to send you a sample pack for honest feedback, with no obligation to post. If you are interested, just reply and we can arrange shipping.\n\nBest,\n{{sender_first_name}}",
+  },
+  {
+    name: "Follow-up (starter)",
+    subject: "Quick follow-up — Survival Tabs",
+    body: "Hi {{creator_name}},\n\nJust following up on my earlier note about Survival Tabs. I know inboxes get busy, so no pressure at all. If a compact emergency-food product would be useful for your {{platform}} audience, we would be glad to send a sample for you to evaluate.\n\nIf it is not a fit right now, no problem.\n\nBest,\n{{sender_first_name}}",
+  },
+  {
+    name: "Thank You (starter)",
+    subject: "Thank you from Survival Tabs",
+    body: "Hi {{creator_name}},\n\nThank you for taking the time to feature Survival Tabs on {{platform}}. We appreciate the care you put into sharing your experience with your audience.\n\nIf you need product details, images, or anything else for follow-up content, please let us know.\n\nBest,\n{{sender_first_name}}",
+  },
+  {
+    name: "Shipping (starter)",
+    subject: "Your Survival Tabs sample is on the way",
+    body: "Hi {{creator_name}},\n\nYour Survival Tabs sample has shipped.\n\nTracking: [TRACKING]\nExpected delivery: [ETA]\n\nPlease let us know when it arrives or if there are any delivery issues.\n\nBest,\n{{sender_first_name}}",
+  },
+  {
+    name: "Campaign Invitation (starter)",
+    subject: "Paid Survival Tabs collaboration",
+    body: "Hi {{creator_name}},\n\nWe are planning a paid Survival Tabs creator campaign and think your {{platform}} content could be a strong fit. We would like to discuss a compensated collaboration and learn your current rate for sponsored content.\n\nIf you are interested, please send your rate card or preferred collaboration terms and we can review the next steps.\n\nBest,\n{{sender_first_name}}",
+  },
+  {
+    name: "Collaboration Proposal (starter)",
+    subject: "Collaboration proposal — Survival Tabs × {{creator_name}}",
+    body: "Hi {{creator_name}},\n\nWe would like to explore a paid partnership with you around Survival Tabs. A possible package would include one dedicated or integrated video plus two supporting story/social placements, with final deliverables and usage terms agreed together before production.\n\nIf this sounds relevant, please send your current rates and any preferred partnership structure.\n\nBest,\n{{sender_first_name}}",
+  },
 ];
-
-const STARTER_SYSTEM_PROMPT = `You write short, warm, professional email TEMPLATES on behalf of the Survival Tabs Creator Partnerships team to influencers and content creators. Survival Tabs makes emergency food ration bars (~1200 calories/tab, 25-year shelf life) beloved by prepper, camping, hunting, EDC, homestead and off-grid creators. Voice: confident, respectful of the creator's audience, no hype, no emojis. Length: 90-140 words unless asked for shorter.
-
-IMPORTANT — this is a REUSABLE TEMPLATE, not a personalized email. Do NOT use any specific creator's name, handle, or niche. Instead, use these Handlebars merge tokens VERBATIM wherever a personalized value would go:
-  {{creator_name}}   — the creator's display name
-  {{platform}}       — their primary platform (YouTube, TikTok, Instagram, etc.)
-  {{handle}}         — their handle on that platform
-  {{sender_first_name}} — the sender's first name (use in the sign-off)
-
-Always include a subject line as the FIRST line prefixed exactly "Subject: ". Then a blank line. Then the body. The body must open with a greeting to {{creator_name}} and sign off with {{sender_first_name}}. Do not invent any other tokens. Do not use square-bracket placeholders like [Name].`;
-
-function starterInstruction(mode: (typeof STARTER_CATEGORIES)[number]["mode"]): string {
-  switch (mode) {
-    case "Initial Outreach":
-      return "Write a first-contact template introducing Survival Tabs and offering a free sample pack in exchange for honest feedback. Reference their content niche generically via {{platform}} and {{handle}}.";
-    case "Follow-up":
-      return "Write a light, no-pressure follow-up template for a previous unanswered outreach email.";
-    case "Thank You":
-      return "Write a thank-you template for after the creator posted content featuring Survival Tabs on {{platform}}.";
-    case "Shipping":
-      return "Write a short shipping-notification template. Use tracking placeholder [TRACKING] and expected delivery placeholder [ETA] (these are NOT merge fields; the team fills them in per send).";
-    case "Campaign Invitation":
-      return "Write an invitation template for a paid campaign — mention a compensated collaboration and ask for the creator's rate.";
-    case "Collaboration Proposal":
-      return "Write a longer collaboration proposal template outlining deliverables (1 video + 2 stories) and a paid partnership.";
-  }
-}
-
-async function generateStarterDraft(
-  apiKey: string,
-  mode: (typeof STARTER_CATEGORIES)[number]["mode"],
-): Promise<{ subject: string; body: string }> {
-  const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
-    body: JSON.stringify({
-      model: "google/gemini-2.5-flash",
-      messages: [
-        { role: "system", content: STARTER_SYSTEM_PROMPT },
-        { role: "user", content: starterInstruction(mode) },
-      ],
-    }),
-  });
-  if (!res.ok) {
-    const t = await res.text();
-    throw new Error(`AI draft failed (${res.status}): ${t.slice(0, 300)}`);
-  }
-  const body = await res.json() as { choices?: Array<{ message?: { content?: string } }> };
-  const raw = body.choices?.[0]?.message?.content?.trim() ?? "";
-  const match = raw.match(/^Subject:\s*(.+?)\r?\n\r?\n?([\s\S]*)$/);
-  if (match) return { subject: match[1].trim(), body: match[2].trim() };
-  return { subject: "", body: raw };
-}
 
 export const seedStarterEmailTemplates = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const apiKey = process.env.LOVABLE_API_KEY;
-    if (!apiKey) throw new Error("LOVABLE_API_KEY not configured");
-
-    // Check which starter templates already exist (by name) so this action is idempotent.
-    const existingNames = new Set(
-      STARTER_CATEGORIES.map((c) => c.name),
-    );
+    const names = STARTERS.map((x) => x.name);
     const { data: existingRows, error: existingErr } = await context.supabase
       .from("email_templates")
       .select("name")
-      .in("name", Array.from(existingNames));
+      .in("name", names);
     if (existingErr) throw existingErr;
     const already = new Set((existingRows ?? []).map((r) => String(r.name)));
-
-    const toCreate = STARTER_CATEGORIES.filter((c) => !already.has(c.name));
     const created: string[] = [];
-    const skipped: string[] = STARTER_CATEGORIES
-      .filter((c) => already.has(c.name))
-      .map((c) => c.name);
+    const skipped: string[] = [];
 
-    for (const cat of toCreate) {
-      const draft = await generateStarterDraft(apiKey, cat.mode);
-      const { error: insErr } = await context.supabase
-        .from("email_templates")
-        .insert({
-          name: cat.name,
-          segment: null,
-          subject: draft.subject || cat.name,
-          body: draft.body,
-          created_by: context.userId,
-          // active defaults to false; approved_by/approved_at stay null.
-        });
-      if (insErr) throw insErr;
-      created.push(cat.name);
+    for (const starter of STARTERS) {
+      if (already.has(starter.name)) {
+        skipped.push(starter.name);
+        continue;
+      }
+      const { error } = await context.supabase.from("email_templates").insert({
+        name: starter.name,
+        segment: null,
+        subject: starter.subject,
+        body: starter.body,
+        image_url: null,
+        image_alt: null,
+        created_by: context.userId,
+      } as never);
+      if (error) throw error;
+      created.push(starter.name);
     }
-
     return { created, skipped };
   });
