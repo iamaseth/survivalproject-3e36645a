@@ -17,12 +17,23 @@ Preview/testing URL: `https://project--2d7f9356-04a7-4000-bd94-816d039b0754-dev.
 
 ```
 Content-Type: application/json
-x-ingest-secret: <YOUTUBE_INGEST_SECRET>
+x-ingest-secret: <ingest token>
 ```
 
-The secret is a server-side project secret. It is never present in client code.
-Store it in the Apps Script under **Project Settings → Script properties** and
-read it with `PropertiesService.getScriptProperties().getProperty('INGEST_SECRET')`.
+Only the SHA-256 hash of the token lives in the database (table
+`public.ingest_tokens`, row `youtube_ingest`), which is readable by the server
+only — never by the browser, and never by signed-in or anonymous clients. No
+platform secret configuration is required.
+
+The endpoint hashes the incoming header and compares it to the stored hash;
+mismatch returns `401`.
+
+Store the plaintext token in the Apps Script under **Project Settings → Script
+properties** as `INGEST_SECRET` and read it with
+`PropertiesService.getScriptProperties().getProperty('INGEST_SECRET')`.
+
+To rotate: update `token_sha256` for the `youtube_ingest` row with the SHA-256
+hex digest of the new token, then update the Apps Script property.
 
 ## Batch payload
 
