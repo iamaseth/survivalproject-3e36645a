@@ -6,6 +6,7 @@ import { ChevronDown, ChevronRight, ExternalLink, Mail, Search, Youtube } from "
 import { CREATORS, type CreatorRow, useCreatorsVersion } from "@/lib/creator-partnerships";
 import { updateCreatorWorkflow } from "@/lib/creators.functions";
 import { externalLinkProps } from "@/lib/external-link";
+import { PipelineCounters, YouTubeCandidatesSection, useYouTubePipeline } from "@/components/creators/YouTubeCandidates";
 
 export const Route = createFileRoute("/creators")({ component: CreatorsLayout, head: () => ({ meta: [{ title: "Creators — Survival Tabs" }, { name: "description", content: "Simple creator outreach workflow." }] }) });
 function CreatorsLayout() { const pathname = useRouterState({ select: (s) => s.location.pathname }); if (pathname !== "/creators") return <Outlet />; return <CreatorPipeline />; }
