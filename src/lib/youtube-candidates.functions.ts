@@ -13,6 +13,11 @@ export type YouTubeCandidate = {
   country: string | null;
   description_email: string | null;
   business_email: string | null;
+  email_source: string | null;
+  enrichment_status: string;
+  enrichment_checked_at: string | null;
+  enrichment_error: string | null;
+  external_links: unknown[];
   topic_keyword: string | null;
   last_upload_at: string | null;
   source: string | null;
@@ -33,6 +38,55 @@ export const listYouTubeCandidates = createServerFn({ method: "GET" })
       .limit(500);
     if (error) throw new Error(error.message);
     return (data ?? []) as unknown as YouTubeCandidate[];
+  });
+
+export const listYouTubeEnrichmentQueue = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { data, error } = await context.supabase
+      .from("youtube_candidates")
+      .select("*")
+      .eq("status", "pending")
+      .is("business_email", null)
+      .is("description_email", null)
+      .in("enrichment_status", ["not_started", "error"])
+      .order("subscriber_count", { ascending: false, nullsFirst: false })
+      .order("last_upload_at", { ascending: false, nullsFirst: false })
+      .limit(250);
+    if (error) throw new Error(error.message);
+    return (data ?? []) as unknown as YouTubeCandidate[];
+  });
+
+export const applyYouTubeEnrichmentResult = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: {
+    id: string;
+    business_email?: string | null;
+    email_source?: string | null;
+    external_links?: unknown[];
+    status: "found" | "no_email_found" | "error";
+    error?: string | null;
+  }) => {
+    if (!data?.id) throw new Error("id required");
+    if (!data?.status) throw new Error("status required");
+    return data;
+  })
+  .handler(async ({ data, context }) => {
+    const email = data.business_email?.trim().toLowerCase() || null;
+    const { error } = await context.supabase
+      .from("youtube_candidates")
+      .update({
+        business_email: email,
+        email_status: email ? "found" : data.status === "error" ? "error" : "none",
+        email_source: data.email_source ?? null,
+        external_links: data.external_links ?? [],
+        enrichment_status: data.status,
+        enrichment_checked_at: new Date().toISOString(),
+        enrichment_error: data.status === "error" ? data.error ?? "Unknown enrichment error" : null,
+      } as never)
+      .eq("id", data.id);
+    if (error) throw new Error(error.message);
+    return { ok: true as const };
   });
 
 export const skipYouTubeCandidate = createServerFn({ method: "POST" })
@@ -73,7 +127,6 @@ export const keepYouTubeCandidate = createServerFn({ method: "POST" })
     const c = cand as unknown as YouTubeCandidate;
     const email = (c.business_email || c.description_email || "").toLowerCase() || null;
 
-    // Dedup: channel id first, then email.
     let creatorId: string | null = null;
     const { data: byChannel } = await context.supabase
       .from("creators")
@@ -106,7 +159,7 @@ export const keepYouTubeCandidate = createServerFn({ method: "POST" })
         youtube: c.channel_url ?? `https://www.youtube.com/channel/${c.channel_id}`,
         youtube_channel_id: c.channel_id,
         email,
-        contact_route: email ? "Public channel email" : null,
+        contact_route: email ? c.email_source || "Public channel email" : null,
         contact_confidence: email ? "Medium" : null,
         research_status: "Imported — needs review",
         priority: null,
@@ -141,6 +194,7 @@ export type PipelineCounts = {
   withEmail: number;
   missingEmail: number;
   pendingCandidates: number;
+  enrichmentPending: number;
   usableEmails: number;
   goal: number;
 };
@@ -183,12 +237,21 @@ export const getPipelineCounts = createServerFn({ method: "GET" })
       .select("id", { count: "exact", head: true })
       .eq("status", "pending");
 
+    const { count: enrichmentPending } = await context.supabase
+      .from("youtube_candidates")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "pending")
+      .is("business_email", null)
+      .is("description_email", null)
+      .in("enrichment_status", ["not_started", "error"]);
+
     return {
       liveCreators: rows.length,
       under20k,
       withEmail,
       missingEmail: rows.length - withEmail,
       pendingCandidates: pending ?? 0,
+      enrichmentPending: enrichmentPending ?? 0,
       usableEmails: usable.size,
       goal: 1000,
     };
