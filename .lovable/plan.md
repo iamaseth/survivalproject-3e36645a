@@ -1,89 +1,72 @@
+# Findings and plan: scaling to 1,000 usable public business emails
 
-## Approved Email Templates
+## 1. Existing YouTube / Apps Script ingestion path
 
-Reusable, human-approved outreach templates that get merged into the composer with no AI call. The existing "Generate AI draft" flow stays exactly as it is — the template picker sits next to it as a faster/cheaper alternative.
+There is none in this project. Verified:
 
-### 1. Database (`email_templates`)
+- No `src/routes/api/` folder exists — the app has zero HTTP endpoints, so an Apps Script has nothing to POST to today.
+- No YouTube Data API usage anywhere. The only YouTube references are stored profile URLs (`creators.youtube`) and link buttons.
+- The only automated discovery is Amazon-based: `.github/workflows/amazon-creator-crawl.yml` + `tools/amazon-discovery-crawler/` writing into `amazon_discovery_candidates`, plus `src/lib/amazon-search.server.ts` / `amazon-search.functions.ts` (keyword scrape) surfaced on `/amazon-creators`.
+- No secret named `YOUTUBE_API_KEY` is configured.
 
-New table `public.email_templates`:
+Conclusion: the Apps Script + YouTube workflow exists outside this app and is currently not connected. Nothing to reuse — only a receiving endpoint to add.
 
-- `id` uuid PK
-- `name` text (required, unique per active template)
-- `segment` text nullable (free-form; e.g. `Pet`, `Fitness`, `Outdoor`, or empty = `General`)
-- `subject` text
-- `body` text (supports merge fields `{{creator_name}}`, `{{platform}}`, `{{handle}}`, `{{segment}}`, `{{sender_first_name}}`)
-- `created_by` uuid → auth.users
-- `approved_by` uuid nullable → auth.users
-- `approved_at` timestamptz nullable
-- `active` bool default false — flips true only when `approved_by` is set; goes back to false on any edit to `subject`/`body`/`name`/`segment`
-- `created_at`, `updated_at` timestamptz with the standard `set_updated_at` trigger
+## 2. Current data sources and dedup
 
-RLS (all `TO authenticated`, gated by `private.is_team_member`):
+- `public.creators` (56 cols, 83 rows) — the live roster. Dedup: unique index on `lower(code)` and on `normalized_domain` (partial, non-empty). Insert paths (`importCreators`, `upsertCreatorFromResearch` in `src/lib/creators.functions.ts`) pre-check both keys, then `upsert(..., { onConflict: "id", ignoreDuplicates: true })`.
+- `public.creator_workspace` (74 cols) — per-creator workflow state; holds `do_not_contact` (currently 0 rows flagged).
+- `public.reviewed_creators` (11 rows) — creators who already reviewed Survival Tabs/MRE.
+- `public.amazon_discovery_candidates` (2 rows) — staging with `status` + `promoted_creator_id` (a real Keep/Skip approval gate).
+- `public.sales_prospects` (0 rows) — separate B2B import, dedup by `normalized_domain`.
+- `public.creators_archive` — the retired ST-INF-001–250 roster; `seedCreatorsFromStatic` is a deliberate no-op and must stay that way.
 
-- Any team member can SELECT.
-- Any team member can INSERT (their own `created_by = auth.uid()`).
-- Any team member can UPDATE — but a trigger clears `approved_by`/`approved_at` and sets `active=false` whenever a non-approver field changes, so re-approval is required.
-- Only executive or partnership_manager can APPROVE (a separate `approve_email_template(id)` SECURITY DEFINER function that stamps `approved_by = auth.uid()`, `approved_at = now()`, `active = true`).
-- Only the creator or executive can DELETE.
+Gap: there is no dedup key for a YouTube channel. A channel with no website domain and no code can be inserted twice.
 
-Standard GRANTs (`SELECT/INSERT/UPDATE/DELETE` to `authenticated`, `ALL` to `service_role`).
+## 3. Current UI flow for "under 20k" and email collection
 
-### 2. Server functions (`src/lib/templates.functions.ts`)
+- `/creators` is the KISS pipeline: 5 collapsible stages (Not contacted → Contacted → Follow up → Responded → Sample), search box, no size filter.
+- Reach is free text only (`reach_signal`, `followers_signal`, e.g. "82.7K YouTube subscribers; ..."). There is **no numeric subscriber column**, so the app cannot filter or count "≤20k" at all today.
+- Email is a plain `creators.email` text column, filled manually or by the AI research drawer. No verification status, no source-of-truth field, no "public business email" distinction.
 
-All use `.middleware([requireSupabaseAuth])`; RLS enforces access.
+## 4. Live counts the app can determine right now
 
-- `listTemplates({ activeOnly?: boolean, segment?: string })` — for the picker and the Templates page.
-- `upsertTemplate({ id?, name, segment, subject, body })` — create or edit.
-- `approveTemplate({ id })` — calls the RPC; server checks role via `private.has_role`.
-- `deleteTemplate({ id })`.
+| Metric | Value |
+|---|---|
+| creators (live roster) | 83 |
+| creators with an email | 43 |
+| creators missing email | 40 |
+| reviewed_creators | 11 (0 with email) |
+| amazon_discovery_candidates pending | 2 |
+| do_not_contact flagged | 0 |
+| creators ≤20k subscribers | **not computable** — no numeric field |
 
-No AI code is touched.
+So against Perry's 1,000 target we are at 43 usable emails, and the ≤20k segmentation cannot be reported until subscriber count is stored as a number.
 
-### 3. New route: `/templates`
+## 5. Smallest safe change (recommended)
 
-`src/routes/templates.tsx` under existing nav (no auth layout in this project — the shell handles gating). Add a `Templates` nav item to `src/components/AppShell.tsx` between Communications and Knowledge Center, icon `FileText`.
+Four narrow steps, no second Apps Script, no spreadsheet.
 
-Page layout:
-
-- Header + "New template" button (opens the editor drawer).
-- List/table of templates with columns: Name · Segment · Status (Draft / Approved / Needs re-approval) · Updated · Created by · Actions.
-- Row actions: Edit, Approve (visible only to executive / partnership_manager, and only when not already active), Delete (creator or executive).
-- Editor drawer: fields for Name, Segment (free-text with datalist of existing segments + "General"), Subject, Body (textarea with a merge-field cheat sheet under it), a live "Preview with sample creator" panel that substitutes merge fields, and a Save button.
-- Editing an approved template shows a clear warning that saving requires re-approval before it can be used.
-
-Visibility rule: research managers and coordinators see the page but only get Approve/Delete when their role permits (hide, don't disable — matches existing conventions).
-
-### 4. GmailPanel integration
-
-`src/components/creators/GmailPanel.tsx` — add a third button in the same button row as `Generate AI draft` and `Save as Gmail draft`:
-
-- Button label: `Use approved template` (icon `FileText`).
-- Opens a small popover/menu listing active templates. If the creator has a segment, matching-segment templates come first, then General.
-- Empty state: "No approved templates yet — create one in Templates."
-- Selecting a template substitutes merge fields (client-side, pure string replace) using the current `CreatorRow` + signed-in user's first name and fills `subject`/`body`, overwriting whatever's there after a lightweight confirm if the body is non-empty.
-- No server call to the AI gateway. No workspace mutation until the user actually saves the draft / sends (existing paths handle that).
-
-Merge substitutions (undefined → empty string, trimmed):
+**Step A — one ingestion endpoint.** Add `src/routes/api/public/youtube-candidates.ts` (POST). The existing Apps Script posts batches of channels there with a shared-secret header (`YOUTUBE_INGEST_SECRET`, added in Project Settings → Secrets) plus Zod validation. Payload per row:
 
 ```text
-{{creator_name}}       → c.name
-{{platform}}           → first of c.instagram/tiktok/youtube/facebook that exists
-{{handle}}             → same, but the handle string only
-{{segment}}            → c.segment ?? "your niche"
-{{sender_first_name}}  → auth.profile.fullName.split(" ")[0]
+{ channel_id, channel_url, channel_title, subscriber_count (number),
+  video_count, country, description_email, business_email,
+  topic_keyword, last_upload_at }
 ```
 
-### 5. Non-goals (out of scope for this change)
+The handler is insert-only into a staging table and returns `{ inserted, skipped_duplicate, skipped_dnc }`. No writes into `creators`.
 
-- No AI-assisted template authoring.
-- No versioning/history of past template edits.
-- No per-role template libraries — one shared list, filtered by segment.
-- No template analytics.
+**Step B — one staging table + dedup keys.** New `public.youtube_candidates` mirroring the payload, with `status` (`pending` / `kept` / `skipped`), `promoted_creator_id`, `email_status` (`none` / `found` / `verified` / `invalid`), and a unique index on `channel_id`. Also add to `creators`: `youtube_channel_id` (unique partial index) and `subscriber_count int`. That makes the channel the dedup key across both tables, backfillable from existing `creators.youtube` URLs. Migration includes GRANTs + RLS as usual.
 
-### Technical details
+**Step C — reuse the Keep/Skip gate.** Extend `/amazon-creators`-style review onto the Creators page as a "Step 0 — New candidates" collapsible section (or a `/creators/candidates` tab), sorted by fit: `subscriber_count <= 20000` and has email first. Keep promotes into `creators` via the existing dedup-checked insert path, sets `promoted_creator_id`, and stamps `subscriber_count` + `youtube_channel_id`. Skip only sets status. Human approval stays mandatory; nothing auto-enters outreach.
 
-- Migration path: single migration file with table + trigger + RPC + policies + grants.
-- The unapprove-on-edit trigger fires `BEFORE UPDATE OF subject, body, name, segment` and only when the row was already approved.
-- `approve_email_template` runs `SECURITY DEFINER` with `SET search_path = public, private`, checks `private.has_role(auth.uid(), 'executive') OR private.has_role(auth.uid(), 'partnership_manager')`, raises `insufficient_privilege` otherwise.
-- Merge substitution is a pure function `applyMergeFields(text, ctx)` in `src/lib/templates.ts` so both the Templates preview and GmailPanel share one implementation.
-- Nav gets a `Templates` entry; no route lives under an auth layout in this codebase — the AppShell already blocks unauthenticated / unroled users.
+**Step D — counts + do-not-contact enforcement.** A small counters strip on `/creators`: total roster, ≤20k, with email, missing email, pending candidates, progress toward 1,000. Ingestion rejects any channel whose email or channel id matches a `do_not_contact` record, so suppression survives re-ingestion.
+
+Optional follow-up (not part of the minimum): an enrichment button on candidates missing email that runs the existing Lovable AI research path to look for a public business email, writing `email_status = 'found'` for human confirmation — never auto-contacting.
+
+### Technical notes
+
+- Endpoint lives under `/api/public/*` so the Apps Script can reach the published site without a Lovable session; security is the shared-secret header + Zod, and it performs no reads of PII back to the caller.
+- Stable URL for the Apps Script: `https://survivalproject.lovable.app/api/public/youtube-candidates`.
+- `seedCreatorsFromStatic` and `creators_archive` remain untouched.
+- Existing Gmail safety states, test mode, and template flow are unaffected — candidates only become contactable after a human Keep.
