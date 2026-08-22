@@ -1,0 +1,13 @@
+SOURCE SNAPSHOT MANIFEST
+
+The complete 2,499-line live Google Apps Script source was captured from the user on 2026-08-22 before expansion changes.
+
+Authoritative captured attachment: Pasted code(20260822-050652).js
+
+Safety verification:
+- YOUTUBE_API_KEY is referenced through Script Properties, not hard-coded.
+- INGEST_SECRET is referenced through Script Properties, not hard-coded.
+- CONFIG.SEND_TO_LOVABLE is false in this snapshot.
+- Existing output function uses sheet.clearContents(); this is the behavior that must be replaced before the next expansion run.
+
+Do not treat this manifest as the executable source. It records the verified pre-change recovery point. The complete source remains in the captured conversation attachment until copied byte-for-byte into GitHub.
