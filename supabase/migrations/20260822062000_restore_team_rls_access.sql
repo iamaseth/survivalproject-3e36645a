@@ -3,6 +3,8 @@
 -- Deliberately does NOT add DELETE policies.
 -- Idempotent because the policies were first restored directly in production during recovery.
 
+alter table public.creators_archive enable row level security;
+
 do $$ begin
   if not exists (select 1 from pg_policies where schemaname='public' and tablename='creators' and policyname='Team can view creators') then
     create policy "Team can view creators" on public.creators for select to authenticated using (exists (select 1 from public.user_roles ur where ur.user_id = auth.uid()));
@@ -12,6 +14,10 @@ do $$ begin
   end if;
   if not exists (select 1 from pg_policies where schemaname='public' and tablename='creators' and policyname='Team can update creators') then
     create policy "Team can update creators" on public.creators for update to authenticated using (exists (select 1 from public.user_roles ur where ur.user_id = auth.uid())) with check (exists (select 1 from public.user_roles ur where ur.user_id = auth.uid()));
+  end if;
+
+  if not exists (select 1 from pg_policies where schemaname='public' and tablename='creators_archive' and policyname='Team can view creators archive') then
+    create policy "Team can view creators archive" on public.creators_archive for select to authenticated using (exists (select 1 from public.user_roles ur where ur.user_id = auth.uid()));
   end if;
 
   if not exists (select 1 from pg_policies where schemaname='public' and tablename='reviewed_creators' and policyname='Team can view reviewed creators') then
