@@ -76,8 +76,8 @@ the row. `last_upload_at` accepts any ISO-8601 date/time.
 }
 ```
 
-Errors: `400` invalid payload, `401` bad/missing secret, `503` secret not yet
-configured on the server, `500` database error.
+Errors: `400` invalid payload, `401` bad/missing token, `503` no ingest token
+row configured in the database, `500` database error.
 
 ## Dedup and safety behaviour
 
