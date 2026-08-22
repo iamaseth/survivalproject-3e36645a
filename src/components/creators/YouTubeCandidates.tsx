@@ -23,6 +23,7 @@ export function PipelineCounters({ counts }: { counts: PipelineCounts | null }) 
         ["With public email", String(counts.withEmail)],
         ["Missing email", String(counts.missingEmail)],
         ["Pending candidates", String(counts.pendingCandidates)],
+        ["Need enrichment", String(counts.enrichmentPending)],
         ["Usable emails / 1,000", `${counts.usableEmails} / ${counts.goal}`],
       ]
     : [];
@@ -30,7 +31,7 @@ export function PipelineCounters({ counts }: { counts: PipelineCounts | null }) 
   if (!counts) return null;
   return (
     <div className="mb-4 rounded-xl border border-border bg-card p-3">
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7">
         {items.map(([label, value]) => (
           <div key={label}>
             <div className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</div>
@@ -81,7 +82,6 @@ export function YouTubeCandidatesSection({
   const [open, setOpen] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
 
-  // Prioritise ≤20k subscribers with a public email.
   const pending = useMemo(() => {
     const score = (c: YouTubeCandidate) => {
       const hasEmail = !!(c.business_email || c.description_email);
@@ -118,7 +118,7 @@ export function YouTubeCandidatesSection({
           <div className="font-semibold">
             New YouTube candidates <span className="ml-1 text-sm font-normal text-muted-foreground">({pending.length})</span>
           </div>
-          <div className="text-xs text-muted-foreground">From the YouTube research script. Keep adds to creators, Skip discards. No email is sent.</div>
+          <div className="text-xs text-muted-foreground">YouTube API discovery + public contact enrichment. Keep adds to creators, Skip discards. No email is sent automatically.</div>
         </div>
       </button>
       {open ? (
@@ -127,6 +127,14 @@ export function YouTubeCandidatesSection({
           {pending.map((c) => {
             const email = c.business_email || c.description_email;
             const url = c.channel_url || `https://www.youtube.com/channel/${c.channel_id}`;
+            const enrichmentLabel =
+              c.enrichment_status === "found"
+                ? "Enriched"
+                : c.enrichment_status === "no_email_found"
+                  ? "Checked — no email"
+                  : c.enrichment_status === "error"
+                    ? "Enrichment error"
+                    : "Needs enrichment";
             return (
               <div key={c.id} className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-border/60 px-4 py-3 last:border-b-0">
                 <div className="min-w-[200px] flex-1">
@@ -136,9 +144,12 @@ export function YouTubeCandidatesSection({
                     {c.topic_keyword ? ` · ${c.topic_keyword}` : ""} · {c.source ?? "apps_script"}
                   </div>
                 </div>
-                <div className="min-w-[180px] text-sm">
-                  {email ? <span className="text-foreground">{email}</span> : <span className="text-muted-foreground">No public email</span>}
-                  <div className="text-[11px] uppercase tracking-wide text-muted-foreground">{c.email_status}</div>
+                <div className="min-w-[210px] text-sm">
+                  {email ? <span className="text-foreground">{email}</span> : <span className="text-muted-foreground">No public email yet</span>}
+                  <div className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                    {c.email_source ? `${c.email_source} · ` : ""}{enrichmentLabel}
+                  </div>
+                  {c.enrichment_error ? <div className="max-w-[260px] truncate text-[11px] text-destructive">{c.enrichment_error}</div> : null}
                 </div>
                 <a {...externalLinkProps(url)} className="inline-flex items-center gap-1 rounded-md border border-input px-2.5 py-1.5 text-xs hover:bg-secondary">
                   <Youtube className="h-3.5 w-3.5" /> Channel
