@@ -9,6 +9,8 @@ export interface EmailTemplate {
   segment: string | null;
   subject: string;
   body: string;
+  imageUrl: string | null;
+  imageAlt: string | null;
   createdBy: string;
   approvedBy: string | null;
   approvedAt: string | null;
