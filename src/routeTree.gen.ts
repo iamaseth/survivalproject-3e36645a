@@ -37,6 +37,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as KnowledgeIdRouteImport } from './routes/knowledge.$id'
 import { Route as CreatorsIdRouteImport } from './routes/creators.$id'
 import { Route as AssetsIdRouteImport } from './routes/assets.$id'
+import { Route as ApiPublicYoutubeCandidatesRouteImport } from './routes/api/public/youtube-candidates'
 
 const WebsiteRoute = WebsiteRouteImport.update({
   id: '/website',
@@ -178,6 +179,12 @@ const AssetsIdRoute = AssetsIdRouteImport.update({
   path: '/$id',
   getParentRoute: () => AssetsRoute,
 } as any)
+const ApiPublicYoutubeCandidatesRoute =
+  ApiPublicYoutubeCandidatesRouteImport.update({
+    id: '/api/public/youtube-candidates',
+    path: '/api/public/youtube-candidates',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -208,6 +215,7 @@ export interface FileRoutesByFullPath {
   '/assets/$id': typeof AssetsIdRoute
   '/creators/$id': typeof CreatorsIdRoute
   '/knowledge/$id': typeof KnowledgeIdRoute
+  '/api/public/youtube-candidates': typeof ApiPublicYoutubeCandidatesRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -238,6 +246,7 @@ export interface FileRoutesByTo {
   '/assets/$id': typeof AssetsIdRoute
   '/creators/$id': typeof CreatorsIdRoute
   '/knowledge/$id': typeof KnowledgeIdRoute
+  '/api/public/youtube-candidates': typeof ApiPublicYoutubeCandidatesRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -269,6 +278,7 @@ export interface FileRoutesById {
   '/assets/$id': typeof AssetsIdRoute
   '/creators/$id': typeof CreatorsIdRoute
   '/knowledge/$id': typeof KnowledgeIdRoute
+  '/api/public/youtube-candidates': typeof ApiPublicYoutubeCandidatesRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -301,6 +311,7 @@ export interface FileRouteTypes {
     | '/assets/$id'
     | '/creators/$id'
     | '/knowledge/$id'
+    | '/api/public/youtube-candidates'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -331,6 +342,7 @@ export interface FileRouteTypes {
     | '/assets/$id'
     | '/creators/$id'
     | '/knowledge/$id'
+    | '/api/public/youtube-candidates'
   id:
     | '__root__'
     | '/'
@@ -361,6 +373,7 @@ export interface FileRouteTypes {
     | '/assets/$id'
     | '/creators/$id'
     | '/knowledge/$id'
+    | '/api/public/youtube-candidates'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -389,6 +402,7 @@ export interface RootRouteChildren {
   TemplatesRoute: typeof TemplatesRoute
   VideoRoute: typeof VideoRoute
   WebsiteRoute: typeof WebsiteRoute
+  ApiPublicYoutubeCandidatesRoute: typeof ApiPublicYoutubeCandidatesRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -589,6 +603,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AssetsIdRouteImport
       parentRoute: typeof AssetsRoute
     }
+    '/api/public/youtube-candidates': {
+      id: '/api/public/youtube-candidates'
+      path: '/api/public/youtube-candidates'
+      fullPath: '/api/public/youtube-candidates'
+      preLoaderRoute: typeof ApiPublicYoutubeCandidatesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -653,6 +674,7 @@ const rootRouteChildren: RootRouteChildren = {
   TemplatesRoute: TemplatesRoute,
   VideoRoute: VideoRoute,
   WebsiteRoute: WebsiteRoute,
+  ApiPublicYoutubeCandidatesRoute: ApiPublicYoutubeCandidatesRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

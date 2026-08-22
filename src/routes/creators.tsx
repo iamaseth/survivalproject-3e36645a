@@ -6,6 +6,7 @@ import { ChevronDown, ChevronRight, ExternalLink, Mail, Search, Youtube } from "
 import { CREATORS, type CreatorRow, useCreatorsVersion } from "@/lib/creator-partnerships";
 import { updateCreatorWorkflow } from "@/lib/creators.functions";
 import { externalLinkProps } from "@/lib/external-link";
+import { PipelineCounters, YouTubeCandidatesSection, useYouTubePipeline } from "@/components/creators/YouTubeCandidates";
 
 export const Route = createFileRoute("/creators")({ component: CreatorsLayout, head: () => ({ meta: [{ title: "Creators — Survival Tabs" }, { name: "description", content: "Simple creator outreach workflow." }] }) });
 function CreatorsLayout() { const pathname = useRouterState({ select: (s) => s.location.pathname }); if (pathname !== "/creators") return <Outlet />; return <CreatorPipeline />; }
@@ -25,10 +26,12 @@ function CreatorPipeline() {
   const [openStages, setOpenStages] = useState<Record<StageKey, boolean>>({ not_contacted: true, contacted: true, follow_up: true, responded: true, sample: true });
   const creators = useMemo(() => { const needle = query.trim().toLowerCase(); const rows = [...CREATORS]; if (!needle) return rows; return rows.filter((c) => [c.name,c.followersSignal,c.reachSignal,c.email,c.youtube,c.instagram,c.facebook,c.tiktok,c.segment,c.responseFollowup,c.sampleStatus].some((v) => String(v ?? "").toLowerCase().includes(needle))); }, [query, version]);
   const grouped = useMemo(() => { const out: Record<StageKey, CreatorRow[]> = { not_contacted: [], contacted: [], follow_up: [], responded: [], sample: [] }; creators.forEach((c) => out[stageFor(c)].push(c)); return out; }, [creators]);
+  const { rows: ytRows, totals, refresh: refreshYT } = useYouTubePipeline();
   return <div className="mx-auto max-w-[1500px]">
     <div className="mb-4 flex flex-wrap items-end justify-between gap-3"><div><div className="text-[11px] uppercase tracking-[0.18em] text-[color:var(--gold)]">Creator outreach</div><h1 className="font-display text-3xl text-foreground">Creators</h1></div><Link to="/amazon-creators" className="rounded-md border border-input bg-background px-3 py-2 text-sm hover:bg-secondary">Amazon creators</Link></div>
+    <PipelineCounters counts={totals}/>
     <div className="mb-4 relative"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"/><input value={query} onChange={(e)=>setQuery(e.target.value)} placeholder="Search creator, followers, email…" className="w-full max-w-xl rounded-md border border-input bg-card py-2.5 pl-9 pr-3 text-sm"/></div>
-    <div className="space-y-3">{STAGES.map((stage)=><StageSection key={stage.key} stage={stage} rows={grouped[stage.key]} open={openStages[stage.key]} toggle={()=>setOpenStages((s)=>({...s,[stage.key]:!s[stage.key]}))}/>)}</div>
+    <div className="space-y-3"><YouTubeCandidatesSection rows={ytRows} refresh={refreshYT}/>{STAGES.map((stage)=><StageSection key={stage.key} stage={stage} rows={grouped[stage.key]} open={openStages[stage.key]} toggle={()=>setOpenStages((s)=>({...s,[stage.key]:!s[stage.key]}))}/>)}</div>
   </div>;
 }
 function StageSection({stage,rows,open,toggle}:{stage:{key:StageKey;step:number;label:string;hint:string};rows:CreatorRow[];open:boolean;toggle:()=>void}) { return <section className="overflow-hidden rounded-xl border border-border bg-card"><button onClick={toggle} className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-secondary/40">{open?<ChevronDown className="h-4 w-4"/>:<ChevronRight className="h-4 w-4"/>}<div className="grid h-7 w-7 place-items-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">{stage.step}</div><div className="min-w-0 flex-1"><div className="font-semibold">{stage.label} <span className="ml-1 text-sm font-normal text-muted-foreground">({rows.length})</span></div><div className="text-xs text-muted-foreground">{stage.hint}</div></div></button>{open?<div className="border-t border-border">{rows.length===0?<div className="px-4 py-5 text-sm text-muted-foreground">Nothing here.</div>:null}{rows.map((creator)=><CreatorLine key={creator.id} creator={creator}/>)}</div>:null}</section>; }

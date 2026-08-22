@@ -406,6 +406,7 @@ export type Database = {
           sample_status: string | null
           segment: string | null
           seth_next_action: string | null
+          subscriber_count: number | null
           target_audience: string | null
           technical_notes: string | null
           tiktok: string | null
@@ -414,6 +415,7 @@ export type Database = {
           verification_date: string | null
           verification_evidence: string | null
           youtube: string | null
+          youtube_channel_id: string | null
         }
         Insert: {
           amazon?: string | null
@@ -464,6 +466,7 @@ export type Database = {
           sample_status?: string | null
           segment?: string | null
           seth_next_action?: string | null
+          subscriber_count?: number | null
           target_audience?: string | null
           technical_notes?: string | null
           tiktok?: string | null
@@ -472,6 +475,7 @@ export type Database = {
           verification_date?: string | null
           verification_evidence?: string | null
           youtube?: string | null
+          youtube_channel_id?: string | null
         }
         Update: {
           amazon?: string | null
@@ -522,6 +526,7 @@ export type Database = {
           sample_status?: string | null
           segment?: string | null
           seth_next_action?: string | null
+          subscriber_count?: number | null
           target_audience?: string | null
           technical_notes?: string | null
           tiktok?: string | null
@@ -530,6 +535,7 @@ export type Database = {
           verification_date?: string | null
           verification_evidence?: string | null
           youtube?: string | null
+          youtube_channel_id?: string | null
         }
         Relationships: []
       }
@@ -1169,6 +1175,78 @@ export type Database = {
           id?: string
           role?: Database["public"]["Enums"]["app_role"]
           user_id?: string
+        }
+        Relationships: []
+      }
+      youtube_candidates: {
+        Row: {
+          business_email: string | null
+          channel_id: string
+          channel_title: string | null
+          channel_url: string | null
+          country: string | null
+          created_at: string
+          description_email: string | null
+          email_status: string
+          id: string
+          last_upload_at: string | null
+          notes: string | null
+          promoted_creator_id: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          source: string
+          source_batch_id: string | null
+          status: string
+          subscriber_count: number | null
+          topic_keyword: string | null
+          updated_at: string
+          video_count: number | null
+        }
+        Insert: {
+          business_email?: string | null
+          channel_id: string
+          channel_title?: string | null
+          channel_url?: string | null
+          country?: string | null
+          created_at?: string
+          description_email?: string | null
+          email_status?: string
+          id?: string
+          last_upload_at?: string | null
+          notes?: string | null
+          promoted_creator_id?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          source?: string
+          source_batch_id?: string | null
+          status?: string
+          subscriber_count?: number | null
+          topic_keyword?: string | null
+          updated_at?: string
+          video_count?: number | null
+        }
+        Update: {
+          business_email?: string | null
+          channel_id?: string
+          channel_title?: string | null
+          channel_url?: string | null
+          country?: string | null
+          created_at?: string
+          description_email?: string | null
+          email_status?: string
+          id?: string
+          last_upload_at?: string | null
+          notes?: string | null
+          promoted_creator_id?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          source?: string
+          source_batch_id?: string | null
+          status?: string
+          subscriber_count?: number | null
+          topic_keyword?: string | null
+          updated_at?: string
+          video_count?: number | null
         }
         Relationships: []
       }
