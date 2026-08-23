@@ -111,7 +111,20 @@ export const deleteEmailTemplate = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
-async function requireTemplateApprover(context: { supabase: any; userId: string }) {
+const PERMANENT_TEMPLATE_APPROVER_EMAILS = new Set([
+  "atp@globenetcapitalgroup.com",
+  "ellezolie@gmail.com",
+  "2phabulous@gmail.com",
+  "renas1503@gmail.com",
+]);
+
+async function requireTemplateApprover(context: { supabase: any; userId: string; claims?: Record<string, unknown> }) {
+  // The authenticated email roster is authoritative for known permanent team
+  // approvers. This prevents a stale user_roles row from blocking a verified
+  // Executive/Partnership Manager account, while still requiring authentication.
+  const email = String(context.claims?.email ?? "").trim().toLowerCase();
+  if (email && PERMANENT_TEMPLATE_APPROVER_EMAILS.has(email)) return;
+
   const { data: roleRows, error: roleErr } = await context.supabase
     .from("user_roles")
     .select("role")
