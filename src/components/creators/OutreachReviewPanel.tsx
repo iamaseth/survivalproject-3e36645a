@@ -133,6 +133,13 @@ export function OutreachReviewPanel() {
   const eligibleVisible = candidates.filter((c) => c.eligible);
   const approvedCount = queue.filter((item) => item.status === "approved").length;
   const pendingCount = queue.filter((item) => item.status === "pending").length;
+  const stageButtonLabel = busy
+    ? "Working…"
+    : !campaignId
+      ? "Select a campaign first"
+      : !selectedIds.length
+        ? "Select creators to stage"
+        : `Stage selected creators (${selectedIds.length})`;
 
   const toggleCreator = (creator: OutreachCandidate) => {
     if (!creator.eligible) return;
@@ -181,6 +188,12 @@ export function OutreachReviewPanel() {
             <Button variant="outline" disabled={busy || !selectedIds.length} onClick={() => setSelectedIds([])}>Clear</Button>
           </div>
 
+          {!campaignId ? (
+            <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+              Select a campaign above before staging creators. If you have not created one yet, use Campaign Preparation first.
+            </div>
+          ) : null}
+
           {selectedCampaign && (
             <div className="rounded-lg border bg-secondary/20 p-3 text-sm">
               <div className="font-medium">Preview before staging</div>
@@ -212,7 +225,7 @@ export function OutreachReviewPanel() {
             </div>
           )}
 
-          <Button disabled={busy || !campaignId || !selectedIds.length} onClick={stageSelectedCreators}>Stage selected creators ({selectedIds.length})</Button>
+          <Button disabled={busy || !campaignId || !selectedIds.length} onClick={stageSelectedCreators}>{stageButtonLabel}</Button>
         </CardContent>
       </Card>
 
