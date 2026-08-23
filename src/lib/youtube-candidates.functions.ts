@@ -30,12 +30,14 @@ export type YouTubeCandidate = {
 export const listYouTubeCandidates = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
+    // Larger review window for the 1,000-contact campaign. Read-only: no existing
+    // creators or candidates are deleted, replaced, or reset by this query.
     const { data, error } = await context.supabase
       .from("youtube_candidates")
       .select("*")
       .order("status", { ascending: true })
       .order("created_at", { ascending: false })
-      .limit(500);
+      .limit(2000);
     if (error) throw new Error(error.message);
     return (data ?? []) as unknown as YouTubeCandidate[];
   });
@@ -52,7 +54,7 @@ export const listYouTubeEnrichmentQueue = createServerFn({ method: "GET" })
       .in("enrichment_status", ["not_started", "error"])
       .order("subscriber_count", { ascending: false, nullsFirst: false })
       .order("last_upload_at", { ascending: false, nullsFirst: false })
-      .limit(250);
+      .limit(500);
     if (error) throw new Error(error.message);
     return (data ?? []) as unknown as YouTubeCandidate[];
   });
@@ -167,6 +169,8 @@ export const keepYouTubeCandidate = createServerFn({ method: "POST" })
         last_researched: new Date().toISOString().slice(0, 10),
         imported_by: context.userId,
       };
+      // Add-only semantics: ignore an ID collision rather than replacing an
+      // existing creator. Existing creator rows are never overwritten here.
       const { error: insErr } = await context.supabase
         .from("creators")
         .upsert(insertRow as never, { onConflict: "id", ignoreDuplicates: true });
@@ -197,6 +201,8 @@ export type PipelineCounts = {
   enrichmentPending: number;
   usableEmails: number;
   goal: number;
+  remainingToGoal: number;
+  progressPercent: number;
 };
 
 /** Compact progress counters. `usableEmails` counts unique addresses, not rows. */
@@ -245,6 +251,8 @@ export const getPipelineCounts = createServerFn({ method: "GET" })
       .is("description_email", null)
       .in("enrichment_status", ["not_started", "error"]);
 
+    const goal = 1000;
+    const usableEmails = usable.size;
     return {
       liveCreators: rows.length,
       under20k,
@@ -252,7 +260,9 @@ export const getPipelineCounts = createServerFn({ method: "GET" })
       missingEmail: rows.length - withEmail,
       pendingCandidates: pending ?? 0,
       enrichmentPending: enrichmentPending ?? 0,
-      usableEmails: usable.size,
-      goal: 1000,
+      usableEmails,
+      goal,
+      remainingToGoal: Math.max(0, goal - usableEmails),
+      progressPercent: Math.min(100, Math.round((usableEmails / goal) * 100)),
     };
   });
