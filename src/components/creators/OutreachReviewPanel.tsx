@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -12,6 +12,7 @@ import {
   type CampaignRow,
   type QueueItemRow,
 } from "@/lib/outreach.functions";
+import { listOutreachCandidates, type OutreachCandidate } from "@/lib/outreach-selection.functions";
 import { listEmailTemplates } from "@/lib/templates.functions";
 import type { EmailTemplate } from "@/lib/templates";
 import {
@@ -28,12 +29,14 @@ export function OutreachReviewPanel() {
   const [campaignId, setCampaignId] = useState("");
   const [queue, setQueue] = useState<QueueItemRow[]>([]);
   const [triage, setTriage] = useState<ReplyTriageRow[]>([]);
+  const [candidates, setCandidates] = useState<OutreachCandidate[]>([]);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [candidateSearch, setCandidateSearch] = useState("");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [campaignName, setCampaignName] = useState("Survival Tabs Creator Outreach");
   const [templateId, setTemplateId] = useState("");
   const [dailyCap, setDailyCap] = useState(25);
-  const [prepareLimit, setPrepareLimit] = useState(25);
 
   const refreshCampaigns = async (preferredId?: string) => {
     const result = await listCampaigns();
@@ -60,10 +63,17 @@ export function OutreachReviewPanel() {
     setTriage(result.rows);
   };
 
+  const refreshCandidates = async (search = candidateSearch) => {
+    const result = await listOutreachCandidates({ data: { search, limit: 300 } });
+    setCandidates(result.rows);
+    setSelectedIds((ids) => ids.filter((id) => result.rows.some((row) => row.id === id && row.eligible)));
+  };
+
   useEffect(() => {
     void refreshCampaigns();
     void refreshTemplates();
     void refreshTriage();
+    void refreshCandidates("");
   }, []);
   useEffect(() => { void refreshQueue(campaignId); }, [campaignId]);
 
@@ -94,17 +104,21 @@ export function OutreachReviewPanel() {
     setMessage(`Campaign created: ${result.row.name}. Sending remains locked.`);
   });
 
-  const stageCreators = () => run(async () => {
+  const stageSelectedCreators = () => run(async () => {
     if (!campaignId) throw new Error("Select or create a campaign first.");
+    if (!selectedIds.length) throw new Error("Select at least one eligible creator.");
     const selectedCampaign = campaigns.find((c) => c.id === campaignId);
     if (!selectedCampaign?.default_template_id) throw new Error("This campaign does not have a default template.");
     const result = await prepareQueue({ data: {
       campaignId,
       sequenceStep: 1,
-      limit: Math.max(1, Math.min(prepareLimit, 100)),
+      creatorIds: selectedIds,
+      limit: Math.min(selectedIds.length, 500),
     } });
     await refreshQueue(campaignId);
-    setMessage(`Staged ${result.inserted} creator(s). ${result.duplicates} duplicate(s) ignored; ${result.skipped.length} ineligible creator(s) skipped.`);
+    setMessage(`Staged ${result.inserted} selected creator(s). ${result.duplicates} duplicate(s) ignored; ${result.skipped.length} ineligible creator(s) skipped.`);
+    setSelectedIds([]);
+    await refreshCandidates();
   });
 
   const changeStatus = (item: QueueItemRow, status: "approved" | "skipped" | "cancelled" | "pending") =>
@@ -114,24 +128,27 @@ export function OutreachReviewPanel() {
     });
 
   const selectedCampaign = campaigns.find((c) => c.id === campaignId);
+  const selectedTemplate = templates.find((t) => t.id === selectedCampaign?.default_template_id);
+  const selectedCreators = useMemo(() => candidates.filter((c) => selectedIds.includes(c.id)), [candidates, selectedIds]);
+  const eligibleVisible = candidates.filter((c) => c.eligible);
   const approvedCount = queue.filter((item) => item.status === "approved").length;
   const pendingCount = queue.filter((item) => item.status === "pending").length;
+
+  const toggleCreator = (creator: OutreachCandidate) => {
+    if (!creator.eligible) return;
+    setSelectedIds((ids) => ids.includes(creator.id) ? ids.filter((id) => id !== creator.id) : [...ids, creator.id]);
+  };
 
   return (
     <div className="space-y-6">
       <Card>
         <CardHeader>
           <CardTitle>Campaign Preparation</CardTitle>
-          <CardDescription>Create a locked campaign and stage eligible existing creators. This does not send email or alter creator records.</CardDescription>
+          <CardDescription>Create a locked campaign. This does not send email or alter creator records.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid gap-3 lg:grid-cols-[1.5fr_1.5fr_120px_auto]">
-            <input
-              value={campaignName}
-              onChange={(e) => setCampaignName(e.target.value)}
-              placeholder="Campaign name"
-              className="h-9 rounded-md border bg-background px-3 text-sm"
-            />
+            <input value={campaignName} onChange={(e) => setCampaignName(e.target.value)} placeholder="Campaign name" className="h-9 rounded-md border bg-background px-3 text-sm" />
             <select value={templateId} onChange={(e) => setTemplateId(e.target.value)} className="h-9 rounded-md border bg-background px-3 text-sm">
               <option value="">Choose approved template</option>
               {templates.map((t) => (
@@ -140,44 +157,72 @@ export function OutreachReviewPanel() {
                 </option>
               ))}
             </select>
-            <input
-              type="number"
-              min={1}
-              max={100}
-              value={dailyCap}
-              onChange={(e) => setDailyCap(Number(e.target.value) || 1)}
-              className="h-9 rounded-md border bg-background px-3 text-sm"
-              aria-label="Daily send cap"
-              title="Daily send cap"
-            />
+            <input type="number" min={1} max={100} value={dailyCap} onChange={(e) => setDailyCap(Number(e.target.value) || 1)} className="h-9 rounded-md border bg-background px-3 text-sm" aria-label="Daily send cap" title="Daily send cap" />
             <Button disabled={busy || !templateId} onClick={createCampaign}>Create locked campaign</Button>
           </div>
-          <p className="text-xs text-muted-foreground">Only approved templates can be used. Template photos are carried into the staged message snapshot when present.</p>
+          <p className="text-xs text-muted-foreground">Only approved templates can be used. Template photos are carried into staged message snapshots when present.</p>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Choose Creators</CardTitle>
+          <CardDescription>Select exactly which existing creators should be prepared for this campaign. Nothing is sent from here.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex flex-wrap gap-2 items-center">
+            <select className="h-9 min-w-[280px] rounded-md border bg-background px-3 text-sm" value={campaignId} onChange={(e) => setCampaignId(e.target.value)}>
+              <option value="">Select campaign</option>
+              {campaigns.map((c) => <option key={c.id} value={c.id}>{c.name}{c.sending_locked ? " — locked" : ""}</option>)}
+            </select>
+            <input value={candidateSearch} onChange={(e) => setCandidateSearch(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") void refreshCandidates(); }} placeholder="Search creator, email or niche" className="h-9 min-w-[260px] rounded-md border bg-background px-3 text-sm" />
+            <Button variant="outline" disabled={busy} onClick={() => void refreshCandidates()}>Search</Button>
+            <Button variant="outline" disabled={busy || !eligibleVisible.length} onClick={() => setSelectedIds(eligibleVisible.map((c) => c.id))}>Select all eligible</Button>
+            <Button variant="outline" disabled={busy || !selectedIds.length} onClick={() => setSelectedIds([])}>Clear</Button>
+          </div>
+
+          {selectedCampaign && (
+            <div className="rounded-lg border bg-secondary/20 p-3 text-sm">
+              <div className="font-medium">Preview before staging</div>
+              <div className="mt-1 text-muted-foreground">Campaign: {selectedCampaign.name}</div>
+              <div className="text-muted-foreground">Template: {selectedTemplate?.name || "No template selected"}{selectedTemplate?.imageUrl ? " · includes photo" : " · no photo"}</div>
+              <div className="text-muted-foreground">Selected creators: {selectedIds.length}</div>
+              {selectedTemplate?.imageUrl ? <img src={selectedTemplate.imageUrl} alt={selectedTemplate.imageAlt || "Survival Tabs template photo"} className="mt-3 max-h-36 rounded-md border object-contain" /> : null}
+            </div>
+          )}
+
+          <div className="max-h-[420px] overflow-auto rounded-lg border">
+            {candidates.length === 0 ? <div className="p-4 text-sm text-muted-foreground">No creators found.</div> : null}
+            {candidates.map((creator) => (
+              <label key={creator.id} className={`grid cursor-pointer items-center gap-3 border-b px-3 py-2 last:border-b-0 md:grid-cols-[28px_1.3fr_1.2fr_100px_1fr_130px] ${creator.eligible ? "hover:bg-secondary/30" : "cursor-not-allowed opacity-60"}`}>
+                <input type="checkbox" checked={selectedIds.includes(creator.id)} disabled={!creator.eligible} onChange={() => toggleCreator(creator)} />
+                <div><div className="font-medium text-sm">{creator.name}</div><div className="text-xs text-muted-foreground">{creator.segment || "No segment"}</div></div>
+                <div className="truncate text-sm">{creator.email || "No email"}</div>
+                <div className="text-sm">{creator.subscriber_count == null ? "—" : creator.subscriber_count.toLocaleString()}</div>
+                <div className="truncate text-xs text-muted-foreground">{creator.youtube || creator.instagram || creator.tiktok || "No social link"}</div>
+                <div>{creator.eligible ? <Badge variant="outline">Eligible</Badge> : <Badge variant="destructive">{creator.reason}</Badge>}</div>
+              </label>
+            ))}
+          </div>
+
+          {selectedCreators.length > 0 && (
+            <div className="rounded-lg border p-3">
+              <div className="mb-2 text-sm font-medium">Selected for staging</div>
+              <div className="flex flex-wrap gap-2">{selectedCreators.slice(0, 30).map((c) => <Badge key={c.id} variant="outline">{c.name}</Badge>)}{selectedCreators.length > 30 ? <Badge variant="outline">+{selectedCreators.length - 30} more</Badge> : null}</div>
+            </div>
+          )}
+
+          <Button disabled={busy || !campaignId || !selectedIds.length} onClick={stageSelectedCreators}>Stage selected creators ({selectedIds.length})</Button>
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader>
           <CardTitle>Outreach Queue Review</CardTitle>
-          <CardDescription>Human approval workspace. Sending remains disabled.</CardDescription>
+          <CardDescription>Review the prepared messages. Approval means ready for a future sending step; it does not send the email.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex flex-wrap gap-2 items-center">
-            <select className="h-9 min-w-[260px] rounded-md border bg-background px-3 text-sm" value={campaignId} onChange={(e) => setCampaignId(e.target.value)}>
-              <option value="">Select campaign</option>
-              {campaigns.map((c) => <option key={c.id} value={c.id}>{c.name}{c.sending_locked ? " — locked" : ""}</option>)}
-            </select>
-            <input
-              type="number"
-              min={1}
-              max={100}
-              value={prepareLimit}
-              onChange={(e) => setPrepareLimit(Number(e.target.value) || 1)}
-              className="h-9 w-24 rounded-md border bg-background px-3 text-sm"
-              aria-label="Creators to stage"
-              title="Creators to stage"
-            />
-            <Button disabled={busy || !campaignId} onClick={stageCreators}>Stage eligible creators</Button>
             <Button variant="outline" disabled={busy || !campaignId} onClick={() => run(async () => { await suppressIneligibleQueueItems({ data: { campaignId } }); await refreshQueue(); })}>Suppress replied / DNC</Button>
             <Button variant="outline" disabled={busy} onClick={() => void refreshQueue()}>Refresh</Button>
           </div>
@@ -218,7 +263,7 @@ export function OutreachReviewPanel() {
       <Card>
         <CardHeader>
           <CardTitle>Reply Triage</CardTitle>
-          <CardDescription>Deterministic classification with human review for risky or ambiguous replies.</CardDescription>
+          <CardDescription>Sort incoming replies and flag unclear or risky ones for a team member to review.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex flex-wrap gap-2">
