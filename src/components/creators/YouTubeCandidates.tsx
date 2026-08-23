@@ -15,6 +15,48 @@ import { externalLinkProps } from "@/lib/external-link";
 const fmt = (n: number | null | undefined) =>
   n == null ? "—" : n >= 1000 ? `${(n / 1000).toFixed(n >= 10000 ? 0 : 1)}k` : String(n);
 
+function daysSinceUpload(value: string | null) {
+  if (!value) return null;
+  const time = new Date(value).getTime();
+  if (Number.isNaN(time)) return null;
+  return Math.max(0, Math.floor((Date.now() - time) / 86_400_000));
+}
+
+function candidatePriority(c: YouTubeCandidate) {
+  const subs = c.subscriber_count;
+  const email = !!(c.business_email || c.description_email);
+  const contactable = email || (c.external_links?.length ?? 0) > 0;
+  const days = daysSinceUpload(c.last_upload_at);
+  let score = 0;
+
+  if (subs == null) score += 0;
+  else if (subs > 20000) score -= 100;
+  else if (subs >= 1000 && subs <= 10000) score += 8;
+  else if (subs > 10000) score += 6;
+  else score += 5;
+
+  if (email) score += 6;
+  else if (contactable) score += 3;
+
+  if (days != null) {
+    if (days <= 90) score += 5;
+    else if (days <= 180) score += 2;
+    else if (days > 365) score -= 3;
+  }
+
+  if (c.topic_keyword) score += 2;
+  return score;
+}
+
+function sizeBand(subs: number | null) {
+  if (subs == null) return "Size unknown";
+  if (subs < 1000) return "Nano · promising";
+  if (subs <= 5000) return "Very high priority";
+  if (subs <= 10000) return "Very high priority";
+  if (subs <= 20000) return "High priority";
+  return "Over 20K · exclude";
+}
+
 export function PipelineCounters({ counts }: { counts: PipelineCounts | null }) {
   const items: Array<[string, string]> = counts
     ? [
@@ -34,7 +76,7 @@ export function PipelineCounters({ counts }: { counts: PipelineCounts | null }) 
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <div>
           <div className="text-[11px] uppercase tracking-[0.18em] text-[color:var(--gold)]">1,000 Creator Goal</div>
-          <div className="text-sm text-muted-foreground">Grow the existing database by adding verified creator contacts. Existing records are preserved.</div>
+          <div className="text-sm text-muted-foreground">Primary campaign: relevant, active creators with 20,000 followers/subscribers or less. No minimum follower count.</div>
         </div>
         <div className="font-display text-2xl text-foreground">{counts.progressPercent}%</div>
       </div>
@@ -91,17 +133,18 @@ export function YouTubeCandidatesSection({
   const [bulkBusy, setBulkBusy] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
-  const pending = useMemo(() => {
-    const score = (c: YouTubeCandidate) => {
-      const hasEmail = !!(c.business_email || c.description_email);
-      const small = c.subscriber_count != null && c.subscriber_count <= 20000;
-      return (hasEmail ? 2 : 0) + (small ? 1 : 0);
-    };
-    return rows.filter((r) => r.status === "pending").sort((a, b) => score(b) - score(a));
-  }, [rows]);
+  const pending = useMemo(
+    () => rows.filter((r) => r.status === "pending").sort((a, b) => candidatePriority(b) - candidatePriority(a)),
+    [rows],
+  );
 
   const recommended = useMemo(
-    () => pending.filter((c) => !!(c.business_email || c.description_email) && c.subscriber_count != null && c.subscriber_count <= 20000),
+    () => pending.filter((c) => {
+      const subs = c.subscriber_count;
+      const contactable = !!(c.business_email || c.description_email) || (c.external_links?.length ?? 0) > 0;
+      const days = daysSinceUpload(c.last_upload_at);
+      return subs != null && subs <= 20000 && contactable && (days == null || days <= 180);
+    }),
     [pending],
   );
 
@@ -172,7 +215,7 @@ export function YouTubeCandidatesSection({
           <div className="font-semibold">
             New YouTube candidates <span className="ml-1 text-sm font-normal text-muted-foreground">({pending.length})</span>
           </div>
-          <div className="text-xs text-muted-foreground">YouTube API discovery + public contact enrichment. Keep only adds or links records after deduplication; nothing here deletes existing creators or sends email.</div>
+          <div className="text-xs text-muted-foreground">Ranked for Survival Tabs: ≤20K first, 1K–10K highest priority, active channels and legitimate public contact paths favored.</div>
         </div>
       </button>
       {open ? (
@@ -180,7 +223,7 @@ export function YouTubeCandidatesSection({
           {pending.length ? (
             <div className="flex flex-wrap items-center gap-2 border-b border-border bg-secondary/20 px-4 py-3">
               <button type="button" onClick={selectRecommended} className="rounded-md border border-input bg-background px-3 py-1.5 text-xs hover:bg-secondary">
-                Select recommended ≤20k + email ({recommended.length})
+                Select recommended ≤20K ({recommended.length})
               </button>
               <button type="button" onClick={clearSelected} className="rounded-md border border-input bg-background px-3 py-1.5 text-xs hover:bg-secondary">Clear</button>
               <button
@@ -198,6 +241,8 @@ export function YouTubeCandidatesSection({
           {pending.map((c) => {
             const email = c.business_email || c.description_email;
             const url = c.channel_url || `https://www.youtube.com/channel/${c.channel_id}`;
+            const days = daysSinceUpload(c.last_upload_at);
+            const overLimit = c.subscriber_count != null && c.subscriber_count > 20000;
             const enrichmentLabel =
               c.enrichment_status === "found"
                 ? "Enriched"
@@ -206,24 +251,26 @@ export function YouTubeCandidatesSection({
                   : c.enrichment_status === "error"
                     ? "Enrichment error"
                     : "Needs enrichment";
-            const isRecommended = !!email && c.subscriber_count != null && c.subscriber_count <= 20000;
+            const isRecommended = recommended.some((r) => r.id === c.id);
             return (
               <div key={c.id} className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-border/60 px-4 py-3 last:border-b-0">
                 <input
                   type="checkbox"
                   checked={selectedIds.has(c.id)}
                   onChange={() => toggleSelected(c.id)}
+                  disabled={overLimit}
                   aria-label={`Select ${c.channel_title || c.channel_id}`}
                   className="h-4 w-4 rounded border-input"
                 />
-                <div className="min-w-[200px] flex-1">
-                  <div className="flex items-center gap-2">
+                <div className="min-w-[220px] flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
                     <div className="truncate font-medium">{c.channel_title || c.channel_id}</div>
+                    <span className="rounded-full border border-border px-2 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">{sizeBand(c.subscriber_count)}</span>
                     {isRecommended ? <span className="rounded-full border border-border px-2 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">Recommended</span> : null}
                   </div>
                   <div className="truncate text-xs text-muted-foreground">
                     {fmt(c.subscriber_count)} subs · {c.video_count ?? "—"} videos{c.country ? ` · ${c.country}` : ""}
-                    {c.topic_keyword ? ` · ${c.topic_keyword}` : ""} · {c.source ?? "apps_script"}
+                    {c.topic_keyword ? ` · ${c.topic_keyword}` : ""} · {days == null ? "activity unknown" : `last upload ${days}d ago`}
                   </div>
                 </div>
                 <div className="min-w-[210px] text-sm">
@@ -237,7 +284,7 @@ export function YouTubeCandidatesSection({
                   <Youtube className="h-3.5 w-3.5" /> Channel
                 </a>
                 <div className="flex gap-2">
-                  <button disabled={busy === c.id || bulkBusy} onClick={() => void act(c.id, "keep")} className="inline-flex items-center gap-1 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground disabled:opacity-50">
+                  <button disabled={overLimit || busy === c.id || bulkBusy} onClick={() => void act(c.id, "keep")} className="inline-flex items-center gap-1 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground disabled:opacity-50">
                     <Check className="h-3.5 w-3.5" /> Keep
                   </button>
                   <button disabled={busy === c.id || bulkBusy} onClick={() => void act(c.id, "skip")} className="inline-flex items-center gap-1 rounded-md border border-input px-3 py-1.5 text-xs disabled:opacity-50">
