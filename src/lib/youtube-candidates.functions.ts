@@ -49,11 +49,12 @@ export const listYouTubeEnrichmentQueue = createServerFn({ method: "GET" })
       .from("youtube_candidates")
       .select("*")
       .eq("status", "pending")
+      .lte("subscriber_count", 20000)
       .is("business_email", null)
       .is("description_email", null)
       .in("enrichment_status", ["not_started", "error"])
-      .order("subscriber_count", { ascending: false, nullsFirst: false })
       .order("last_upload_at", { ascending: false, nullsFirst: false })
+      .order("subscriber_count", { ascending: true, nullsFirst: false })
       .limit(500);
     if (error) throw new Error(error.message);
     return (data ?? []) as unknown as YouTubeCandidate[];
@@ -127,6 +128,9 @@ export const keepYouTubeCandidate = createServerFn({ method: "POST" })
     if (!cand) throw new Error("Candidate not found");
 
     const c = cand as unknown as YouTubeCandidate;
+    if (c.subscriber_count != null && c.subscriber_count > 20000) {
+      throw new Error("This creator is over the 20,000-subscriber primary campaign limit.");
+    }
     const email = (c.business_email || c.description_email || "").toLowerCase() || null;
 
     let creatorId: string | null = null;
@@ -233,7 +237,10 @@ export const getPipelineCounts = createServerFn({ method: "GET" })
       const e = (r.email ?? "").trim().toLowerCase();
       if (e && e.includes("@")) {
         withEmail++;
-        if (!dncIds.has(r.id)) usable.add(e);
+        // The 1,000-contact campaign counts only creators within the <=20K target
+        // when subscriber data is known. Unknown-size legacy rows remain preserved
+        // but do not inflate the campaign goal.
+        if (!dncIds.has(r.id) && r.subscriber_count != null && r.subscriber_count <= 20000) usable.add(e);
       }
       if (r.subscriber_count != null && r.subscriber_count <= 20000) under20k++;
     }
@@ -241,12 +248,14 @@ export const getPipelineCounts = createServerFn({ method: "GET" })
     const { count: pending } = await context.supabase
       .from("youtube_candidates")
       .select("id", { count: "exact", head: true })
-      .eq("status", "pending");
+      .eq("status", "pending")
+      .lte("subscriber_count", 20000);
 
     const { count: enrichmentPending } = await context.supabase
       .from("youtube_candidates")
       .select("id", { count: "exact", head: true })
       .eq("status", "pending")
+      .lte("subscriber_count", 20000)
       .is("business_email", null)
       .is("description_email", null)
       .in("enrichment_status", ["not_started", "error"]);
