@@ -23,17 +23,42 @@ import { hydrateCreatorsFromDB } from "@/lib/creator-partnerships";
 import { SignInCard } from "@/routes/auth";
 import { TestModeBanner } from "@/components/TestModeBanner";
 
-const nav = [
-  { to: "/", label: "Dashboard", icon: LayoutDashboard, exact: true },
-  { to: "/creators", label: "Creators", icon: Users },
-  { to: "/creators/outreach", label: "Outreach Review", icon: ClipboardCheck },
-  { to: "/reviewed-survival-tabs-mre", label: "Reviewed Survival Tabs & MRE", icon: Users },
-  { to: "/amazon-creators", label: "Amazon Creators", icon: ShoppingBag },
-  { to: "/campaigns", label: "Campaigns", icon: Megaphone },
-  { to: "/communications", label: "Messages", icon: MessageSquare },
-  { to: "/templates", label: "Templates", icon: FileText },
-  { to: "/analytics", label: "Analytics", icon: BarChart3 },
-  { to: "/settings", label: "Settings", icon: SettingsIcon },
+const navSections = [
+  {
+    label: null,
+    items: [
+      { to: "/", label: "Dashboard", icon: LayoutDashboard, exact: true },
+    ],
+  },
+  {
+    label: "Creators",
+    items: [
+      { to: "/creators", label: "All Creators", icon: Users },
+      { to: "/reviewed-survival-tabs-mre", label: "Reviewed Creators", icon: ClipboardCheck },
+      { to: "/amazon-creators", label: "Amazon Creators", icon: ShoppingBag },
+    ],
+  },
+  {
+    label: "Outreach",
+    items: [
+      { to: "/campaigns", label: "Campaigns", icon: Megaphone },
+      { to: "/creators/outreach", label: "Outreach Review", icon: ClipboardCheck },
+      { to: "/communications", label: "Messages", icon: MessageSquare },
+      { to: "/templates", label: "Email Templates", icon: FileText },
+    ],
+  },
+  {
+    label: "Reports",
+    items: [
+      { to: "/analytics", label: "Analytics", icon: BarChart3 },
+    ],
+  },
+  {
+    label: "Admin",
+    items: [
+      { to: "/settings", label: "Settings", icon: SettingsIcon },
+    ],
+  },
 ];
 
 export function AppShell() {
@@ -86,25 +111,36 @@ export function AppShell() {
           <div className="text-[10px] uppercase tracking-[0.22em] text-sidebar-primary">Survival Tabs</div>
           <div className="font-display text-xl leading-tight text-sidebar-foreground">Creator CRM</div>
         </div>
-        <nav className="flex-1 space-y-0.5 overflow-y-auto px-3 py-4">
-          {nav.map((item) => {
-            const active = item.exact ? pathname === item.to : pathname === item.to || pathname.startsWith(item.to + "/");
-            const Icon = item.icon;
-            return (
-              <Link
-                key={item.to}
-                to={item.to}
-                className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm transition ${
-                  active
-                    ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                    : "text-sidebar-foreground/80 hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground"
-                }`}
-              >
-                <Icon className="h-4 w-4 shrink-0" />
-                <span className="truncate">{item.label}</span>
-              </Link>
-            );
-          })}
+        <nav className="flex-1 overflow-y-auto px-3 py-4">
+          {navSections.map((section, sectionIndex) => (
+            <div key={section.label ?? "home"} className={sectionIndex === 0 ? "" : "mt-5"}>
+              {section.label ? (
+                <div className="mb-1 px-3 text-[10px] font-semibold uppercase tracking-[0.18em] text-sidebar-foreground/50">
+                  {section.label}
+                </div>
+              ) : null}
+              <div className="space-y-0.5">
+                {section.items.map((item) => {
+                  const active = item.exact ? pathname === item.to : pathname === item.to || pathname.startsWith(item.to + "/");
+                  const Icon = item.icon;
+                  return (
+                    <Link
+                      key={item.to}
+                      to={item.to}
+                      className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm transition ${
+                        active
+                          ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                          : "text-sidebar-foreground/80 hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground"
+                      }`}
+                    >
+                      <Icon className="h-4 w-4 shrink-0" />
+                      <span className="truncate">{item.label}</span>
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
         </nav>
       </aside>
 
