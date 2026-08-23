@@ -145,6 +145,12 @@ export const approveEmailTemplate = createServerFn({ method: "POST" })
   });
 
 // Starter templates are static so this action never spends Lovable AI credits.
+// Use the official Survival Tabs site image as the default starter photo. Existing
+// starter text is never overwritten; re-running this only fills a missing image.
+const STARTER_IMAGE_URL =
+  "https://cdn.shopify.com/s/files/1/0409/4735/1720/t/2/assets/thesurvivaltabshomeamazon3-1641333286382.png?v=1641333289";
+const STARTER_IMAGE_ALT = "Survival Tabs emergency nutrition product";
+
 const STARTERS: Array<{ name: string; subject: string; body: string }> = [
   {
     name: "Initial Outreach (starter)",
@@ -184,29 +190,47 @@ export const seedStarterEmailTemplates = createServerFn({ method: "POST" })
     const names = STARTERS.map((x) => x.name);
     const { data: existingRows, error: existingErr } = await context.supabase
       .from("email_templates")
-      .select("name")
+      .select("name, image_url, image_alt")
       .in("name", names);
     if (existingErr) throw existingErr;
-    const already = new Set((existingRows ?? []).map((r) => String(r.name)));
+
+    const existingByName = new Map(
+      (existingRows ?? []).map((r) => [String(r.name), r] as const),
+    );
     const created: string[] = [];
+    const updated: string[] = [];
     const skipped: string[] = [];
 
     for (const starter of STARTERS) {
-      if (already.has(starter.name)) {
-        skipped.push(starter.name);
+      const existing = existingByName.get(starter.name);
+      if (existing) {
+        if (!existing.image_url) {
+          const { error } = await context.supabase
+            .from("email_templates")
+            .update({
+              image_url: STARTER_IMAGE_URL,
+              image_alt: existing.image_alt || STARTER_IMAGE_ALT,
+            } as never)
+            .eq("name", starter.name);
+          if (error) throw error;
+          updated.push(starter.name);
+        } else {
+          skipped.push(starter.name);
+        }
         continue;
       }
+
       const { error } = await context.supabase.from("email_templates").insert({
         name: starter.name,
         segment: null,
         subject: starter.subject,
         body: starter.body,
-        image_url: null,
-        image_alt: null,
+        image_url: STARTER_IMAGE_URL,
+        image_alt: STARTER_IMAGE_ALT,
         created_by: context.userId,
       } as never);
       if (error) throw error;
       created.push(starter.name);
     }
-    return { created, skipped };
+    return { created, updated, skipped };
   });
