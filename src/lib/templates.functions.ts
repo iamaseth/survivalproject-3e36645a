@@ -111,6 +111,19 @@ export const deleteEmailTemplate = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+async function requireTemplateApprover(context: { supabase: any; userId: string }) {
+  const { data: roleRows, error: roleErr } = await context.supabase
+    .from("user_roles")
+    .select("role")
+    .eq("user_id", context.userId);
+  if (roleErr) throw roleErr;
+  const roles = (roleRows ?? []).map((r: { role: string }) => r.role);
+  const canApprove = roles.includes("executive") || roles.includes("partnership_manager");
+  if (!canApprove) {
+    throw new Error("Only Executives or Partnership Managers can approve templates.");
+  }
+}
+
 export const approveEmailTemplate = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: { id: string }) => {
@@ -118,16 +131,7 @@ export const approveEmailTemplate = createServerFn({ method: "POST" })
     return input;
   })
   .handler(async ({ data, context }) => {
-    const { data: roleRows, error: roleErr } = await context.supabase
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", context.userId);
-    if (roleErr) throw roleErr;
-    const roles = (roleRows ?? []).map((r) => r.role);
-    const canApprove = roles.includes("executive") || roles.includes("partnership_manager");
-    if (!canApprove) {
-      throw new Error("Only Executives or Partnership Managers can approve templates.");
-    }
+    await requireTemplateApprover(context);
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: row, error } = await supabaseAdmin
@@ -183,6 +187,22 @@ const STARTERS: Array<{ name: string; subject: string; body: string }> = [
     body: "Hi {{creator_name}},\n\nWe would like to explore a paid partnership with you around Survival Tabs. A possible package would include one dedicated or integrated video plus two supporting story/social placements, with final deliverables and usage terms agreed together before production.\n\nIf this sounds relevant, please send your current rates and any preferred partnership structure.\n\nBest,\n{{sender_first_name}}",
   },
 ];
+
+export const approveStarterEmailTemplates = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await requireTemplateApprover(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const names = STARTERS.map((x) => x.name);
+    const approvedAt = new Date().toISOString();
+    const { data, error } = await supabaseAdmin
+      .from("email_templates")
+      .update({ approved_by: context.userId, approved_at: approvedAt, active: true })
+      .in("name", names)
+      .select("id, name");
+    if (error) throw error;
+    return { approved: data ?? [], approvedAt };
+  });
 
 export const seedStarterEmailTemplates = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
