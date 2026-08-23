@@ -37,6 +37,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as KnowledgeIdRouteImport } from './routes/knowledge.$id'
 import { Route as CreatorsIdRouteImport } from './routes/creators.$id'
 import { Route as AssetsIdRouteImport } from './routes/assets.$id'
+import { Route as ApiPublicYoutubeEnrichmentRouteImport } from './routes/api/public/youtube-enrichment'
 import { Route as ApiPublicYoutubeCandidatesRouteImport } from './routes/api/public/youtube-candidates'
 
 const WebsiteRoute = WebsiteRouteImport.update({
@@ -179,6 +180,12 @@ const AssetsIdRoute = AssetsIdRouteImport.update({
   path: '/$id',
   getParentRoute: () => AssetsRoute,
 } as any)
+const ApiPublicYoutubeEnrichmentRoute =
+  ApiPublicYoutubeEnrichmentRouteImport.update({
+    id: '/api/public/youtube-enrichment',
+    path: '/api/public/youtube-enrichment',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicYoutubeCandidatesRoute =
   ApiPublicYoutubeCandidatesRouteImport.update({
     id: '/api/public/youtube-candidates',
@@ -216,6 +223,7 @@ export interface FileRoutesByFullPath {
   '/creators/$id': typeof CreatorsIdRoute
   '/knowledge/$id': typeof KnowledgeIdRoute
   '/api/public/youtube-candidates': typeof ApiPublicYoutubeCandidatesRoute
+  '/api/public/youtube-enrichment': typeof ApiPublicYoutubeEnrichmentRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -247,6 +255,7 @@ export interface FileRoutesByTo {
   '/creators/$id': typeof CreatorsIdRoute
   '/knowledge/$id': typeof KnowledgeIdRoute
   '/api/public/youtube-candidates': typeof ApiPublicYoutubeCandidatesRoute
+  '/api/public/youtube-enrichment': typeof ApiPublicYoutubeEnrichmentRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -279,6 +288,7 @@ export interface FileRoutesById {
   '/creators/$id': typeof CreatorsIdRoute
   '/knowledge/$id': typeof KnowledgeIdRoute
   '/api/public/youtube-candidates': typeof ApiPublicYoutubeCandidatesRoute
+  '/api/public/youtube-enrichment': typeof ApiPublicYoutubeEnrichmentRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -312,6 +322,7 @@ export interface FileRouteTypes {
     | '/creators/$id'
     | '/knowledge/$id'
     | '/api/public/youtube-candidates'
+    | '/api/public/youtube-enrichment'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -343,6 +354,7 @@ export interface FileRouteTypes {
     | '/creators/$id'
     | '/knowledge/$id'
     | '/api/public/youtube-candidates'
+    | '/api/public/youtube-enrichment'
   id:
     | '__root__'
     | '/'
@@ -374,6 +386,7 @@ export interface FileRouteTypes {
     | '/creators/$id'
     | '/knowledge/$id'
     | '/api/public/youtube-candidates'
+    | '/api/public/youtube-enrichment'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -403,6 +416,7 @@ export interface RootRouteChildren {
   VideoRoute: typeof VideoRoute
   WebsiteRoute: typeof WebsiteRoute
   ApiPublicYoutubeCandidatesRoute: typeof ApiPublicYoutubeCandidatesRoute
+  ApiPublicYoutubeEnrichmentRoute: typeof ApiPublicYoutubeEnrichmentRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -603,6 +617,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AssetsIdRouteImport
       parentRoute: typeof AssetsRoute
     }
+    '/api/public/youtube-enrichment': {
+      id: '/api/public/youtube-enrichment'
+      path: '/api/public/youtube-enrichment'
+      fullPath: '/api/public/youtube-enrichment'
+      preLoaderRoute: typeof ApiPublicYoutubeEnrichmentRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/youtube-candidates': {
       id: '/api/public/youtube-candidates'
       path: '/api/public/youtube-candidates'
@@ -675,6 +696,7 @@ const rootRouteChildren: RootRouteChildren = {
   VideoRoute: VideoRoute,
   WebsiteRoute: WebsiteRoute,
   ApiPublicYoutubeCandidatesRoute: ApiPublicYoutubeCandidatesRoute,
+  ApiPublicYoutubeEnrichmentRoute: ApiPublicYoutubeEnrichmentRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

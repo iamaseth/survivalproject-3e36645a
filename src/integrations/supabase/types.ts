@@ -704,6 +704,8 @@ export type Database = {
           created_at: string
           created_by: string
           id: string
+          image_alt: string | null
+          image_url: string | null
           name: string
           segment: string | null
           subject: string
@@ -717,6 +719,8 @@ export type Database = {
           created_at?: string
           created_by?: string
           id?: string
+          image_alt?: string | null
+          image_url?: string | null
           name: string
           segment?: string | null
           subject?: string
@@ -730,6 +734,8 @@ export type Database = {
           created_at?: string
           created_by?: string
           id?: string
+          image_alt?: string | null
+          image_url?: string | null
           name?: string
           segment?: string | null
           subject?: string
@@ -1205,7 +1211,12 @@ export type Database = {
           country: string | null
           created_at: string
           description_email: string | null
+          email_source: string | null
           email_status: string
+          enrichment_checked_at: string | null
+          enrichment_error: string | null
+          enrichment_status: string
+          external_links: Json
           id: string
           last_upload_at: string | null
           notes: string | null
@@ -1228,7 +1239,12 @@ export type Database = {
           country?: string | null
           created_at?: string
           description_email?: string | null
+          email_source?: string | null
           email_status?: string
+          enrichment_checked_at?: string | null
+          enrichment_error?: string | null
+          enrichment_status?: string
+          external_links?: Json
           id?: string
           last_upload_at?: string | null
           notes?: string | null
@@ -1251,7 +1267,12 @@ export type Database = {
           country?: string | null
           created_at?: string
           description_email?: string | null
+          email_source?: string | null
           email_status?: string
+          enrichment_checked_at?: string | null
+          enrichment_error?: string | null
+          enrichment_status?: string
+          external_links?: Json
           id?: string
           last_upload_at?: string | null
           notes?: string | null
