@@ -69,12 +69,12 @@ export const upsertEmailTemplate = createServerFn({ method: "POST" })
       body: data.body,
       image_url: data.imageUrl,
       image_alt: data.imageAlt,
-    } as never;
+    } satisfies Record<string, unknown>;
 
     if (data.id) {
       const { data: row, error } = await context.supabase
         .from("email_templates")
-        .update(payload)
+        .update(payload as never)
         .eq("id", data.id)
         .select("*")
         .single();
