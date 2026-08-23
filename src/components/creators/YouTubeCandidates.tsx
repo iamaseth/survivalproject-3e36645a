@@ -81,6 +81,8 @@ export function YouTubeCandidatesSection({
   const skip = useServerFn(skipYouTubeCandidate);
   const [open, setOpen] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   const pending = useMemo(() => {
     const score = (c: YouTubeCandidate) => {
@@ -90,6 +92,51 @@ export function YouTubeCandidatesSection({
     };
     return rows.filter((r) => r.status === "pending").sort((a, b) => score(b) - score(a));
   }, [rows]);
+
+  const recommended = useMemo(
+    () => pending.filter((c) => !!(c.business_email || c.description_email) && c.subscriber_count != null && c.subscriber_count <= 20000),
+    [pending],
+  );
+
+  useEffect(() => {
+    const pendingIds = new Set(pending.map((c) => c.id));
+    setSelectedIds((current) => new Set([...current].filter((id) => pendingIds.has(id))));
+  }, [pending]);
+
+  const toggleSelected = (id: string) => {
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const selectRecommended = () => setSelectedIds(new Set(recommended.map((c) => c.id)));
+  const clearSelected = () => setSelectedIds(new Set());
+
+  const keepSelected = async () => {
+    const ids = [...selectedIds];
+    if (!ids.length) return;
+    setBulkBusy(true);
+    let created = 0;
+    let linked = 0;
+    let failed = 0;
+    try {
+      for (const id of ids) {
+        try {
+          const res = (await keep({ data: { id } })) as { creatorId: string; created: boolean };
+          if (res.created) created += 1; else linked += 1;
+        } catch {
+          failed += 1;
+        }
+      }
+      setSelectedIds(new Set());
+      await refresh();
+      toast.success(`Kept ${created + linked} candidate(s): ${created} added, ${linked} linked${failed ? `, ${failed} failed` : ""}.`);
+    } finally {
+      setBulkBusy(false);
+    }
+  };
 
   const act = async (id: string, action: "keep" | "skip") => {
     setBusy(id);
@@ -123,6 +170,23 @@ export function YouTubeCandidatesSection({
       </button>
       {open ? (
         <div className="border-t border-border">
+          {pending.length ? (
+            <div className="flex flex-wrap items-center gap-2 border-b border-border bg-secondary/20 px-4 py-3">
+              <button type="button" onClick={selectRecommended} className="rounded-md border border-input bg-background px-3 py-1.5 text-xs hover:bg-secondary">
+                Select recommended ≤20k + email ({recommended.length})
+              </button>
+              <button type="button" onClick={clearSelected} className="rounded-md border border-input bg-background px-3 py-1.5 text-xs hover:bg-secondary">Clear</button>
+              <button
+                type="button"
+                disabled={bulkBusy || selectedIds.size === 0}
+                onClick={() => void keepSelected()}
+                className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground disabled:opacity-50"
+              >
+                {bulkBusy ? "Keeping…" : `Keep selected (${selectedIds.size})`}
+              </button>
+              <span className="text-xs text-muted-foreground">This only adds/links creator records. It does not send email or delete existing influencers.</span>
+            </div>
+          ) : null}
           {pending.length === 0 ? <div className="px-4 py-5 text-sm text-muted-foreground">No candidates waiting for review.</div> : null}
           {pending.map((c) => {
             const email = c.business_email || c.description_email;
@@ -135,10 +199,21 @@ export function YouTubeCandidatesSection({
                   : c.enrichment_status === "error"
                     ? "Enrichment error"
                     : "Needs enrichment";
+            const isRecommended = !!email && c.subscriber_count != null && c.subscriber_count <= 20000;
             return (
               <div key={c.id} className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-border/60 px-4 py-3 last:border-b-0">
+                <input
+                  type="checkbox"
+                  checked={selectedIds.has(c.id)}
+                  onChange={() => toggleSelected(c.id)}
+                  aria-label={`Select ${c.channel_title || c.channel_id}`}
+                  className="h-4 w-4 rounded border-input"
+                />
                 <div className="min-w-[200px] flex-1">
-                  <div className="truncate font-medium">{c.channel_title || c.channel_id}</div>
+                  <div className="flex items-center gap-2">
+                    <div className="truncate font-medium">{c.channel_title || c.channel_id}</div>
+                    {isRecommended ? <span className="rounded-full border border-border px-2 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">Recommended</span> : null}
+                  </div>
                   <div className="truncate text-xs text-muted-foreground">
                     {fmt(c.subscriber_count)} subs · {c.video_count ?? "—"} videos{c.country ? ` · ${c.country}` : ""}
                     {c.topic_keyword ? ` · ${c.topic_keyword}` : ""} · {c.source ?? "apps_script"}
@@ -155,10 +230,10 @@ export function YouTubeCandidatesSection({
                   <Youtube className="h-3.5 w-3.5" /> Channel
                 </a>
                 <div className="flex gap-2">
-                  <button disabled={busy === c.id} onClick={() => void act(c.id, "keep")} className="inline-flex items-center gap-1 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground disabled:opacity-50">
+                  <button disabled={busy === c.id || bulkBusy} onClick={() => void act(c.id, "keep")} className="inline-flex items-center gap-1 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground disabled:opacity-50">
                     <Check className="h-3.5 w-3.5" /> Keep
                   </button>
-                  <button disabled={busy === c.id} onClick={() => void act(c.id, "skip")} className="inline-flex items-center gap-1 rounded-md border border-input px-3 py-1.5 text-xs disabled:opacity-50">
+                  <button disabled={busy === c.id || bulkBusy} onClick={() => void act(c.id, "skip")} className="inline-flex items-center gap-1 rounded-md border border-input px-3 py-1.5 text-xs disabled:opacity-50">
                     <X className="h-3.5 w-3.5" /> Skip
                   </button>
                 </div>
