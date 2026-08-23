@@ -42,7 +42,7 @@ const navSections = [
     label: "Outreach",
     items: [
       { to: "/campaigns", label: "Campaigns", icon: Megaphone },
-      { to: "/creators/outreach", label: "Outreach Review", icon: ClipboardCheck },
+      { to: "/creators/outreach", label: "Bulk Outreach", icon: ClipboardCheck },
       { to: "/communications", label: "Messages", icon: MessageSquare },
       { to: "/templates", label: "Email Templates", icon: FileText },
     ],
