@@ -18,7 +18,7 @@ const PERMANENT_TEAM: Record<string, { role: AppRole; name: string }> = {
   "atp@globenetcapitalgroup.com": { role: "executive", name: "Perry" },
   "ellezolie@gmail.com":          { role: "executive", name: "Perry" },
   "thenxyz@gmail.com":            { role: "research_manager", name: "Seth" },
-  "2phabulous@gmail.com":         { role: "research_manager", name: "Thu" },
+  "2phabulous@gmail.com":         { role: "executive", name: "Perry" },
   "renas1503@gmail.com":          { role: "partnership_manager", name: "Rena" },
   "vinapanda777@gmail.com":       { role: "partnership_coordinator", name: "Vina" },
   "alvisslohasfarms@gmail.com":   { role: "shopify_content_editor", name: "Tuan (Alvis)" },
@@ -70,7 +70,9 @@ async function fetchProfile(userId: string, email: string, meta: Record<string, 
     supabase.from("user_roles").select("role").eq("user_id", userId).maybeSingle(),
   ]);
 
-  const role = ((roleRow?.role as AppRole | undefined) ?? roster?.role) ?? null;
+  // The permanent roster is authoritative for known team accounts. This also
+  // prevents a stale database role from overriding a corrected team mapping.
+  const role = (roster?.role ?? (roleRow?.role as AppRole | undefined)) ?? null;
   const fullName =
     roster?.name ??
     profileRow?.full_name ??
