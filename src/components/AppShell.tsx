@@ -14,6 +14,7 @@ import {
   ChevronDown,
   LogOut,
   User as UserIcon,
+  ClipboardCheck,
 } from "lucide-react";
 
 import { useAuth } from "@/lib/current-user";
@@ -25,6 +26,7 @@ import { TestModeBanner } from "@/components/TestModeBanner";
 const nav = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard, exact: true },
   { to: "/creators", label: "Creators", icon: Users },
+  { to: "/creators/outreach", label: "Outreach Review", icon: ClipboardCheck },
   { to: "/reviewed-survival-tabs-mre", label: "Reviewed Survival Tabs & MRE", icon: Users },
   { to: "/amazon-creators", label: "Amazon Creators", icon: ShoppingBag },
   { to: "/campaigns", label: "Campaigns", icon: Megaphone },
