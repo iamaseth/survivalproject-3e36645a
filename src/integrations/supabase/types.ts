@@ -125,6 +125,54 @@ export type Database = {
         }
         Relationships: []
       }
+      creator_reply_classifications: {
+        Row: {
+          category: string
+          classifier_version: string
+          confidence: number
+          created_at: string
+          creator_id: string | null
+          gmail_message_id: string
+          id: string
+          next_action: string | null
+          requires_human_review: boolean
+          reviewed_at: string | null
+          reviewed_by: string | null
+          risk_flags: Json
+          updated_at: string
+        }
+        Insert: {
+          category: string
+          classifier_version?: string
+          confidence?: number
+          created_at?: string
+          creator_id?: string | null
+          gmail_message_id: string
+          id?: string
+          next_action?: string | null
+          requires_human_review?: boolean
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          risk_flags?: Json
+          updated_at?: string
+        }
+        Update: {
+          category?: string
+          classifier_version?: string
+          confidence?: number
+          created_at?: string
+          creator_id?: string | null
+          gmail_message_id?: string
+          id?: string
+          next_action?: string | null
+          requires_human_review?: boolean
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          risk_flags?: Json
+          updated_at?: string
+        }
+        Relationships: []
+      }
       creator_workspace: {
         Row: {
           activity: Json
@@ -901,6 +949,161 @@ export type Database = {
           token_sha256?: string
         }
         Relationships: []
+      }
+      outreach_campaigns: {
+        Row: {
+          allowed_offer_notes: string | null
+          brand_tone: string | null
+          created_at: string
+          created_by: string | null
+          daily_send_cap: number
+          default_template_id: string | null
+          forbidden_promises: string | null
+          goal: string | null
+          id: string
+          name: string
+          product_context: string | null
+          sample_policy: string | null
+          sending_locked: boolean
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          allowed_offer_notes?: string | null
+          brand_tone?: string | null
+          created_at?: string
+          created_by?: string | null
+          daily_send_cap?: number
+          default_template_id?: string | null
+          forbidden_promises?: string | null
+          goal?: string | null
+          id?: string
+          name: string
+          product_context?: string | null
+          sample_policy?: string | null
+          sending_locked?: boolean
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          allowed_offer_notes?: string | null
+          brand_tone?: string | null
+          created_at?: string
+          created_by?: string | null
+          daily_send_cap?: number
+          default_template_id?: string | null
+          forbidden_promises?: string | null
+          goal?: string | null
+          id?: string
+          name?: string
+          product_context?: string | null
+          sample_policy?: string | null
+          sending_locked?: boolean
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "outreach_campaigns_default_template_id_fkey"
+            columns: ["default_template_id"]
+            isOneToOne: false
+            referencedRelation: "email_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      outreach_queue_items: {
+        Row: {
+          attempt_count: number
+          body_snapshot: string | null
+          campaign_id: string
+          cancelled_reason: string | null
+          created_at: string
+          created_by: string | null
+          creator_id: string
+          error_reason: string | null
+          gmail_message_id: string | null
+          gmail_thread_id: string | null
+          id: string
+          idempotency_key: string
+          image_alt: string | null
+          image_url: string | null
+          not_before: string
+          recipient_email: string | null
+          sent_at: string | null
+          sequence_step: number
+          status: string
+          subject_snapshot: string | null
+          template_id: string | null
+          template_version: string | null
+          updated_at: string
+        }
+        Insert: {
+          attempt_count?: number
+          body_snapshot?: string | null
+          campaign_id: string
+          cancelled_reason?: string | null
+          created_at?: string
+          created_by?: string | null
+          creator_id: string
+          error_reason?: string | null
+          gmail_message_id?: string | null
+          gmail_thread_id?: string | null
+          id?: string
+          idempotency_key: string
+          image_alt?: string | null
+          image_url?: string | null
+          not_before?: string
+          recipient_email?: string | null
+          sent_at?: string | null
+          sequence_step?: number
+          status?: string
+          subject_snapshot?: string | null
+          template_id?: string | null
+          template_version?: string | null
+          updated_at?: string
+        }
+        Update: {
+          attempt_count?: number
+          body_snapshot?: string | null
+          campaign_id?: string
+          cancelled_reason?: string | null
+          created_at?: string
+          created_by?: string | null
+          creator_id?: string
+          error_reason?: string | null
+          gmail_message_id?: string | null
+          gmail_thread_id?: string | null
+          id?: string
+          idempotency_key?: string
+          image_alt?: string | null
+          image_url?: string | null
+          not_before?: string
+          recipient_email?: string | null
+          sent_at?: string | null
+          sequence_step?: number
+          status?: string
+          subject_snapshot?: string | null
+          template_id?: string | null
+          template_version?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "outreach_queue_items_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "outreach_campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "outreach_queue_items_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "email_templates"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profiles: {
         Row: {
