@@ -17,7 +17,7 @@ export type YouTubeCandidate = {
   enrichment_status: string;
   enrichment_checked_at: string | null;
   enrichment_error: string | null;
-  external_links: unknown[];
+  external_links: Array<Record<string, string | null>>;
   topic_keyword: string | null;
   last_upload_at: string | null;
   source: string | null;
@@ -63,7 +63,7 @@ export const applyYouTubeEnrichmentResult = createServerFn({ method: "POST" })
     id: string;
     business_email?: string | null;
     email_source?: string | null;
-    external_links?: unknown[];
+    external_links?: Array<Record<string, string | null>>;
     status: "found" | "no_email_found" | "error";
     error?: string | null;
   }) => {

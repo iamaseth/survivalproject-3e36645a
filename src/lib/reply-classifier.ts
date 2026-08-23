@@ -77,9 +77,7 @@ export function classifyCreatorReplyDeterministically(input: string): ReplyClass
   }
 
   const requiresHumanReview =
-    category === "needs_human" ||
-    category === "invalid" ||
-    riskFlags.length > 0;
+    category === "needs_human" || riskFlags.length > 0;
 
   return { category, confidence, riskFlags, nextAction, requiresHumanReview };
 }
