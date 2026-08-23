@@ -24,14 +24,21 @@ export function PipelineCounters({ counts }: { counts: PipelineCounts | null }) 
         ["Missing email", String(counts.missingEmail)],
         ["Pending candidates", String(counts.pendingCandidates)],
         ["Need enrichment", String(counts.enrichmentPending)],
-        ["Usable emails / 1,000", `${counts.usableEmails} / ${counts.goal}`],
+        ["Usable contacts", `${counts.usableEmails} / ${counts.goal}`],
+        ["Still needed", String(counts.remainingToGoal)],
       ]
     : [];
-  const pct = counts ? Math.min(100, Math.round((counts.usableEmails / counts.goal) * 100)) : 0;
   if (!counts) return null;
   return (
-    <div className="mb-4 rounded-xl border border-border bg-card p-3">
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7">
+    <div className="mb-4 rounded-xl border border-border bg-card p-4">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <div className="text-[11px] uppercase tracking-[0.18em] text-[color:var(--gold)]">1,000 Creator Goal</div>
+          <div className="text-sm text-muted-foreground">Grow the existing database by adding verified creator contacts. Existing records are preserved.</div>
+        </div>
+        <div className="font-display text-2xl text-foreground">{counts.progressPercent}%</div>
+      </div>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 xl:grid-cols-8">
         {items.map(([label, value]) => (
           <div key={label}>
             <div className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</div>
@@ -39,8 +46,8 @@ export function PipelineCounters({ counts }: { counts: PipelineCounts | null }) 
           </div>
         ))}
       </div>
-      <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-secondary">
-        <div className="h-full bg-primary" style={{ width: `${pct}%` }} />
+      <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-secondary">
+        <div className="h-full bg-primary" style={{ width: `${counts.progressPercent}%` }} />
       </div>
     </div>
   );
@@ -165,7 +172,7 @@ export function YouTubeCandidatesSection({
           <div className="font-semibold">
             New YouTube candidates <span className="ml-1 text-sm font-normal text-muted-foreground">({pending.length})</span>
           </div>
-          <div className="text-xs text-muted-foreground">YouTube API discovery + public contact enrichment. Keep adds to creators, Skip discards. No email is sent automatically.</div>
+          <div className="text-xs text-muted-foreground">YouTube API discovery + public contact enrichment. Keep only adds or links records after deduplication; nothing here deletes existing creators or sends email.</div>
         </div>
       </button>
       {open ? (
@@ -184,7 +191,7 @@ export function YouTubeCandidatesSection({
               >
                 {bulkBusy ? "Keeping…" : `Keep selected (${selectedIds.size})`}
               </button>
-              <span className="text-xs text-muted-foreground">This only adds/links creator records. It does not send email or delete existing influencers.</span>
+              <span className="text-xs text-muted-foreground">Add-only: existing creators are preserved and duplicates are linked instead of recreated.</span>
             </div>
           ) : null}
           {pending.length === 0 ? <div className="px-4 py-5 text-sm text-muted-foreground">No candidates waiting for review.</div> : null}
