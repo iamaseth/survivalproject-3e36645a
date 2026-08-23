@@ -185,14 +185,15 @@ export const prepareQueue = createServerFn({ method: "POST" })
       .in("category", ["rejected", "interested", "ask_price", "ask_sample", "posted"]);
     const replied = new Set((rejected ?? []).map((r) => r.creator_id).filter(Boolean) as string[]);
 
-    let template: { id: string; subject: string; body: string; image_url: string | null; image_alt: string | null } | null = null;
+    type TemplateSnapshot = { id: string; subject: string; body: string; image_url: string | null; image_alt: string | null };
+    let template: TemplateSnapshot | null = null;
     if (campaign.default_template_id) {
       const { data: t } = await context.supabase
         .from("email_templates")
         .select("id, subject, body, image_url, image_alt")
         .eq("id", campaign.default_template_id)
         .maybeSingle();
-      template = (t as typeof template) ?? null;
+      template = (t as TemplateSnapshot | null) ?? null;
     }
 
     const skipped: Array<{ id: string; reason: string }> = [];
