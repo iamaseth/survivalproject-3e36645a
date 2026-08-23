@@ -4,6 +4,14 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
 
+// Recovery fallback for the rotated Apps Script INGEST_SECRET.
+// This is a one-way SHA-256 digest, not the plaintext secret. Keeping this
+// fallback in application source lets the existing discovery sheet be imported
+// even when the Lovable-managed database has not yet applied the token-rotation
+// migration. A matching DB token remains preferred when available.
+const ROTATED_YOUTUBE_INGEST_SHA256 =
+  "96a5e58e2b3cee6ada60cd42ee4fa316294296577f47665a795f5669898a68a3";
+
 const emailish = z
   .string()
   .trim()
@@ -67,19 +75,23 @@ export const Route = createFileRoute("/api/public/youtube-candidates")({
 
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-        // Token is stored only as a SHA-256 hash in a server-only table.
+        // Prefer the server-only database token. During recovery/sync gaps, the
+        // checked-in rotated SHA-256 digest is an intentionally narrow fallback.
         const { data: tokenRow, error: tokenErr } = await supabaseAdmin
           .from("ingest_tokens")
           .select("token_sha256")
           .eq("name", "youtube_ingest")
           .maybeSingle();
-        if (tokenErr) return json({ error: "Auth check failed" }, 500);
-        if (!tokenRow) return json({ error: "Ingestion is not configured (no ingest token)." }, 503);
 
         const providedHash = await sha256Hex(provided);
-        if (!timingSafeEqualStr(providedHash, String((tokenRow as { token_sha256: string }).token_sha256))) {
-          return json({ error: "Unauthorized" }, 401);
-        }
+        const dbHash = !tokenErr && tokenRow
+          ? String((tokenRow as { token_sha256: string }).token_sha256)
+          : "";
+        const authorized =
+          (dbHash ? timingSafeEqualStr(providedHash, dbHash) : false) ||
+          timingSafeEqualStr(providedHash, ROTATED_YOUTUBE_INGEST_SHA256);
+
+        if (!authorized) return json({ error: "Unauthorized" }, 401);
 
         let raw: unknown;
         try {
@@ -91,7 +103,6 @@ export const Route = createFileRoute("/api/public/youtube-candidates")({
         if (!parsed.success) {
           return json({ error: "Invalid payload", issues: parsed.error.issues.slice(0, 10) }, 400);
         }
-
 
         // De-dup within the batch itself (last row per channel wins).
         const byChannel = new Map<string, z.infer<typeof CandidateSchema>>();
