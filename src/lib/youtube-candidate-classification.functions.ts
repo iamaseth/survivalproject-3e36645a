@@ -61,9 +61,10 @@ export const setYouTubeCandidateClassification = createServerFn({ method: "POST"
   });
 
 /**
- * Applies classifications in one server request.
- * Important: these rows already exist. Use UPDATE, not UPSERT/INSERT, so RLS only
- * needs the same update permission used by the working single-row classifier.
+ * Applies classifications to existing rows only. UPDATE is required here because
+ * youtube_candidates RLS intentionally blocks inserts from this workflow.
+ * Writes run in small parallel groups so imports finish quickly without flooding
+ * Supabase or changing any non-classification fields.
  */
 export const setYouTubeCandidateClassificationsBatch = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -87,22 +88,31 @@ export const setYouTubeCandidateClassificationsBatch = createServerFn({ method: 
       .in("id", ids);
     if (readErr) throw new Error(readErr.message);
 
-    let classified = 0;
-    for (const raw of currentRows ?? []) {
+    const rows = (currentRows ?? []).map((raw) => {
       const current = raw as unknown as {
         id: string;
         external_links?: Array<Record<string, string | null>> | null;
       };
-      const classification = requested.get(current.id);
-      if (!classification) continue;
-      const existing = Array.isArray(current.external_links) ? current.external_links : [];
+      return {
+        id: current.id,
+        classification: requested.get(current.id)!,
+        externalLinks: Array.isArray(current.external_links) ? current.external_links : [],
+      };
+    });
 
-      const { error: writeErr } = await context.supabase
-        .from("youtube_candidates")
-        .update({ external_links: withClassification(existing, classification) } as never)
-        .eq("id", current.id);
-      if (writeErr) throw new Error(writeErr.message);
-      classified += 1;
+    let classified = 0;
+    const concurrency = 10;
+    for (let start = 0; start < rows.length; start += concurrency) {
+      const group = rows.slice(start, start + concurrency);
+      const results = await Promise.all(group.map(async (row) => {
+        const { error } = await context.supabase
+          .from("youtube_candidates")
+          .update({ external_links: withClassification(row.externalLinks, row.classification) } as never)
+          .eq("id", row.id);
+        if (error) throw new Error(error.message);
+        return 1;
+      }));
+      classified += results.length;
     }
 
     return {
