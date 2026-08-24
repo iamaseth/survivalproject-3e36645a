@@ -62,8 +62,8 @@ export const setYouTubeCandidateClassification = createServerFn({ method: "POST"
 
 /**
  * Applies classifications in one server request.
- * One read fetches all existing candidate rows, then a single upsert writes only
- * rows that actually exist. This avoids hundreds of browser/server round trips.
+ * Important: these rows already exist. Use UPDATE, not UPSERT/INSERT, so RLS only
+ * needs the same update permission used by the working single-row classifier.
  */
 export const setYouTubeCandidateClassificationsBatch = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -87,26 +87,27 @@ export const setYouTubeCandidateClassificationsBatch = createServerFn({ method: 
       .in("id", ids);
     if (readErr) throw new Error(readErr.message);
 
-    const updates = (currentRows ?? []).map((raw) => {
-      const current = raw as unknown as { id: string; external_links?: Array<Record<string, string | null>> | null };
-      const classification = requested.get(current.id)!;
-      const existing = Array.isArray(current.external_links) ? current.external_links : [];
-      return {
-        id: current.id,
-        external_links: withClassification(existing, classification),
+    let classified = 0;
+    for (const raw of currentRows ?? []) {
+      const current = raw as unknown as {
+        id: string;
+        external_links?: Array<Record<string, string | null>> | null;
       };
-    });
+      const classification = requested.get(current.id);
+      if (!classification) continue;
+      const existing = Array.isArray(current.external_links) ? current.external_links : [];
 
-    if (updates.length) {
       const { error: writeErr } = await context.supabase
         .from("youtube_candidates")
-        .upsert(updates as never, { onConflict: "id" });
+        .update({ external_links: withClassification(existing, classification) } as never)
+        .eq("id", current.id);
       if (writeErr) throw new Error(writeErr.message);
+      classified += 1;
     }
 
     return {
       received: data.rows.length,
-      classified: updates.length,
-      missing: data.rows.length - updates.length,
+      classified,
+      missing: data.rows.length - classified,
     };
   });
