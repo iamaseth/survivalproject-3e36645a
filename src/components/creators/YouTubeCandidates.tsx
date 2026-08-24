@@ -210,12 +210,12 @@ export function YouTubeCandidatesSection({
     <section className="overflow-hidden rounded-xl border border-border bg-card">
       <button onClick={() => setOpen((v) => !v)} className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-secondary/40">
         {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-        <div className="grid h-7 w-7 place-items-center rounded-full bg-[color:var(--gold)] text-xs font-semibold text-[color:var(--forest)]">0</div>
+        <div className="grid h-7 w-7 place-items-center rounded-full bg-[color:var(--gold)] text-xs font-semibold text-[color:var(--forest)]">R</div>
         <div className="min-w-0 flex-1">
           <div className="font-semibold">
-            New YouTube candidates <span className="ml-1 text-sm font-normal text-muted-foreground">({pending.length})</span>
+            Candidates — research before adding <span className="ml-1 text-sm font-normal text-muted-foreground">({pending.length})</span>
           </div>
-          <div className="text-xs text-muted-foreground">Ranked for Survival Tabs: ≤20K first, 1K–10K highest priority, active channels and legitimate public contact paths favored.</div>
+          <div className="text-xs text-muted-foreground">Not yet in the main creator list. Review the YouTube channel and contact details. Keep = add to main creators. Skip = unsuitable. Leave here if more research is needed.</div>
         </div>
       </button>
       {open ? (
