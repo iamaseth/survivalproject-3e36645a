@@ -238,62 +238,107 @@ export function YouTubeCandidatesSection({
             </div>
           ) : null}
           {pending.length === 0 ? <div className="px-4 py-5 text-sm text-muted-foreground">No candidates waiting for review.</div> : null}
-          {pending.map((c) => {
-            const email = c.business_email || c.description_email;
-            const url = c.channel_url || `https://www.youtube.com/channel/${c.channel_id}`;
-            const days = daysSinceUpload(c.last_upload_at);
-            const overLimit = c.subscriber_count != null && c.subscriber_count > 20000;
-            const enrichmentLabel =
-              c.enrichment_status === "found"
-                ? "Enriched"
-                : c.enrichment_status === "no_email_found"
-                  ? "Checked — no email"
-                  : c.enrichment_status === "error"
-                    ? "Enrichment error"
-                    : "Needs enrichment";
-            const isRecommended = recommended.some((r) => r.id === c.id);
-            return (
-              <div key={c.id} className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-border/60 px-4 py-3 last:border-b-0">
-                <input
-                  type="checkbox"
-                  checked={selectedIds.has(c.id)}
-                  onChange={() => toggleSelected(c.id)}
-                  disabled={overLimit}
-                  aria-label={`Select ${c.channel_title || c.channel_id}`}
-                  className="h-4 w-4 rounded border-input"
-                />
-                <div className="min-w-[220px] flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <div className="truncate font-medium">{c.channel_title || c.channel_id}</div>
-                    <span className="rounded-full border border-border px-2 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">{sizeBand(c.subscriber_count)}</span>
-                    {isRecommended ? <span className="rounded-full border border-border px-2 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">Recommended</span> : null}
-                  </div>
-                  <div className="truncate text-xs text-muted-foreground">
-                    {fmt(c.subscriber_count)} subs · {c.video_count ?? "—"} videos{c.country ? ` · ${c.country}` : ""}
-                    {c.topic_keyword ? ` · ${c.topic_keyword}` : ""} · {days == null ? "activity unknown" : `last upload ${days}d ago`}
-                  </div>
-                </div>
-                <div className="min-w-[210px] text-sm">
-                  {email ? <span className="text-foreground">{email}</span> : <span className="text-muted-foreground">No public email yet</span>}
-                  <div className="text-[11px] uppercase tracking-wide text-muted-foreground">
-                    {c.email_source ? `${c.email_source} · ` : ""}{enrichmentLabel}
-                  </div>
-                  {c.enrichment_error ? <div className="max-w-[260px] truncate text-[11px] text-destructive">{c.enrichment_error}</div> : null}
-                </div>
-                <a {...externalLinkProps(url)} className="inline-flex items-center gap-1 rounded-md border border-input px-2.5 py-1.5 text-xs hover:bg-secondary">
-                  <Youtube className="h-3.5 w-3.5" /> Channel
-                </a>
-                <div className="flex gap-2">
-                  <button disabled={overLimit || busy === c.id || bulkBusy} onClick={() => void act(c.id, "keep")} className="inline-flex items-center gap-1 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground disabled:opacity-50">
-                    <Check className="h-3.5 w-3.5" /> Keep
-                  </button>
-                  <button disabled={busy === c.id || bulkBusy} onClick={() => void act(c.id, "skip")} className="inline-flex items-center gap-1 rounded-md border border-input px-3 py-1.5 text-xs disabled:opacity-50">
-                    <X className="h-3.5 w-3.5" /> Skip
-                  </button>
-                </div>
-              </div>
-            );
-          })}
+          {pending.length > 0 ? (
+            <div className="w-full overflow-x-auto">
+              <table className="w-full min-w-[1320px] border-collapse text-sm">
+                <thead className="sticky top-0 z-10 bg-secondary/45 text-left text-[11px] uppercase tracking-wide text-muted-foreground">
+                  <tr className="border-b border-border">
+                    <th className="w-12 px-4 py-3">Select</th>
+                    <th className="min-w-[220px] px-3 py-3">Creator</th>
+                    <th className="w-[100px] px-3 py-3 text-right">Subscribers</th>
+                    <th className="w-[90px] px-3 py-3 text-right">Videos</th>
+                    <th className="w-[80px] px-3 py-3">Country</th>
+                    <th className="min-w-[190px] px-3 py-3">Niche / Description</th>
+                    <th className="w-[115px] px-3 py-3">Last Upload</th>
+                    <th className="min-w-[155px] px-3 py-3">Priority</th>
+                    <th className="min-w-[125px] px-3 py-3">Recommendation</th>
+                    <th className="min-w-[220px] px-3 py-3">Contact</th>
+                    <th className="min-w-[150px] px-3 py-3">Status</th>
+                    <th className="w-[95px] px-3 py-3">Channel</th>
+                    <th className="w-[160px] px-3 py-3">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pending.map((c) => {
+                    const email = c.business_email || c.description_email;
+                    const url = c.channel_url || `https://www.youtube.com/channel/${c.channel_id}`;
+                    const days = daysSinceUpload(c.last_upload_at);
+                    const overLimit = c.subscriber_count != null && c.subscriber_count > 20000;
+                    const enrichmentLabel =
+                      c.enrichment_status === "found"
+                        ? "Enriched"
+                        : c.enrichment_status === "no_email_found"
+                          ? "Checked — no email"
+                          : c.enrichment_status === "error"
+                            ? "Enrichment error"
+                            : "Needs enrichment";
+                    const isRecommended = recommended.some((r) => r.id === c.id);
+
+                    return (
+                      <tr key={c.id} className="border-b border-border/60 align-middle hover:bg-secondary/25">
+                        <td className="px-4 py-3">
+                          <input
+                            type="checkbox"
+                            checked={selectedIds.has(c.id)}
+                            onChange={() => toggleSelected(c.id)}
+                            disabled={overLimit}
+                            aria-label={`Select ${c.channel_title || c.channel_id}`}
+                            className="h-4 w-4 rounded border-input"
+                          />
+                        </td>
+                        <td className="px-3 py-3">
+                          <div className="max-w-[260px] font-medium text-foreground">{c.channel_title || c.channel_id}</div>
+                          <div className="mt-0.5 max-w-[260px] truncate text-[11px] text-muted-foreground">{c.channel_id}</div>
+                        </td>
+                        <td className="px-3 py-3 text-right font-medium tabular-nums">{fmt(c.subscriber_count)}</td>
+                        <td className="px-3 py-3 text-right tabular-nums">{c.video_count ?? "—"}</td>
+                        <td className="px-3 py-3">{c.country || "—"}</td>
+                        <td className="px-3 py-3">
+                          <div className="max-w-[220px] whitespace-normal text-foreground">{c.topic_keyword || "—"}</div>
+                        </td>
+                        <td className="px-3 py-3 tabular-nums">{days == null ? "Unknown" : `${days}d ago`}</td>
+                        <td className="px-3 py-3">
+                          <span className="inline-flex rounded-full border border-border px-2 py-1 text-[10px] uppercase tracking-wide text-muted-foreground">
+                            {sizeBand(c.subscriber_count)}
+                          </span>
+                        </td>
+                        <td className="px-3 py-3">
+                          {isRecommended ? (
+                            <span className="inline-flex rounded-full border border-border px-2 py-1 text-[10px] uppercase tracking-wide text-muted-foreground">Recommended</span>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">—</span>
+                          )}
+                        </td>
+                        <td className="px-3 py-3">
+                          <div className="max-w-[230px] break-all text-foreground">{email || "No public email yet"}</div>
+                          {c.email_source ? <div className="mt-0.5 text-[11px] text-muted-foreground">{c.email_source}</div> : null}
+                        </td>
+                        <td className="px-3 py-3">
+                          <div className="text-xs uppercase tracking-wide text-muted-foreground">{enrichmentLabel}</div>
+                          {c.enrichment_error ? <div className="mt-0.5 max-w-[190px] truncate text-[11px] text-destructive">{c.enrichment_error}</div> : null}
+                        </td>
+                        <td className="px-3 py-3">
+                          <a {...externalLinkProps(url)} className="inline-flex items-center gap-1 rounded-md border border-input px-2.5 py-1.5 text-xs hover:bg-secondary">
+                            <Youtube className="h-3.5 w-3.5" /> Open
+                          </a>
+                        </td>
+                        <td className="px-3 py-3">
+                          <div className="flex gap-2">
+                            <button disabled={overLimit || busy === c.id || bulkBusy} onClick={() => void act(c.id, "keep")} className="inline-flex items-center gap-1 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground disabled:opacity-50">
+                              <Check className="h-3.5 w-3.5" /> Keep
+                            </button>
+                            <button disabled={busy === c.id || bulkBusy} onClick={() => void act(c.id, "skip")} className="inline-flex items-center gap-1 rounded-md border border-input px-3 py-1.5 text-xs disabled:opacity-50">
+                              <X className="h-3.5 w-3.5" /> Skip
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          ) : null}
         </div>
       ) : null}
     </section>
