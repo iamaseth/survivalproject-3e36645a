@@ -1,14 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { ChevronDown, ChevronRight, Check, X, Youtube, Mail, Download } from "lucide-react";
+import { ChevronDown, ChevronRight, Check, X, Youtube, Mail, Download, Upload } from "lucide-react";
 import {
   listYouTubeCandidates,
   keepYouTubeCandidate,
   skipYouTubeCandidate,
   getPipelineCounts,
+  applyReviewedCandidateEnrichmentBatch,
   type YouTubeCandidate,
   type PipelineCounts,
+  type ReviewedCandidateEnrichment,
 } from "@/lib/youtube-candidates.functions";
 import { externalLinkProps } from "@/lib/external-link";
 
@@ -60,6 +62,65 @@ function sizeBand(subs: number | null) {
 function csvCell(value: unknown) {
   const text = value == null ? "" : String(value);
   return `"${text.replace(/"/g, '""')}"`;
+}
+
+function parseCsv(text: string) {
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let field = "";
+  let quoted = false;
+  for (let i = 0; i < text.length; i += 1) {
+    const ch = text[i];
+    if (quoted) {
+      if (ch === '"' && text[i + 1] === '"') {
+        field += '"';
+        i += 1;
+      } else if (ch === '"') {
+        quoted = false;
+      } else {
+        field += ch;
+      }
+    } else if (ch === '"') {
+      quoted = true;
+    } else if (ch === ",") {
+      row.push(field.trim());
+      field = "";
+    } else if (ch === "\n") {
+      row.push(field.trim());
+      if (row.some(Boolean)) rows.push(row);
+      row = [];
+      field = "";
+    } else if (ch !== "\r") {
+      field += ch;
+    }
+  }
+  row.push(field.trim());
+  if (row.some(Boolean)) rows.push(row);
+  return rows;
+}
+
+function enrichmentRowsFromCsv(text: string): ReviewedCandidateEnrichment[] {
+  const rows = parseCsv(text.replace(/^\uFEFF/, ""));
+  if (rows.length < 2) throw new Error("CSV has no research rows.");
+  const headers = rows[0].map((h) => h.trim().toLowerCase());
+  const col = (name: string) => headers.indexOf(name.toLowerCase());
+  const idCol = col("Candidate ID");
+  if (idCol < 0) throw new Error("CSV must include a Candidate ID column.");
+  const read = (row: string[], name: string) => {
+    const index = col(name);
+    return index >= 0 ? row[index] || null : null;
+  };
+  return rows.slice(1).map((row) => ({
+    id: row[idCol]?.trim() || "",
+    email: read(row, "Perplexity Email"),
+    emailSource: read(row, "Email Source URL"),
+    website: read(row, "Website"),
+    instagram: read(row, "Instagram"),
+    tiktok: read(row, "TikTok"),
+    facebook: read(row, "Facebook"),
+    amazonStorefront: read(row, "Amazon Storefront"),
+    otherLinks: read(row, "Other Useful Links"),
+  })).filter((row) => row.id);
 }
 
 export function PipelineCounters({ counts }: { counts: PipelineCounts | null }) {
@@ -133,9 +194,11 @@ export function YouTubeCandidatesSection({
 }) {
   const keep = useServerFn(keepYouTubeCandidate);
   const skip = useServerFn(skipYouTubeCandidate);
+  const applyEnrichment = useServerFn(applyReviewedCandidateEnrichmentBatch);
   const [open, setOpen] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
   const [bulkBusy, setBulkBusy] = useState(false);
+  const [importBusy, setImportBusy] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   const pending = useMemo(
@@ -207,6 +270,26 @@ export function YouTubeCandidatesSection({
     toast.success(`Downloaded ${pending.length} candidate(s) for Perplexity research.`);
   };
 
+  const uploadResearchCsv = async (file: File | undefined) => {
+    if (!file) return;
+    setImportBusy(true);
+    try {
+      const parsed = enrichmentRowsFromCsv(await file.text());
+      if (!parsed.length) throw new Error("No Candidate IDs were found in the CSV.");
+      const totals = { received: 0, updated: 0, missing: 0, emailAdded: 0, emailConflict: 0, linksAdded: 0 };
+      for (let start = 0; start < parsed.length; start += 100) {
+        const result = (await applyEnrichment({ data: { rows: parsed.slice(start, start + 100) } })) as typeof totals;
+        for (const key of Object.keys(totals) as Array<keyof typeof totals>) totals[key] += result[key] ?? 0;
+      }
+      await refresh();
+      toast.success(`Research import complete: ${totals.updated} updated, ${totals.emailAdded} email(s) added, ${totals.linksAdded} link(s) added, ${totals.emailConflict} email conflict(s), ${totals.missing} unmatched.`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Research import failed");
+    } finally {
+      setImportBusy(false);
+    }
+  };
+
   const keepSelected = async () => {
     const ids = [...selectedIds];
     if (!ids.length) return;
@@ -271,7 +354,7 @@ export function YouTubeCandidatesSection({
               <button type="button" onClick={clearSelected} className="rounded-md border border-input bg-background px-2 py-1 text-xs hover:bg-secondary">Clear</button>
               <button
                 type="button"
-                disabled={bulkBusy || selectedIds.size === 0}
+                disabled={bulkBusy || importBusy || selectedIds.size === 0}
                 onClick={() => void keepSelected()}
                 className="rounded-md bg-primary px-2 py-1 text-xs font-medium text-primary-foreground disabled:opacity-50"
               >
@@ -280,7 +363,21 @@ export function YouTubeCandidatesSection({
               <button type="button" onClick={downloadResearchCsv} className="inline-flex items-center gap-1 rounded-md border border-input bg-background px-2 py-1 text-xs hover:bg-secondary" title="Download the pending candidate list for Perplexity research">
                 <Download className="h-3.5 w-3.5" /> Download research CSV
               </button>
-              <span className="text-[11px] text-muted-foreground">Add-only; duplicates link to existing creators.</span>
+              <label className={`inline-flex items-center gap-1 rounded-md border border-input bg-background px-2 py-1 text-xs hover:bg-secondary ${importBusy ? "pointer-events-none opacity-50" : "cursor-pointer"}`} title="Upload a completed Perplexity research CSV. Add-only: existing emails are not replaced.">
+                <Upload className="h-3.5 w-3.5" /> {importBusy ? "Importing…" : "Upload enrichment CSV"}
+                <input
+                  type="file"
+                  accept=".csv,text/csv"
+                  className="hidden"
+                  disabled={importBusy}
+                  onChange={(event) => {
+                    const file = event.target.files?.[0];
+                    event.target.value = "";
+                    void uploadResearchCsv(file);
+                  }}
+                />
+              </label>
+              <span className="text-[11px] text-muted-foreground">Research import is add-only. It does not Keep, Skip, delete, or overwrite existing emails.</span>
             </div>
           ) : null}
           {pending.length === 0 ? <div className="px-4 py-5 text-sm text-muted-foreground">No candidates waiting for review.</div> : null}
@@ -372,10 +469,10 @@ export function YouTubeCandidatesSection({
                         </td>
                         <td className="px-2 py-2">
                           <div className="flex items-center gap-1">
-                            <button title="Keep candidate" aria-label="Keep candidate" disabled={overLimit || busy === c.id || bulkBusy} onClick={() => void act(c.id, "keep")} className="inline-flex h-7 items-center gap-1 rounded-md bg-primary px-2 text-[11px] font-medium text-primary-foreground disabled:opacity-50">
+                            <button title="Keep candidate" aria-label="Keep candidate" disabled={overLimit || busy === c.id || bulkBusy || importBusy} onClick={() => void act(c.id, "keep")} className="inline-flex h-7 items-center gap-1 rounded-md bg-primary px-2 text-[11px] font-medium text-primary-foreground disabled:opacity-50">
                               <Check className="h-3 w-3" /> Keep
                             </button>
-                            <button title="Skip candidate" aria-label="Skip candidate" disabled={busy === c.id || bulkBusy} onClick={() => void act(c.id, "skip")} className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-input disabled:opacity-50">
+                            <button title="Skip candidate" aria-label="Skip candidate" disabled={busy === c.id || bulkBusy || importBusy} onClick={() => void act(c.id, "skip")} className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-input disabled:opacity-50">
                               <X className="h-3.5 w-3.5" />
                             </button>
                           </div>
