@@ -1,0 +1,141 @@
+// Survival Tabs — creator website email enrichment v2
+// Add this as a NEW Google Apps Script file in the same project.
+// Requires the existing candidate-bulk-research.gs helpers.
+// ZERO YouTube API calls. Never guesses emails. Never sends outreach.
+
+function runCreatorPublicWebsiteEmailEnrichmentV2() {
+  const secret = PropertiesService.getScriptProperties().getProperty('INGEST_SECRET');
+  if (!secret) throw new Error('Missing Script Property: INGEST_SECRET');
+
+  Logger.log('PUBLIC WEBSITE EMAIL ENRICHMENT V2 START');
+  Logger.log('YouTube API calls: 0');
+
+  const report = fetchCreatorContactReport_(secret);
+  const queue = (((report || {}).samples || {}).public_link_research || []);
+  const props = PropertiesService.getScriptProperties();
+  const doneRaw = props.getProperty('ST_CREATOR_WEB_RESEARCH_DONE_V2') || '[]';
+  let done;
+  try { done = new Set(JSON.parse(doneRaw)); } catch (e) { done = new Set(); }
+
+  const remaining = queue.filter(row => row && row.id && !done.has(String(row.id)));
+  const batch = remaining.slice(0, 6);
+
+  Logger.log('Public-link queue currently: ' + queue.length);
+  Logger.log('Already attempted in V2: ' + done.size);
+  Logger.log('This run: ' + batch.length);
+
+  let websitesFetched = 0;
+  let emailsFound = 0;
+  let crmUpdated = 0;
+
+  batch.forEach(row => {
+    const id = String(row.id);
+    const title = String(row.channel_title || id);
+    const links = Array.isArray(row.links) ? row.links : [];
+    const websites = stSelectCreatorOwnedWebsitesV2_(links);
+    Logger.log('Researching: ' + title + ' | eligible websites=' + websites.length + (websites.length ? ' | ' + websites.join(' | ') : ''));
+
+    let found = null;
+    for (let i = 0; i < websites.length && !found; i++) {
+      const result = stResearchWebsiteForPublicEmailV2_(websites[i]);
+      websitesFetched += result.fetchCount;
+      if (result.email) found = result;
+    }
+
+    if (found && found.email && found.sourceUrl) {
+      const applied = postEnrichmentBatch_(secret, [{
+        id: id,
+        business_email: found.email,
+        email_source: found.sourceUrl,
+        external_links: [],
+        status: 'found',
+        error: null,
+      }]);
+      emailsFound += 1;
+      crmUpdated += Number(applied.updated || 0);
+      Logger.log('FOUND ' + title + ': ' + found.email + ' @ ' + found.sourceUrl);
+    } else {
+      Logger.log('No public website email found: ' + title);
+    }
+
+    done.add(id);
+    props.setProperty('ST_CREATOR_WEB_RESEARCH_DONE_V2', JSON.stringify(Array.from(done)));
+  });
+
+  Logger.log('PUBLIC WEBSITE EMAIL ENRICHMENT V2 COMPLETE');
+  Logger.log('Creators attempted this run: ' + batch.length);
+  Logger.log('HTTP pages fetched: ' + websitesFetched);
+  Logger.log('Public emails found: ' + emailsFound);
+  Logger.log('CRM rows updated: ' + crmUpdated);
+  Logger.log('YouTube API calls: 0');
+  Logger.log('Remaining V2 queue: ' + Math.max(0, remaining.length - batch.length));
+}
+
+function resetCreatorPublicWebsiteResearchProgressV2() {
+  PropertiesService.getScriptProperties().deleteProperty('ST_CREATOR_WEB_RESEARCH_DONE_V2');
+  Logger.log('V2 website research progress reset. No CRM data changed.');
+}
+
+function stNormalizePublicUrlV2_(value) {
+  let raw = String(value || '').trim();
+  if (!raw) return '';
+
+  // Accept normal URLs and Markdown-shaped URLs such as [https://site.com](https://site.com).
+  const md = raw.match(/^\[[^\]]*\]\((https?:\/\/[^)]+)\)$/i);
+  if (md) raw = md[1];
+
+  // Fallback: extract the first http(s) URL from any wrapper text.
+  if (!/^https?:\/\//i.test(raw)) {
+    const match = raw.match(/https?:\/\/[^\s\]\)<>"']+/i);
+    if (match) raw = match[0];
+  }
+
+  return raw.replace(/[.,;:!?]+$/, '');
+}
+
+function stSelectCreatorOwnedWebsitesV2_(links) {
+  const blocked = /(youtube\.com|youtu\.be|instagram\.com|facebook\.com|fb\.com|tiktok\.com|amazon\.|amzn\.to|patreon\.com|udemy\.com|discord\.|bit\.ly|printify\.me)/i;
+  const seenHosts = new Set();
+  const out = [];
+
+  (links || []).forEach(item => {
+    const raw = stNormalizePublicUrlV2_((item || {}).url);
+    if (!/^https?:\/\//i.test(raw) || blocked.test(raw)) return;
+    try {
+      const u = new URL(raw);
+      const host = u.hostname.toLowerCase().replace(/^www\./, '');
+      if (!host || seenHosts.has(host)) return;
+      seenHosts.add(host);
+      out.push(u.origin + '/');
+    } catch (e) {}
+  });
+
+  return out.slice(0, 2);
+}
+
+function stResearchWebsiteForPublicEmailV2_(baseUrl) {
+  const paths = ['', 'contact', 'contact-us', 'about', 'about-us'];
+  let fetchCount = 0;
+
+  for (let i = 0; i < paths.length; i++) {
+    const url = paths[i] ? baseUrl.replace(/\/$/, '') + '/' + paths[i] : baseUrl;
+    try {
+      const response = UrlFetchApp.fetch(url, {
+        method: 'get',
+        followRedirects: true,
+        muteHttpExceptions: true,
+        headers: { 'User-Agent': 'Mozilla/5.0 (compatible; SurvivalTabsPublicResearch/2.0)' },
+      });
+      fetchCount += 1;
+      const code = response.getResponseCode();
+      if (code < 200 || code >= 400) continue;
+      const html = response.getContentText();
+      const emails = publicEmailsFromText_(html);
+      if (emails.length) return { email: emails[0], sourceUrl: url, fetchCount: fetchCount };
+    } catch (e) {
+      fetchCount += 1;
+    }
+  }
+
+  return { email: null, sourceUrl: null, fetchCount: fetchCount };
+}
