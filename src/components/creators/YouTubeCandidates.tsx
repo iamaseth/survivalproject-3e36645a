@@ -12,6 +12,10 @@ import {
   type PipelineCounts,
   type ReviewedCandidateEnrichment,
 } from "@/lib/youtube-candidates.functions";
+import {
+  setYouTubeCandidateClassification,
+  type CandidateClassification,
+} from "@/lib/youtube-candidate-classification.functions";
 import { externalLinkProps } from "@/lib/external-link";
 
 const fmt = (n: number | null | undefined) =>
@@ -53,10 +57,29 @@ function candidatePriority(c: YouTubeCandidate) {
 function sizeBand(subs: number | null) {
   if (subs == null) return "Size unknown";
   if (subs < 1000) return "Nano · promising";
-  if (subs <= 5000) return "Very high";
   if (subs <= 10000) return "Very high";
   if (subs <= 20000) return "High";
   return "Over 20K · exclude";
+}
+
+function candidateClassification(c: YouTubeCandidate): CandidateClassification {
+  const marker = (Array.isArray(c.external_links) ? c.external_links : []).find(
+    (item) => item?.kind === "research_classification",
+  );
+  const value = marker?.source as CandidateClassification | undefined;
+  return value && ["creator", "brand_company", "competitor", "organization", "needs_review"].includes(value)
+    ? value
+    : "needs_review";
+}
+
+function classificationLabel(value: CandidateClassification) {
+  switch (value) {
+    case "creator": return "Creator";
+    case "brand_company": return "Brand / company";
+    case "competitor": return "Competitor";
+    case "organization": return "Organization";
+    default: return "Needs review";
+  }
 }
 
 function csvCell(value: unknown) {
@@ -99,7 +122,17 @@ function parseCsv(text: string) {
   return rows;
 }
 
-function enrichmentRowsFromCsv(text: string): ReviewedCandidateEnrichment[] {
+function normalizeClassification(raw: string | null): CandidateClassification | null {
+  const value = (raw || "").trim().toLowerCase().replace(/[\s/-]+/g, "_");
+  if (["creator", "influencer", "independent_creator"].includes(value)) return "creator";
+  if (["brand", "company", "brand_company", "business"].includes(value)) return "brand_company";
+  if (["competitor", "direct_competitor"].includes(value)) return "competitor";
+  if (["organization", "government", "agency", "nonprofit", "ngo"].includes(value)) return "organization";
+  if (["needs_review", "review", "unclear", "unknown"].includes(value)) return "needs_review";
+  return null;
+}
+
+function researchRowsFromCsv(text: string) {
   const rows = parseCsv(text.replace(/^\uFEFF/, ""));
   if (rows.length < 2) throw new Error("CSV has no research rows.");
   const headers = rows[0].map((h) => h.trim().toLowerCase());
@@ -110,17 +143,21 @@ function enrichmentRowsFromCsv(text: string): ReviewedCandidateEnrichment[] {
     const index = col(name);
     return index >= 0 ? row[index] || null : null;
   };
+
   return rows.slice(1).map((row) => ({
-    id: row[idCol]?.trim() || "",
-    email: read(row, "Perplexity Email"),
-    emailSource: read(row, "Email Source URL"),
-    website: read(row, "Website"),
-    instagram: read(row, "Instagram"),
-    tiktok: read(row, "TikTok"),
-    facebook: read(row, "Facebook"),
-    amazonStorefront: read(row, "Amazon Storefront"),
-    otherLinks: read(row, "Other Useful Links"),
-  })).filter((row) => row.id);
+    enrichment: {
+      id: row[idCol]?.trim() || "",
+      email: read(row, "Perplexity Email"),
+      emailSource: read(row, "Email Source URL"),
+      website: read(row, "Website"),
+      instagram: read(row, "Instagram"),
+      tiktok: read(row, "TikTok"),
+      facebook: read(row, "Facebook"),
+      amazonStorefront: read(row, "Amazon Storefront"),
+      otherLinks: read(row, "Other Useful Links"),
+    } satisfies ReviewedCandidateEnrichment,
+    classification: normalizeClassification(read(row, "Classification")),
+  })).filter((row) => row.enrichment.id);
 }
 
 export function PipelineCounters({ counts }: { counts: PipelineCounts | null }) {
@@ -173,7 +210,7 @@ export function useYouTubePipeline() {
       setRows(r as YouTubeCandidate[]);
       setTotals(c as PipelineCounts);
     } catch {
-      /* not signed in / no access — counters simply stay hidden */
+      // No access: counters stay hidden.
     }
   };
 
@@ -195,10 +232,12 @@ export function YouTubeCandidatesSection({
   const keep = useServerFn(keepYouTubeCandidate);
   const skip = useServerFn(skipYouTubeCandidate);
   const applyEnrichment = useServerFn(applyReviewedCandidateEnrichmentBatch);
+  const setClassification = useServerFn(setYouTubeCandidateClassification);
   const [open, setOpen] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
   const [bulkBusy, setBulkBusy] = useState(false);
   const [importBusy, setImportBusy] = useState(false);
+  const [classifyingId, setClassifyingId] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   const pending = useMemo(
@@ -206,10 +245,17 @@ export function YouTubeCandidatesSection({
     [rows],
   );
 
+  const classificationCounts = useMemo(() => {
+    const result = { creator: 0, brand_company: 0, competitor: 0, organization: 0, needs_review: 0 };
+    for (const c of pending) result[candidateClassification(c)] += 1;
+    return result;
+  }, [pending]);
+
   const recommended = useMemo(
     () => pending.filter((c) => {
+      if (candidateClassification(c) !== "creator") return false;
       const subs = c.subscriber_count;
-      const contactable = !!(c.business_email || c.description_email) || (c.external_links?.length ?? 0) > 0;
+      const contactable = !!(c.business_email || c.description_email) || (c.external_links?.some((item) => item?.url) ?? false);
       const days = daysSinceUpload(c.last_upload_at);
       return subs != null && subs <= 20000 && contactable && (days == null || days <= 180);
     }),
@@ -217,11 +263,12 @@ export function YouTubeCandidatesSection({
   );
 
   useEffect(() => {
-    const pendingIds = new Set(pending.map((c) => c.id));
-    setSelectedIds((current) => new Set([...current].filter((id) => pendingIds.has(id))));
-  }, [pending]);
+    const selectableIds = new Set(recommended.map((c) => c.id));
+    setSelectedIds((current) => new Set([...current].filter((id) => selectableIds.has(id))));
+  }, [recommended]);
 
   const toggleSelected = (id: string) => {
+    if (!recommended.some((c) => c.id === id)) return;
     setSelectedIds((current) => {
       const next = new Set(current);
       if (next.has(id)) next.delete(id); else next.add(id);
@@ -232,15 +279,29 @@ export function YouTubeCandidatesSection({
   const selectRecommended = () => setSelectedIds(new Set(recommended.map((c) => c.id)));
   const clearSelected = () => setSelectedIds(new Set());
 
+  const changeClassification = async (id: string, classification: CandidateClassification) => {
+    setClassifyingId(id);
+    try {
+      await setClassification({ data: { id, classification } });
+      await refresh();
+      toast.success(`Classified as ${classificationLabel(classification)}.`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Classification failed");
+    } finally {
+      setClassifyingId(null);
+    }
+  };
+
   const downloadResearchCsv = () => {
     const headers = [
       "Candidate ID", "Creator Name", "YouTube URL", "Subscribers", "Videos", "Country", "Niche", "Last Upload",
       "Existing Email", "Known Links", "Perplexity Email", "Email Source URL", "Website", "Instagram", "TikTok", "Facebook",
-      "Amazon Storefront", "Other Useful Links", "Research Notes", "Confidence",
+      "Amazon Storefront", "Other Useful Links", "Research Notes", "Confidence", "Classification",
     ];
     const lines = [headers.map(csvCell).join(",")];
     for (const c of pending) {
       const knownLinks = (Array.isArray(c.external_links) ? c.external_links : [])
+        .filter((item) => item?.kind !== "research_classification")
         .flatMap((item) => Object.values(item || {}))
         .filter((value): value is string => typeof value === "string" && /^https?:/i.test(value))
         .join(" | ");
@@ -256,6 +317,7 @@ export function YouTubeCandidatesSection({
         c.business_email || c.description_email || "",
         knownLinks,
         "", "", "", "", "", "", "", "", "", "",
+        candidateClassification(c) === "needs_review" ? "" : classificationLabel(candidateClassification(c)),
       ].map(csvCell).join(","));
     }
     const blob = new Blob([`\uFEFF${lines.join("\n")}`], { type: "text/csv;charset=utf-8" });
@@ -267,22 +329,36 @@ export function YouTubeCandidatesSection({
     anchor.click();
     anchor.remove();
     URL.revokeObjectURL(href);
-    toast.success(`Downloaded ${pending.length} candidate(s) for Perplexity research.`);
+    toast.success(`Downloaded ${pending.length} candidate(s) for research.`);
   };
 
   const uploadResearchCsv = async (file: File | undefined) => {
     if (!file) return;
     setImportBusy(true);
     try {
-      const parsed = enrichmentRowsFromCsv(await file.text());
+      const parsed = researchRowsFromCsv(await file.text());
       if (!parsed.length) throw new Error("No Candidate IDs were found in the CSV.");
-      const totals = { received: 0, updated: 0, missing: 0, emailAdded: 0, emailConflict: 0, linksAdded: 0 };
+      const totals = { received: 0, updated: 0, missing: 0, emailAdded: 0, emailConflict: 0, linksAdded: 0, classified: 0 };
+
       for (let start = 0; start < parsed.length; start += 100) {
-        const result = (await applyEnrichment({ data: { rows: parsed.slice(start, start + 100) } })) as typeof totals;
-        for (const key of Object.keys(totals) as Array<keyof typeof totals>) totals[key] += result[key] ?? 0;
+        const enrichmentRows = parsed.slice(start, start + 100).map((item) => item.enrichment);
+        const result = (await applyEnrichment({ data: { rows: enrichmentRows } })) as Omit<typeof totals, "classified">;
+        totals.received += result.received ?? 0;
+        totals.updated += result.updated ?? 0;
+        totals.missing += result.missing ?? 0;
+        totals.emailAdded += result.emailAdded ?? 0;
+        totals.emailConflict += result.emailConflict ?? 0;
+        totals.linksAdded += result.linksAdded ?? 0;
       }
+
+      for (const item of parsed) {
+        if (!item.classification) continue;
+        await setClassification({ data: { id: item.enrichment.id, classification: item.classification } });
+        totals.classified += 1;
+      }
+
       await refresh();
-      toast.success(`Research import complete: ${totals.updated} updated, ${totals.emailAdded} email(s) added, ${totals.linksAdded} link(s) added, ${totals.emailConflict} email conflict(s), ${totals.missing} unmatched.`);
+      toast.success(`Research import complete: ${totals.updated} enriched, ${totals.classified} classified, ${totals.emailAdded} email(s) added, ${totals.linksAdded} link(s) added, ${totals.emailConflict} email conflict(s), ${totals.missing} unmatched.`);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Research import failed");
     } finally {
@@ -315,6 +391,11 @@ export function YouTubeCandidatesSection({
   };
 
   const act = async (id: string, action: "keep" | "skip") => {
+    const candidate = pending.find((c) => c.id === id);
+    if (action === "keep" && candidate && candidateClassification(candidate) !== "creator") {
+      toast.error("Classify this record as Creator before adding it to the main creator list.");
+      return;
+    }
     setBusy(id);
     try {
       if (action === "keep") {
@@ -341,60 +422,72 @@ export function YouTubeCandidatesSection({
           <div className="font-semibold">
             Candidates — research before adding <span className="ml-1 text-sm font-normal text-muted-foreground">({pending.length})</span>
           </div>
-          <div className="text-xs text-muted-foreground">Not yet in the main creator list. Review the YouTube channel and contact details. Keep = add to main creators. Skip = unsuitable. Leave here if more research is needed.</div>
+          <div className="text-xs text-muted-foreground">Classify first. Only records explicitly classified as Creator can be recommended or added to the main creator list.</div>
         </div>
       </button>
       {open ? (
         <div className="border-t border-border">
           {pending.length ? (
-            <div className="flex flex-wrap items-center gap-2 border-b border-border bg-secondary/20 px-3 py-2">
-              <button type="button" onClick={selectRecommended} className="rounded-md border border-input bg-background px-2 py-1 text-xs hover:bg-secondary">
-                Select recommended ({recommended.length})
-              </button>
-              <button type="button" onClick={clearSelected} className="rounded-md border border-input bg-background px-2 py-1 text-xs hover:bg-secondary">Clear</button>
-              <button
-                type="button"
-                disabled={bulkBusy || importBusy || selectedIds.size === 0}
-                onClick={() => void keepSelected()}
-                className="rounded-md bg-primary px-2 py-1 text-xs font-medium text-primary-foreground disabled:opacity-50"
-              >
-                {bulkBusy ? "Keeping…" : `Keep (${selectedIds.size})`}
-              </button>
-              <button type="button" onClick={downloadResearchCsv} className="inline-flex items-center gap-1 rounded-md border border-input bg-background px-2 py-1 text-xs hover:bg-secondary" title="Download the pending candidate list for Perplexity research">
-                <Download className="h-3.5 w-3.5" /> Download research CSV
-              </button>
-              <label className={`inline-flex items-center gap-1 rounded-md border border-input bg-background px-2 py-1 text-xs hover:bg-secondary ${importBusy ? "pointer-events-none opacity-50" : "cursor-pointer"}`} title="Upload a completed Perplexity research CSV. Add-only: existing emails are not replaced.">
-                <Upload className="h-3.5 w-3.5" /> {importBusy ? "Importing…" : "Upload enrichment CSV"}
-                <input
-                  type="file"
-                  accept=".csv,text/csv"
-                  className="hidden"
-                  disabled={importBusy}
-                  onChange={(event) => {
-                    const file = event.target.files?.[0];
-                    event.target.value = "";
-                    void uploadResearchCsv(file);
-                  }}
-                />
-              </label>
-              <span className="text-[11px] text-muted-foreground">Research import is add-only. It does not Keep, Skip, delete, or overwrite existing emails.</span>
-            </div>
+            <>
+              <div className="flex flex-wrap items-center gap-2 border-b border-border bg-secondary/20 px-3 py-2">
+                <span className="rounded-md border border-input bg-background px-2 py-1 text-xs">Creators {classificationCounts.creator}</span>
+                <span className="rounded-md border border-input bg-background px-2 py-1 text-xs">Needs review {classificationCounts.needs_review}</span>
+                <span className="rounded-md border border-input bg-background px-2 py-1 text-xs">Brands {classificationCounts.brand_company}</span>
+                <span className="rounded-md border border-input bg-background px-2 py-1 text-xs">Competitors {classificationCounts.competitor}</span>
+                <span className="rounded-md border border-input bg-background px-2 py-1 text-xs">Organizations {classificationCounts.organization}</span>
+              </div>
+              <div className="flex flex-wrap items-center gap-2 border-b border-border bg-secondary/20 px-3 py-2">
+                <button type="button" onClick={selectRecommended} className="rounded-md border border-input bg-background px-2 py-1 text-xs hover:bg-secondary">
+                  Select recommended creators ({recommended.length})
+                </button>
+                <button type="button" onClick={clearSelected} className="rounded-md border border-input bg-background px-2 py-1 text-xs hover:bg-secondary">Clear</button>
+                <button
+                  type="button"
+                  disabled={bulkBusy || importBusy || selectedIds.size === 0}
+                  onClick={() => void keepSelected()}
+                  className="rounded-md bg-primary px-2 py-1 text-xs font-medium text-primary-foreground disabled:opacity-50"
+                >
+                  {bulkBusy ? "Keeping…" : `Keep (${selectedIds.size})`}
+                </button>
+                <button type="button" onClick={downloadResearchCsv} className="inline-flex items-center gap-1 rounded-md border border-input bg-background px-2 py-1 text-xs hover:bg-secondary" title="Download pending candidates for research">
+                  <Download className="h-3.5 w-3.5" /> Download research CSV
+                </button>
+                <label className={`inline-flex items-center gap-1 rounded-md border border-input bg-background px-2 py-1 text-xs hover:bg-secondary ${importBusy ? "pointer-events-none opacity-50" : "cursor-pointer"}`} title="Upload completed research. Add-only: existing emails are not replaced.">
+                  <Upload className="h-3.5 w-3.5" /> {importBusy ? "Importing…" : "Upload enrichment CSV"}
+                  <input
+                    type="file"
+                    accept=".csv,text/csv"
+                    className="hidden"
+                    disabled={importBusy}
+                    onChange={(event) => {
+                      const file = event.target.files?.[0];
+                      event.target.value = "";
+                      void uploadResearchCsv(file);
+                    }}
+                  />
+                </label>
+                <span className="text-[11px] text-muted-foreground">Research import is add-only. Classification does not Keep, Skip, delete, or overwrite existing emails.</span>
+              </div>
+            </>
           ) : null}
+
           {pending.length === 0 ? <div className="px-4 py-5 text-sm text-muted-foreground">No candidates waiting for review.</div> : null}
+
           {pending.length > 0 ? (
             <div className="w-full overflow-hidden">
               <table className="w-full table-fixed border-collapse text-xs">
                 <colgroup>
                   <col className="w-[3%]" />
-                  <col className="w-[27%]" />
-                  <col className="w-[8%]" />
+                  <col className="w-[23%]" />
                   <col className="w-[7%]" />
                   <col className="w-[6%]" />
-                  <col className="w-[9%]" />
-                  <col className="w-[14%]" />
+                  <col className="w-[5%]" />
+                  <col className="w-[8%]" />
+                  <col className="w-[11%]" />
+                  <col className="w-[15%]" />
                   <col className="w-[7%]" />
-                  <col className="w-[9%]" />
-                  <col className="w-[10%]" />
+                  <col className="w-[7%]" />
+                  <col className="w-[8%]" />
                 </colgroup>
                 <thead className="sticky top-0 z-10 bg-secondary/45 text-left text-[10px] uppercase tracking-wide text-muted-foreground">
                   <tr className="border-b border-border">
@@ -403,8 +496,9 @@ export function YouTubeCandidatesSection({
                     <th className="px-2 py-2 text-right">Subs</th>
                     <th className="px-2 py-2 text-right">Videos</th>
                     <th className="px-2 py-2">Country</th>
-                    <th className="px-2 py-2">Last upload</th>
+                    <th className="px-2 py-2">Upload</th>
                     <th className="px-2 py-2">Priority</th>
+                    <th className="px-2 py-2">Classification</th>
                     <th className="px-2 py-2">Email</th>
                     <th className="px-2 py-2">Status</th>
                     <th className="px-2 py-2">Actions</th>
@@ -416,6 +510,8 @@ export function YouTubeCandidatesSection({
                     const url = c.channel_url || `https://www.youtube.com/channel/${c.channel_id}`;
                     const days = daysSinceUpload(c.last_upload_at);
                     const overLimit = c.subscriber_count != null && c.subscriber_count > 20000;
+                    const classification = candidateClassification(c);
+                    const isRecommended = recommended.some((r) => r.id === c.id);
                     const enrichmentLabel =
                       c.enrichment_status === "found"
                         ? "Enriched"
@@ -424,7 +520,6 @@ export function YouTubeCandidatesSection({
                           : c.enrichment_status === "error"
                             ? "Error"
                             : "Needs enrichment";
-                    const isRecommended = recommended.some((r) => r.id === c.id);
 
                     return (
                       <tr key={c.id} className="border-b border-border/60 align-middle hover:bg-secondary/25">
@@ -433,7 +528,7 @@ export function YouTubeCandidatesSection({
                             type="checkbox"
                             checked={selectedIds.has(c.id)}
                             onChange={() => toggleSelected(c.id)}
-                            disabled={overLimit}
+                            disabled={!isRecommended || overLimit}
                             aria-label={`Select ${c.channel_title || c.channel_id}`}
                             className="h-3.5 w-3.5 rounded border-input"
                           />
@@ -456,20 +551,33 @@ export function YouTubeCandidatesSection({
                           {isRecommended ? <div className="text-[10px] font-medium text-primary">Recommended</div> : null}
                         </td>
                         <td className="px-2 py-2">
+                          <select
+                            value={classification}
+                            disabled={classifyingId === c.id || importBusy || bulkBusy}
+                            onChange={(e) => void changeClassification(c.id, e.target.value as CandidateClassification)}
+                            className="h-7 w-full rounded border border-input bg-background px-1 text-[10px]"
+                            aria-label={`Classify ${c.channel_title || c.channel_id}`}
+                          >
+                            <option value="needs_review">Needs review</option>
+                            <option value="creator">Creator</option>
+                            <option value="brand_company">Brand / company</option>
+                            <option value="competitor">Competitor</option>
+                            <option value="organization">Organization</option>
+                          </select>
+                        </td>
+                        <td className="px-2 py-2">
                           {email ? (
                             <a href={`mailto:${email}`} title={email} aria-label={`Email ${c.channel_title || c.channel_id}`} className="inline-flex h-7 items-center gap-1 rounded border border-input px-2 hover:bg-secondary">
                               <Mail className="h-3.5 w-3.5" /> Email
                             </a>
-                          ) : (
-                            <span className="text-muted-foreground">—</span>
-                          )}
+                          ) : <span className="text-muted-foreground">—</span>}
                         </td>
                         <td className="px-2 py-2">
                           <div className="truncate text-[10px] uppercase tracking-wide text-muted-foreground" title={enrichmentLabel}>{enrichmentLabel}</div>
                         </td>
                         <td className="px-2 py-2">
                           <div className="flex items-center gap-1">
-                            <button title="Keep candidate" aria-label="Keep candidate" disabled={overLimit || busy === c.id || bulkBusy || importBusy} onClick={() => void act(c.id, "keep")} className="inline-flex h-7 items-center gap-1 rounded-md bg-primary px-2 text-[11px] font-medium text-primary-foreground disabled:opacity-50">
+                            <button title={classification === "creator" ? "Keep candidate" : "Classify as Creator before keeping"} aria-label="Keep candidate" disabled={classification !== "creator" || overLimit || busy === c.id || bulkBusy || importBusy} onClick={() => void act(c.id, "keep")} className="inline-flex h-7 items-center gap-1 rounded-md bg-primary px-2 text-[11px] font-medium text-primary-foreground disabled:opacity-50">
                               <Check className="h-3 w-3" /> Keep
                             </button>
                             <button title="Skip candidate" aria-label="Skip candidate" disabled={busy === c.id || bulkBusy || importBusy} onClick={() => void act(c.id, "skip")} className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-input disabled:opacity-50">
