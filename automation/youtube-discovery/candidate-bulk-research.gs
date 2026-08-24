@@ -16,11 +16,6 @@ const CANDIDATE_BULK_RESEARCH = {
   POST_BATCH_SIZE: 100,
 };
 
-/**
- * First pass for the newly discovered candidates.
- * Existing manually/research-classified records are left untouched.
- * Only high-confidence classifications are applied; ambiguous records stay Needs review.
- */
 function runSafeClassificationFirstPass() {
   const secret = PropertiesService.getScriptProperties().getProperty('INGEST_SECRET');
   if (!secret) throw new Error('Missing Script Property: INGEST_SECRET');
@@ -50,10 +45,6 @@ function runSafeClassificationFirstPass() {
   Logger.log('Previously classified preserved: ' + Number(data.already_classified || 0));
 }
 
-/**
- * Enriches the CRM directly from PUBLIC YouTube channel descriptions.
- * Re-runnable: the API queue only returns pending records whose enrichment is not_started/error.
- */
 function runPublicYouTubeDescriptionEnrichment() {
   const secret = PropertiesService.getScriptProperties().getProperty('INGEST_SECRET');
   const apiKey = PropertiesService.getScriptProperties().getProperty('YOUTUBE_API_KEY');
@@ -105,26 +96,20 @@ function runPublicYouTubeDescriptionEnrichment() {
 }
 
 /**
- * Read-only planning report for the next research stage.
+ * Read-only report for classified Creator candidates.
  * ZERO YouTube API calls and ZERO CRM writes.
- *
- * Asks the existing CRM endpoint to summarize classified Creator candidates into:
- * - already_contactable: already has a usable public contact
- * - public_link_research: no email/contact yet, but has public links worth following
- * - external_research: no usable public contact/link; send to Perplexity/manual research later
- *
- * If the deployed CRM endpoint does not yet support this action, this function fails safely
- * and makes no changes. The endpoint must be updated before using the queue report.
  */
 function runCreatorContactQueueReport() {
   const secret = PropertiesService.getScriptProperties().getProperty('INGEST_SECRET');
   if (!secret) throw new Error('Missing Script Property: INGEST_SECRET');
 
+  const endpoint = 'https://survivalproject.lovable.app/api/public/creator-contact-queue';
+
   Logger.log('CREATOR CONTACT QUEUE REPORT START');
   Logger.log('YouTube API calls: 0');
   Logger.log('CRM writes: 0');
 
-  const response = UrlFetchApp.fetch(CANDIDATE_BULK_RESEARCH.ENRICHMENT_ENDPOINT, {
+  const response = UrlFetchApp.fetch(endpoint, {
     method: 'post',
     contentType: 'application/json',
     headers: { 'x-ingest-secret': secret },
@@ -146,7 +131,8 @@ function runCreatorContactQueueReport() {
   Logger.log('Public-link research queue: ' + Number(data.public_link_research || 0));
   Logger.log('External research queue: ' + Number(data.external_research || 0));
   Logger.log('Recommended now: ' + Number(data.recommended_now || 0));
-  Logger.log('No YouTube search quota used.');
+  Logger.log('YouTube API calls: ' + Number(data.youtube_api_calls || 0));
+  Logger.log('CRM writes: ' + Number(data.crm_writes || 0));
 }
 
 function fetchEnrichmentQueue_(secret, limit) {
