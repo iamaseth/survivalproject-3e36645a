@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { ChevronDown, ChevronRight, Check, X, Youtube } from "lucide-react";
+import { ChevronDown, ChevronRight, Check, X, Youtube, Mail } from "lucide-react";
 import {
   listYouTubeCandidates,
   keepYouTubeCandidate,
@@ -51,9 +51,9 @@ function candidatePriority(c: YouTubeCandidate) {
 function sizeBand(subs: number | null) {
   if (subs == null) return "Size unknown";
   if (subs < 1000) return "Nano · promising";
-  if (subs <= 5000) return "Very high priority";
-  if (subs <= 10000) return "Very high priority";
-  if (subs <= 20000) return "High priority";
+  if (subs <= 5000) return "Very high";
+  if (subs <= 10000) return "Very high";
+  if (subs <= 20000) return "High";
   return "Over 20K · exclude";
 }
 
@@ -221,41 +221,50 @@ export function YouTubeCandidatesSection({
       {open ? (
         <div className="border-t border-border">
           {pending.length ? (
-            <div className="flex flex-wrap items-center gap-2 border-b border-border bg-secondary/20 px-4 py-3">
-              <button type="button" onClick={selectRecommended} className="rounded-md border border-input bg-background px-3 py-1.5 text-xs hover:bg-secondary">
-                Select recommended ≤20K ({recommended.length})
+            <div className="flex flex-wrap items-center gap-2 border-b border-border bg-secondary/20 px-3 py-2">
+              <button type="button" onClick={selectRecommended} className="rounded-md border border-input bg-background px-2 py-1 text-xs hover:bg-secondary">
+                Select recommended ({recommended.length})
               </button>
-              <button type="button" onClick={clearSelected} className="rounded-md border border-input bg-background px-3 py-1.5 text-xs hover:bg-secondary">Clear</button>
+              <button type="button" onClick={clearSelected} className="rounded-md border border-input bg-background px-2 py-1 text-xs hover:bg-secondary">Clear</button>
               <button
                 type="button"
                 disabled={bulkBusy || selectedIds.size === 0}
                 onClick={() => void keepSelected()}
-                className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground disabled:opacity-50"
+                className="rounded-md bg-primary px-2 py-1 text-xs font-medium text-primary-foreground disabled:opacity-50"
               >
-                {bulkBusy ? "Keeping…" : `Keep selected (${selectedIds.size})`}
+                {bulkBusy ? "Keeping…" : `Keep (${selectedIds.size})`}
               </button>
-              <span className="text-xs text-muted-foreground">Add-only: existing creators are preserved and duplicates are linked instead of recreated.</span>
+              <span className="text-[11px] text-muted-foreground">Add-only; duplicates link to existing creators.</span>
             </div>
           ) : null}
           {pending.length === 0 ? <div className="px-4 py-5 text-sm text-muted-foreground">No candidates waiting for review.</div> : null}
           {pending.length > 0 ? (
-            <div className="w-full overflow-x-auto">
-              <table className="w-full min-w-[1320px] border-collapse text-sm">
-                <thead className="sticky top-0 z-10 bg-secondary/45 text-left text-[11px] uppercase tracking-wide text-muted-foreground">
+            <div className="w-full overflow-hidden">
+              <table className="w-full table-fixed border-collapse text-xs">
+                <colgroup>
+                  <col className="w-[3%]" />
+                  <col className="w-[27%]" />
+                  <col className="w-[8%]" />
+                  <col className="w-[7%]" />
+                  <col className="w-[6%]" />
+                  <col className="w-[9%]" />
+                  <col className="w-[14%]" />
+                  <col className="w-[7%]" />
+                  <col className="w-[9%]" />
+                  <col className="w-[10%]" />
+                </colgroup>
+                <thead className="sticky top-0 z-10 bg-secondary/45 text-left text-[10px] uppercase tracking-wide text-muted-foreground">
                   <tr className="border-b border-border">
-                    <th className="w-12 px-4 py-3">Select</th>
-                    <th className="min-w-[220px] px-3 py-3">Creator</th>
-                    <th className="w-[100px] px-3 py-3 text-right">Subscribers</th>
-                    <th className="w-[90px] px-3 py-3 text-right">Videos</th>
-                    <th className="w-[80px] px-3 py-3">Country</th>
-                    <th className="min-w-[190px] px-3 py-3">Niche / Description</th>
-                    <th className="w-[115px] px-3 py-3">Last Upload</th>
-                    <th className="min-w-[155px] px-3 py-3">Priority</th>
-                    <th className="min-w-[125px] px-3 py-3">Recommendation</th>
-                    <th className="min-w-[220px] px-3 py-3">Contact</th>
-                    <th className="min-w-[150px] px-3 py-3">Status</th>
-                    <th className="w-[95px] px-3 py-3">Channel</th>
-                    <th className="w-[160px] px-3 py-3">Actions</th>
+                    <th className="px-1 py-2" aria-label="Select" />
+                    <th className="px-2 py-2">Creator / niche</th>
+                    <th className="px-2 py-2 text-right">Subs</th>
+                    <th className="px-2 py-2 text-right">Videos</th>
+                    <th className="px-2 py-2">Country</th>
+                    <th className="px-2 py-2">Last upload</th>
+                    <th className="px-2 py-2">Priority</th>
+                    <th className="px-2 py-2">Email</th>
+                    <th className="px-2 py-2">Status</th>
+                    <th className="px-2 py-2">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -268,67 +277,60 @@ export function YouTubeCandidatesSection({
                       c.enrichment_status === "found"
                         ? "Enriched"
                         : c.enrichment_status === "no_email_found"
-                          ? "Checked — no email"
+                          ? "No email"
                           : c.enrichment_status === "error"
-                            ? "Enrichment error"
+                            ? "Error"
                             : "Needs enrichment";
                     const isRecommended = recommended.some((r) => r.id === c.id);
 
                     return (
                       <tr key={c.id} className="border-b border-border/60 align-middle hover:bg-secondary/25">
-                        <td className="px-4 py-3">
+                        <td className="px-1 py-2 text-center">
                           <input
                             type="checkbox"
                             checked={selectedIds.has(c.id)}
                             onChange={() => toggleSelected(c.id)}
                             disabled={overLimit}
                             aria-label={`Select ${c.channel_title || c.channel_id}`}
-                            className="h-4 w-4 rounded border-input"
+                            className="h-3.5 w-3.5 rounded border-input"
                           />
                         </td>
-                        <td className="px-3 py-3">
-                          <div className="max-w-[260px] font-medium text-foreground">{c.channel_title || c.channel_id}</div>
-                          <div className="mt-0.5 max-w-[260px] truncate text-[11px] text-muted-foreground">{c.channel_id}</div>
+                        <td className="px-2 py-2">
+                          <div className="flex min-w-0 items-center gap-1.5">
+                            <div className="min-w-0 truncate font-medium text-foreground" title={c.channel_title || c.channel_id}>{c.channel_title || c.channel_id}</div>
+                            <a {...externalLinkProps(url)} title="Open YouTube channel for research" aria-label={`Open ${c.channel_title || c.channel_id} on YouTube`} className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded border border-input hover:bg-secondary">
+                              <Youtube className="h-3.5 w-3.5" />
+                            </a>
+                          </div>
+                          <div className="mt-0.5 truncate text-[10px] text-muted-foreground" title={c.topic_keyword || ""}>{c.topic_keyword || "—"}</div>
                         </td>
-                        <td className="px-3 py-3 text-right font-medium tabular-nums">{fmt(c.subscriber_count)}</td>
-                        <td className="px-3 py-3 text-right tabular-nums">{c.video_count ?? "—"}</td>
-                        <td className="px-3 py-3">{c.country || "—"}</td>
-                        <td className="px-3 py-3">
-                          <div className="max-w-[220px] whitespace-normal text-foreground">{c.topic_keyword || "—"}</div>
+                        <td className="px-2 py-2 text-right font-medium tabular-nums">{fmt(c.subscriber_count)}</td>
+                        <td className="px-2 py-2 text-right tabular-nums">{c.video_count ?? "—"}</td>
+                        <td className="px-2 py-2 truncate" title={c.country || ""}>{c.country || "—"}</td>
+                        <td className="px-2 py-2 whitespace-nowrap tabular-nums">{days == null ? "Unknown" : `${days}d`}</td>
+                        <td className="px-2 py-2">
+                          <div className="truncate font-medium" title={sizeBand(c.subscriber_count)}>{sizeBand(c.subscriber_count)}</div>
+                          {isRecommended ? <div className="text-[10px] font-medium text-primary">Recommended</div> : null}
                         </td>
-                        <td className="px-3 py-3 tabular-nums">{days == null ? "Unknown" : `${days}d ago`}</td>
-                        <td className="px-3 py-3">
-                          <span className="inline-flex rounded-full border border-border px-2 py-1 text-[10px] uppercase tracking-wide text-muted-foreground">
-                            {sizeBand(c.subscriber_count)}
-                          </span>
-                        </td>
-                        <td className="px-3 py-3">
-                          {isRecommended ? (
-                            <span className="inline-flex rounded-full border border-border px-2 py-1 text-[10px] uppercase tracking-wide text-muted-foreground">Recommended</span>
+                        <td className="px-2 py-2">
+                          {email ? (
+                            <a href={`mailto:${email}`} title={email} aria-label={`Email ${c.channel_title || c.channel_id}`} className="inline-flex h-7 items-center gap-1 rounded border border-input px-2 hover:bg-secondary">
+                              <Mail className="h-3.5 w-3.5" /> Email
+                            </a>
                           ) : (
-                            <span className="text-xs text-muted-foreground">—</span>
+                            <span className="text-muted-foreground">—</span>
                           )}
                         </td>
-                        <td className="px-3 py-3">
-                          <div className="max-w-[230px] break-all text-foreground">{email || "No public email yet"}</div>
-                          {c.email_source ? <div className="mt-0.5 text-[11px] text-muted-foreground">{c.email_source}</div> : null}
+                        <td className="px-2 py-2">
+                          <div className="truncate text-[10px] uppercase tracking-wide text-muted-foreground" title={enrichmentLabel}>{enrichmentLabel}</div>
                         </td>
-                        <td className="px-3 py-3">
-                          <div className="text-xs uppercase tracking-wide text-muted-foreground">{enrichmentLabel}</div>
-                          {c.enrichment_error ? <div className="mt-0.5 max-w-[190px] truncate text-[11px] text-destructive">{c.enrichment_error}</div> : null}
-                        </td>
-                        <td className="px-3 py-3">
-                          <a {...externalLinkProps(url)} className="inline-flex items-center gap-1 rounded-md border border-input px-2.5 py-1.5 text-xs hover:bg-secondary">
-                            <Youtube className="h-3.5 w-3.5" /> Open
-                          </a>
-                        </td>
-                        <td className="px-3 py-3">
-                          <div className="flex gap-2">
-                            <button disabled={overLimit || busy === c.id || bulkBusy} onClick={() => void act(c.id, "keep")} className="inline-flex items-center gap-1 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground disabled:opacity-50">
-                              <Check className="h-3.5 w-3.5" /> Keep
+                        <td className="px-2 py-2">
+                          <div className="flex items-center gap-1">
+                            <button title="Keep candidate" aria-label="Keep candidate" disabled={overLimit || busy === c.id || bulkBusy} onClick={() => void act(c.id, "keep")} className="inline-flex h-7 items-center gap-1 rounded-md bg-primary px-2 text-[11px] font-medium text-primary-foreground disabled:opacity-50">
+                              <Check className="h-3 w-3" /> Keep
                             </button>
-                            <button disabled={busy === c.id || bulkBusy} onClick={() => void act(c.id, "skip")} className="inline-flex items-center gap-1 rounded-md border border-input px-3 py-1.5 text-xs disabled:opacity-50">
-                              <X className="h-3.5 w-3.5" /> Skip
+                            <button title="Skip candidate" aria-label="Skip candidate" disabled={busy === c.id || bulkBusy} onClick={() => void act(c.id, "skip")} className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-input disabled:opacity-50">
+                              <X className="h-3.5 w-3.5" />
                             </button>
                           </div>
                         </td>
