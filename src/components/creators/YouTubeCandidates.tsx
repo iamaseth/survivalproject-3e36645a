@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { ChevronDown, ChevronRight, Check, X, Youtube, Mail } from "lucide-react";
+import { ChevronDown, ChevronRight, Check, X, Youtube, Mail, Download } from "lucide-react";
 import {
   listYouTubeCandidates,
   keepYouTubeCandidate,
@@ -55,6 +55,11 @@ function sizeBand(subs: number | null) {
   if (subs <= 10000) return "Very high";
   if (subs <= 20000) return "High";
   return "Over 20K · exclude";
+}
+
+function csvCell(value: unknown) {
+  const text = value == null ? "" : String(value);
+  return `"${text.replace(/"/g, '""')}"`;
 }
 
 export function PipelineCounters({ counts }: { counts: PipelineCounts | null }) {
@@ -164,6 +169,44 @@ export function YouTubeCandidatesSection({
   const selectRecommended = () => setSelectedIds(new Set(recommended.map((c) => c.id)));
   const clearSelected = () => setSelectedIds(new Set());
 
+  const downloadResearchCsv = () => {
+    const headers = [
+      "Candidate ID", "Creator Name", "YouTube URL", "Subscribers", "Videos", "Country", "Niche", "Last Upload",
+      "Existing Email", "Known Links", "Perplexity Email", "Email Source URL", "Website", "Instagram", "TikTok", "Facebook",
+      "Amazon Storefront", "Other Useful Links", "Research Notes", "Confidence",
+    ];
+    const lines = [headers.map(csvCell).join(",")];
+    for (const c of pending) {
+      const knownLinks = (Array.isArray(c.external_links) ? c.external_links : [])
+        .flatMap((item) => Object.values(item || {}))
+        .filter((value): value is string => typeof value === "string" && /^https?:/i.test(value))
+        .join(" | ");
+      lines.push([
+        c.id,
+        c.channel_title || c.channel_id,
+        c.channel_url || `https://www.youtube.com/channel/${c.channel_id}`,
+        c.subscriber_count ?? "",
+        c.video_count ?? "",
+        c.country || "",
+        c.topic_keyword || "",
+        c.last_upload_at || "",
+        c.business_email || c.description_email || "",
+        knownLinks,
+        "", "", "", "", "", "", "", "", "", "",
+      ].map(csvCell).join(","));
+    }
+    const blob = new Blob([`\uFEFF${lines.join("\n")}`], { type: "text/csv;charset=utf-8" });
+    const href = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = href;
+    anchor.download = `survival-tabs-perplexity-research-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    URL.revokeObjectURL(href);
+    toast.success(`Downloaded ${pending.length} candidate(s) for Perplexity research.`);
+  };
+
   const keepSelected = async () => {
     const ids = [...selectedIds];
     if (!ids.length) return;
@@ -233,6 +276,9 @@ export function YouTubeCandidatesSection({
                 className="rounded-md bg-primary px-2 py-1 text-xs font-medium text-primary-foreground disabled:opacity-50"
               >
                 {bulkBusy ? "Keeping…" : `Keep (${selectedIds.size})`}
+              </button>
+              <button type="button" onClick={downloadResearchCsv} className="inline-flex items-center gap-1 rounded-md border border-input bg-background px-2 py-1 text-xs hover:bg-secondary" title="Download the pending candidate list for Perplexity research">
+                <Download className="h-3.5 w-3.5" /> Download research CSV
               </button>
               <span className="text-[11px] text-muted-foreground">Add-only; duplicates link to existing creators.</span>
             </div>
