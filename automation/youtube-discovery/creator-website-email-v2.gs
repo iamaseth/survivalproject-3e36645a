@@ -79,18 +79,24 @@ function resetCreatorPublicWebsiteResearchProgressV2() {
 function stNormalizePublicUrlV2_(value) {
   let raw = String(value || '').trim();
   if (!raw) return '';
-
-  // Accept normal URLs and Markdown-shaped URLs such as [https://site.com](https://site.com).
   const md = raw.match(/^\[[^\]]*\]\((https?:\/\/[^)]+)\)$/i);
   if (md) raw = md[1];
-
-  // Fallback: extract the first http(s) URL from any wrapper text.
   if (!/^https?:\/\//i.test(raw)) {
     const match = raw.match(/https?:\/\/[^\s\]\)<>"']+/i);
     if (match) raw = match[0];
   }
-
   return raw.replace(/[.,;:!?]+$/, '');
+}
+
+// Apps Script does not reliably provide the browser URL constructor.
+// Parse the origin with regex instead so valid website URLs are not silently discarded.
+function stOriginAndHostV2_(raw) {
+  const match = String(raw || '').match(/^(https?):\/\/([^\/:?#]+)(?::\d+)?(?:[\/?#]|$)/i);
+  if (!match) return null;
+  const scheme = match[1].toLowerCase();
+  const host = match[2].toLowerCase().replace(/^www\./, '');
+  if (!host) return null;
+  return { host: host, origin: scheme + '://' + match[2].toLowerCase() + '/' };
 }
 
 function stSelectCreatorOwnedWebsitesV2_(links) {
@@ -101,13 +107,10 @@ function stSelectCreatorOwnedWebsitesV2_(links) {
   (links || []).forEach(item => {
     const raw = stNormalizePublicUrlV2_((item || {}).url);
     if (!/^https?:\/\//i.test(raw) || blocked.test(raw)) return;
-    try {
-      const u = new URL(raw);
-      const host = u.hostname.toLowerCase().replace(/^www\./, '');
-      if (!host || seenHosts.has(host)) return;
-      seenHosts.add(host);
-      out.push(u.origin + '/');
-    } catch (e) {}
+    const parsed = stOriginAndHostV2_(raw);
+    if (!parsed || seenHosts.has(parsed.host)) return;
+    seenHosts.add(parsed.host);
+    out.push(parsed.origin);
   });
 
   return out.slice(0, 2);
@@ -124,7 +127,7 @@ function stResearchWebsiteForPublicEmailV2_(baseUrl) {
         method: 'get',
         followRedirects: true,
         muteHttpExceptions: true,
-        headers: { 'User-Agent': 'Mozilla/5.0 (compatible; SurvivalTabsPublicResearch/2.0)' },
+        headers: { 'User-Agent': 'Mozilla/5.0 (compatible; SurvivalTabsPublicResearch/2.1)' },
       });
       fetchCount += 1;
       const code = response.getResponseCode();
