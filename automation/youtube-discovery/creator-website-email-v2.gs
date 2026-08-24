@@ -1,4 +1,4 @@
-// Survival Tabs — creator website email enrichment v2
+// Survival Tabs — creator website email enrichment v2.2
 // Add this as a NEW Google Apps Script file in the same project.
 // Requires the existing candidate-bulk-research.gs helpers.
 // ZERO YouTube API calls. Never guesses emails. Never sends outreach.
@@ -7,8 +7,14 @@ function runCreatorPublicWebsiteEmailEnrichmentV2() {
   const secret = PropertiesService.getScriptProperties().getProperty('INGEST_SECRET');
   if (!secret) throw new Error('Missing Script Property: INGEST_SECRET');
 
-  Logger.log('PUBLIC WEBSITE EMAIL ENRICHMENT V2 START');
+  Logger.log('PUBLIC WEBSITE EMAIL ENRICHMENT V2.2 START');
+  Logger.log('SCRIPT VERSION: 2.2');
   Logger.log('YouTube API calls: 0');
+
+  // Built-in parser self-test. If this says 0, the wrong/stale script is running.
+  const selfTest = stSelectCreatorOwnedWebsitesV2_([{url:'https://offgridhermit.com/'}]);
+  Logger.log('Parser self-test eligible websites: ' + selfTest.length + ' | ' + selfTest.join(' | '));
+  if (selfTest.length !== 1) throw new Error('V2.2 parser self-test failed. Stop before CRM research.');
 
   const report = fetchCreatorContactReport_(secret);
   const queue = (((report || {}).samples || {}).public_link_research || []);
@@ -33,7 +39,15 @@ function runCreatorPublicWebsiteEmailEnrichmentV2() {
     const title = String(row.channel_title || id);
     const links = Array.isArray(row.links) ? row.links : [];
     const websites = stSelectCreatorOwnedWebsitesV2_(links);
-    Logger.log('Researching: ' + title + ' | eligible websites=' + websites.length + (websites.length ? ' | ' + websites.join(' | ') : ''));
+    Logger.log('Researching: ' + title + ' | raw links=' + links.length + ' | eligible websites=' + websites.length + (websites.length ? ' | ' + websites.join(' | ') : ''));
+
+    if (!websites.length && links.length) {
+      links.slice(0, 3).forEach((item, i) => {
+        const original = String((item || {}).url || '');
+        const normalized = stNormalizePublicUrlV2_(original);
+        Logger.log('  Link ' + (i + 1) + ' raw=' + original + ' | normalized=' + normalized + ' | blocked=' + stIsBlockedResearchUrlV2_(normalized));
+      });
+    }
 
     let found = null;
     for (let i = 0; i < websites.length && !found; i++) {
@@ -62,7 +76,7 @@ function runCreatorPublicWebsiteEmailEnrichmentV2() {
     props.setProperty('ST_CREATOR_WEB_RESEARCH_DONE_V2', JSON.stringify(Array.from(done)));
   });
 
-  Logger.log('PUBLIC WEBSITE EMAIL ENRICHMENT V2 COMPLETE');
+  Logger.log('PUBLIC WEBSITE EMAIL ENRICHMENT V2.2 COMPLETE');
   Logger.log('Creators attempted this run: ' + batch.length);
   Logger.log('HTTP pages fetched: ' + websitesFetched);
   Logger.log('Public emails found: ' + emailsFound);
@@ -79,37 +93,52 @@ function resetCreatorPublicWebsiteResearchProgressV2() {
 function stNormalizePublicUrlV2_(value) {
   let raw = String(value || '').trim();
   if (!raw) return '';
-  const md = raw.match(/^\[[^\]]*\]\((https?:\/\/[^)]+)\)$/i);
-  if (md) raw = md[1];
+
+  // Handle markdown-shaped stored links: [label](https://site/path)
+  const openParen = raw.lastIndexOf('](');
+  if (raw.charAt(0) === '[' && openParen > 0 && raw.charAt(raw.length - 1) === ')') {
+    const inside = raw.substring(openParen + 2, raw.length - 1).trim();
+    if (/^https?:\/\//i.test(inside)) raw = inside;
+  }
+
+  // Otherwise extract the first http(s) token from wrapper text.
   if (!/^https?:\/\//i.test(raw)) {
-    const match = raw.match(/https?:\/\/[^\s\]\)<>"']+/i);
+    const match = raw.match(/https?:\/\/[^\s<>"']+/i);
     if (match) raw = match[0];
   }
-  return raw.replace(/[.,;:!?]+$/, '');
+
+  // Strip markdown/trailing punctuation left over from extraction.
+  raw = raw.replace(/[\]\)>,.;:!?]+$/, '');
+  return raw;
 }
 
-// Apps Script does not reliably provide the browser URL constructor.
-// Parse the origin with regex instead so valid website URLs are not silently discarded.
+function stIsBlockedResearchUrlV2_(raw) {
+  const value = String(raw || '').toLowerCase();
+  return /(youtube\.com|youtu\.be|instagram\.com|facebook\.com|fb\.com|tiktok\.com|amazon\.|amzn\.to|patreon\.com|udemy\.com|discord\.|bit\.ly|printify\.me)/i.test(value);
+}
+
 function stOriginAndHostV2_(raw) {
-  const match = String(raw || '').match(/^(https?):\/\/([^\/:?#]+)(?::\d+)?(?:[\/?#]|$)/i);
+  const text = String(raw || '').trim();
+  const match = text.match(/^(https?):\/\/([^\/:?#]+)(?::\d+)?(?:[\/?#]|$)/i);
   if (!match) return null;
   const scheme = match[1].toLowerCase();
-  const host = match[2].toLowerCase().replace(/^www\./, '');
+  const originalHost = match[2].toLowerCase();
+  const host = originalHost.replace(/^www\./, '');
   if (!host) return null;
-  return { host: host, origin: scheme + '://' + match[2].toLowerCase() + '/' };
+  return { host: host, origin: scheme + '://' + originalHost + '/' };
 }
 
 function stSelectCreatorOwnedWebsitesV2_(links) {
-  const blocked = /(youtube\.com|youtu\.be|instagram\.com|facebook\.com|fb\.com|tiktok\.com|amazon\.|amzn\.to|patreon\.com|udemy\.com|discord\.|bit\.ly|printify\.me)/i;
-  const seenHosts = new Set();
+  const seenHosts = {};
   const out = [];
 
   (links || []).forEach(item => {
     const raw = stNormalizePublicUrlV2_((item || {}).url);
-    if (!/^https?:\/\//i.test(raw) || blocked.test(raw)) return;
+    if (!/^https?:\/\//i.test(raw)) return;
+    if (stIsBlockedResearchUrlV2_(raw)) return;
     const parsed = stOriginAndHostV2_(raw);
-    if (!parsed || seenHosts.has(parsed.host)) return;
-    seenHosts.add(parsed.host);
+    if (!parsed || seenHosts[parsed.host]) return;
+    seenHosts[parsed.host] = true;
     out.push(parsed.origin);
   });
 
@@ -127,7 +156,7 @@ function stResearchWebsiteForPublicEmailV2_(baseUrl) {
         method: 'get',
         followRedirects: true,
         muteHttpExceptions: true,
-        headers: { 'User-Agent': 'Mozilla/5.0 (compatible; SurvivalTabsPublicResearch/2.1)' },
+        headers: { 'User-Agent': 'Mozilla/5.0 (compatible; SurvivalTabsPublicResearch/2.2)' },
       });
       fetchCount += 1;
       const code = response.getResponseCode();
