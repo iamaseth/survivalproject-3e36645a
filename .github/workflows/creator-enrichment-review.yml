@@ -1,0 +1,44 @@
+name: Creator Enrichment Review
+
+on:
+  workflow_dispatch:
+    inputs:
+      limit:
+        description: "Max main creators and pending YouTube candidates to research"
+        required: false
+        default: "1000"
+  push:
+    paths:
+      - ".github/workflows/creator-enrichment-review.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  enrich:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      SUPABASE_URL: ${{ secrets.AMAZON_CRAWLER_SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.AMAZON_CRAWLER_SUPABASE_SERVICE_ROLE_KEY }}
+      ENRICHMENT_LIMIT: ${{ github.event.inputs.limit || '1000' }}
+      ENRICHMENT_OUTPUT: creator-enrichment-review.json
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Run read-only enrichment
+        run: node tools/creator-enrichment/src/main.mjs
+
+      - name: Save enrichment review
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: creator-enrichment-review
+          path: creator-enrichment-review.json
+          if-no-files-found: warn
+          retention-days: 14
