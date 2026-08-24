@@ -30,8 +30,6 @@ export type YouTubeCandidate = {
 export const listYouTubeCandidates = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    // Larger review window for the 1,000-contact campaign. Read-only: no existing
-    // creators or candidates are deleted, replaced, or reset by this query.
     const { data, error } = await context.supabase
       .from("youtube_candidates")
       .select("*")
@@ -90,6 +88,147 @@ export const applyYouTubeEnrichmentResult = createServerFn({ method: "POST" })
       .eq("id", data.id);
     if (error) throw new Error(error.message);
     return { ok: true as const };
+  });
+
+export type ReviewedCandidateEnrichment = {
+  id: string;
+  email?: string | null;
+  emailSource?: string | null;
+  website?: string | null;
+  instagram?: string | null;
+  tiktok?: string | null;
+  facebook?: string | null;
+  amazonStorefront?: string | null;
+  otherLinks?: string | null;
+};
+
+function validPublicUrl(raw?: string | null) {
+  if (!raw) return null;
+  try {
+    const url = new URL(raw.trim());
+    return url.protocol === "https:" || url.protocol === "http:" ? url.toString() : null;
+  } catch {
+    return null;
+  }
+}
+
+function verifiedAmazonStorefront(raw?: string | null) {
+  const url = validPublicUrl(raw);
+  if (!url) return null;
+  try {
+    const parsed = new URL(url);
+    const host = parsed.hostname.toLowerCase().replace(/^www\./, "");
+    return (host === "amazon.com" || host.endsWith(".amazon.com")) && /^\/shop\/[A-Za-z0-9@._-]+/i.test(parsed.pathname)
+      ? parsed.toString()
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+function parseOtherLinks(raw?: string | null) {
+  if (!raw) return [] as string[];
+  return raw
+    .split(/[\s,;|]+/)
+    .map((value) => validPublicUrl(value))
+    .filter((value): value is string => Boolean(value));
+}
+
+/**
+ * Applies human-reviewed Perplexity/research enrichment to EXISTING candidate rows only.
+ * Safety rules:
+ * - match by candidate UUID only; never creates/deletes/promotes candidates
+ * - never replaces an existing candidate email with a different email
+ * - a new email is accepted only with a public source URL
+ * - social/website links are merged with existing external_links, never replacing them
+ * - Amazon is accepted only for verified amazon.com/shop/... format
+ */
+export const applyReviewedCandidateEnrichmentBatch = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: { rows: ReviewedCandidateEnrichment[] }) => {
+    if (!data || !Array.isArray(data.rows)) throw new Error("rows required");
+    if (data.rows.length > 100) throw new Error("Maximum 100 enrichment rows per batch");
+    return data;
+  })
+  .handler(async ({ data, context }) => {
+    let updated = 0;
+    let missing = 0;
+    let emailAdded = 0;
+    let emailConflict = 0;
+    let linksAdded = 0;
+
+    for (const row of data.rows) {
+      if (!row.id) continue;
+      const { data: current, error: readErr } = await context.supabase
+        .from("youtube_candidates")
+        .select("id,business_email,description_email,email_source,external_links")
+        .eq("id", row.id)
+        .maybeSingle();
+      if (readErr) throw new Error(readErr.message);
+      if (!current) { missing += 1; continue; }
+
+      const candidate = current as unknown as Pick<YouTubeCandidate, "id" | "business_email" | "description_email" | "email_source" | "external_links">;
+      const existingEmail = (candidate.business_email || candidate.description_email || "").trim().toLowerCase();
+      const proposedEmail = (row.email || "").trim().toLowerCase();
+      const sourceUrl = validPublicUrl(row.emailSource);
+
+      let newBusinessEmail = candidate.business_email;
+      let newEmailSource = candidate.email_source;
+      if (proposedEmail && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(proposedEmail)) {
+        if (existingEmail && existingEmail !== proposedEmail) {
+          emailConflict += 1;
+        } else if (!existingEmail && sourceUrl) {
+          newBusinessEmail = proposedEmail;
+          newEmailSource = sourceUrl;
+          emailAdded += 1;
+        }
+      }
+
+      const additions: Array<Record<string, string | null>> = [];
+      const push = (kind: string, raw?: string | null) => {
+        const url = validPublicUrl(raw);
+        if (url) additions.push({ kind, url, source: "Reviewed research import" });
+      };
+      push("website", row.website);
+      push("instagram", row.instagram);
+      push("tiktok", row.tiktok);
+      push("facebook", row.facebook);
+      const amazon = verifiedAmazonStorefront(row.amazonStorefront);
+      if (amazon) additions.push({ kind: "amazon_storefront", url: amazon, source: "Reviewed research import" });
+      for (const url of parseOtherLinks(row.otherLinks)) additions.push({ kind: "other", url, source: "Reviewed research import" });
+
+      const existingLinks = Array.isArray(candidate.external_links) ? candidate.external_links : [];
+      const seen = new Set(existingLinks.map((item) => `${item.kind || ""}:${item.url || ""}`));
+      const merged = [...existingLinks];
+      for (const item of additions) {
+        const key = `${item.kind || ""}:${item.url || ""}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          merged.push(item);
+          linksAdded += 1;
+        }
+      }
+
+      const changed = newBusinessEmail !== candidate.business_email || newEmailSource !== candidate.email_source || merged.length !== existingLinks.length;
+      if (!changed) continue;
+
+      const { error: updateErr } = await context.supabase
+        .from("youtube_candidates")
+        .update({
+          business_email: newBusinessEmail,
+          email_source: newEmailSource,
+          email_status: newBusinessEmail || candidate.description_email ? "found" : undefined,
+          external_links: merged,
+          enrichment_status: "found",
+          enrichment_checked_at: new Date().toISOString(),
+          enrichment_error: null,
+        } as never)
+        .eq("id", row.id);
+      if (updateErr) throw new Error(updateErr.message);
+      updated += 1;
+    }
+
+    return { received: data.rows.length, updated, missing, emailAdded, emailConflict, linksAdded };
   });
 
 export const skipYouTubeCandidate = createServerFn({ method: "POST" })
@@ -173,8 +312,6 @@ export const keepYouTubeCandidate = createServerFn({ method: "POST" })
         last_researched: new Date().toISOString().slice(0, 10),
         imported_by: context.userId,
       };
-      // Add-only semantics: ignore an ID collision rather than replacing an
-      // existing creator. Existing creator rows are never overwritten here.
       const { error: insErr } = await context.supabase
         .from("creators")
         .upsert(insertRow as never, { onConflict: "id", ignoreDuplicates: true });
@@ -209,7 +346,6 @@ export type PipelineCounts = {
   progressPercent: number;
 };
 
-/** Compact progress counters. `usableEmails` counts unique addresses, not rows. */
 export const getPipelineCounts = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }): Promise<PipelineCounts> => {
@@ -237,9 +373,6 @@ export const getPipelineCounts = createServerFn({ method: "GET" })
       const e = (r.email ?? "").trim().toLowerCase();
       if (e && e.includes("@")) {
         withEmail++;
-        // The 1,000-contact campaign counts only creators within the <=20K target
-        // when subscriber data is known. Unknown-size legacy rows remain preserved
-        // but do not inflate the campaign goal.
         if (!dncIds.has(r.id) && r.subscriber_count != null && r.subscriber_count <= 20000) usable.add(e);
       }
       if (r.subscriber_count != null && r.subscriber_count <= 20000) under20k++;
