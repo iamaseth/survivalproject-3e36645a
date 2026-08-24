@@ -1,24 +1,22 @@
-// Survival Tabs — creator website email enrichment v2.3
-// Add this as a NEW Google Apps Script file in the same project.
-// Requires the existing candidate-bulk-research.gs helpers.
+// Survival Tabs — creator website email enrichment v2.4
 // ZERO YouTube API calls. Never guesses emails. Never sends outreach.
 
 function runCreatorPublicWebsiteEmailEnrichmentV2() {
   const secret = PropertiesService.getScriptProperties().getProperty('INGEST_SECRET');
   if (!secret) throw new Error('Missing Script Property: INGEST_SECRET');
 
-  Logger.log('PUBLIC WEBSITE EMAIL ENRICHMENT V2.3 START');
-  Logger.log('SCRIPT VERSION: 2.3');
+  Logger.log('PUBLIC WEBSITE EMAIL ENRICHMENT V2.4 START');
+  Logger.log('SCRIPT VERSION: 2.4');
   Logger.log('YouTube API calls: 0');
 
   const selfTest = stSelectCreatorOwnedWebsitesV2_([{url:'https://offgridhermit.com/'}], 'The Off Grid Hermit');
   Logger.log('Parser self-test eligible websites: ' + selfTest.length + ' | ' + selfTest.join(' | '));
-  if (selfTest.length !== 1) throw new Error('V2.3 parser self-test failed. Stop before CRM research.');
+  if (selfTest.length !== 1) throw new Error('V2.4 parser self-test failed. Stop before CRM research.');
 
   const report = fetchCreatorContactReport_(secret);
   const queue = (((report || {}).samples || {}).public_link_research || []);
   const props = PropertiesService.getScriptProperties();
-  const doneRaw = props.getProperty('ST_CREATOR_WEB_RESEARCH_DONE_V23') || '[]';
+  const doneRaw = props.getProperty('ST_CREATOR_WEB_RESEARCH_DONE_V24') || '[]';
   let done;
   try { done = new Set(JSON.parse(doneRaw)); } catch (e) { done = new Set(); }
 
@@ -26,13 +24,13 @@ function runCreatorPublicWebsiteEmailEnrichmentV2() {
   const batch = remaining.slice(0, 6);
 
   Logger.log('Public-link queue currently: ' + queue.length);
-  Logger.log('Already attempted in V2.3: ' + done.size);
+  Logger.log('Already attempted in V2.4: ' + done.size);
   Logger.log('This run: ' + batch.length);
 
   let websitesFetched = 0;
   let emailsFound = 0;
   let crmUpdated = 0;
-  let placeholdersRejected = 0;
+  let rejected = 0;
 
   batch.forEach(row => {
     const id = String(row.id);
@@ -41,31 +39,16 @@ function runCreatorPublicWebsiteEmailEnrichmentV2() {
     const websites = stSelectCreatorOwnedWebsitesV2_(links, title);
     Logger.log('Researching: ' + title + ' | raw links=' + links.length + ' | eligible creator-owned websites=' + websites.length + (websites.length ? ' | ' + websites.join(' | ') : ''));
 
-    if (!websites.length && links.length) {
-      links.slice(0, 3).forEach((item, i) => {
-        const original = String((item || {}).url || '');
-        const normalized = stNormalizePublicUrlV2_(original);
-        Logger.log('  Link ' + (i + 1) + ' raw=' + original + ' | normalized=' + normalized + ' | blocked=' + stIsBlockedResearchUrlV2_(normalized));
-      });
-    }
-
     let found = null;
     for (let i = 0; i < websites.length && !found; i++) {
       const result = stResearchWebsiteForPublicEmailV2_(websites[i]);
       websitesFetched += result.fetchCount;
-      placeholdersRejected += Number(result.placeholdersRejected || 0);
+      rejected += Number(result.rejected || 0);
       if (result.email) found = result;
     }
 
     if (found && found.email && found.sourceUrl) {
-      const applied = postEnrichmentBatch_(secret, [{
-        id: id,
-        business_email: found.email,
-        email_source: found.sourceUrl,
-        external_links: [],
-        status: 'found',
-        error: null,
-      }]);
+      const applied = postEnrichmentBatch_(secret, [{ id:id, business_email:found.email, email_source:found.sourceUrl, external_links:[], status:'found', error:null }]);
       emailsFound += 1;
       crmUpdated += Number(applied.updated || 0);
       Logger.log('FOUND ' + title + ': ' + found.email + ' @ ' + found.sourceUrl);
@@ -74,22 +57,40 @@ function runCreatorPublicWebsiteEmailEnrichmentV2() {
     }
 
     done.add(id);
-    props.setProperty('ST_CREATOR_WEB_RESEARCH_DONE_V23', JSON.stringify(Array.from(done)));
+    props.setProperty('ST_CREATOR_WEB_RESEARCH_DONE_V24', JSON.stringify(Array.from(done)));
   });
 
-  Logger.log('PUBLIC WEBSITE EMAIL ENRICHMENT V2.3 COMPLETE');
+  Logger.log('PUBLIC WEBSITE EMAIL ENRICHMENT V2.4 COMPLETE');
   Logger.log('Creators attempted this run: ' + batch.length);
   Logger.log('HTTP pages fetched: ' + websitesFetched);
-  Logger.log('Placeholder/example emails rejected: ' + placeholdersRejected);
+  Logger.log('Invalid/placeholder asset emails rejected: ' + rejected);
   Logger.log('Public emails found: ' + emailsFound);
   Logger.log('CRM rows updated: ' + crmUpdated);
   Logger.log('YouTube API calls: 0');
-  Logger.log('Remaining V2.3 queue: ' + Math.max(0, remaining.length - batch.length));
+  Logger.log('Remaining V2.4 queue: ' + Math.max(0, remaining.length - batch.length));
 }
 
 function resetCreatorPublicWebsiteResearchProgressV2() {
-  PropertiesService.getScriptProperties().deleteProperty('ST_CREATOR_WEB_RESEARCH_DONE_V23');
-  Logger.log('V2.3 website research progress reset. No CRM data changed.');
+  PropertiesService.getScriptProperties().deleteProperty('ST_CREATOR_WEB_RESEARCH_DONE_V24');
+  Logger.log('V2.4 website research progress reset. No CRM data changed.');
+}
+
+function cleanupKnownInvalidCreatorEmails() {
+  const secret = PropertiesService.getScriptProperties().getProperty('INGEST_SECRET');
+  if (!secret) throw new Error('Missing Script Property: INGEST_SECRET');
+  Logger.log('KNOWN INVALID EMAIL CLEANUP START');
+  const response = UrlFetchApp.fetch(ST_CANDIDATE_BULK_RESEARCH.ENRICHMENT_ENDPOINT, {
+    method:'post', contentType:'application/json', headers:{'x-ingest-secret':secret},
+    payload:JSON.stringify({action:'cleanup_known_invalid_emails'}), muteHttpExceptions:true,
+  });
+  const code = response.getResponseCode();
+  const text = response.getContentText();
+  Logger.log('Response: ' + code + ' ' + text);
+  if (code < 200 || code >= 300) throw new Error('Cleanup failed. HTTP ' + code + ': ' + text);
+  const data = JSON.parse(text);
+  Logger.log('KNOWN INVALID EMAIL CLEANUP COMPLETE');
+  Logger.log('Rows examined: ' + Number(data.examined || 0));
+  Logger.log('Known bad emails removed: ' + Number(data.cleaned || 0));
 }
 
 function stNormalizePublicUrlV2_(value) {
@@ -119,31 +120,24 @@ function stOriginAndHostV2_(raw) {
   const scheme = match[1].toLowerCase();
   const originalHost = match[2].toLowerCase();
   const host = originalHost.replace(/^www\./, '');
-  if (!host) return null;
-  return { host: host, origin: scheme + '://' + originalHost + '/' };
+  return host ? { host:host, origin:scheme + '://' + originalHost + '/' } : null;
 }
 
 function stCreatorTitleTokensV2_(title) {
   const stop = {the:1,and:1,with:1,from:1,this:1,that:1,official:1,channel:1,outdoors:1,outdoor:1,survival:1,prepper:1,prepping:1,gear:1,homestead:1,homesteading:1,edc:1};
-  return String(title || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').split(/\s+/)
-    .filter(t => t.length >= 4 && !stop[t]);
+  return String(title || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').split(/\s+/).filter(t => t.length >= 4 && !stop[t]);
 }
-
 function stHostMatchesCreatorV2_(host, title) {
   const normalizedHost = String(host || '').toLowerCase().replace(/[^a-z0-9]/g, '');
   const titleCompact = String(title || '').toLowerCase().replace(/[^a-z0-9]/g, '');
   if (titleCompact.length >= 6 && normalizedHost.indexOf(titleCompact) >= 0) return true;
-  const tokens = stCreatorTitleTokensV2_(title);
-  return tokens.some(t => normalizedHost.indexOf(t) >= 0);
+  return stCreatorTitleTokensV2_(title).some(t => normalizedHost.indexOf(t) >= 0);
 }
-
 function stSelectCreatorOwnedWebsitesV2_(links, title) {
-  const seenHosts = {};
-  const out = [];
+  const seenHosts = {}; const out = [];
   (links || []).forEach(item => {
     const raw = stNormalizePublicUrlV2_((item || {}).url);
-    if (!/^https?:\/\//i.test(raw)) return;
-    if (stIsBlockedResearchUrlV2_(raw)) return;
+    if (!/^https?:\/\//i.test(raw) || stIsBlockedResearchUrlV2_(raw)) return;
     const parsed = stOriginAndHostV2_(raw);
     if (!parsed || seenHosts[parsed.host]) return;
     seenHosts[parsed.host] = true;
@@ -153,51 +147,34 @@ function stSelectCreatorOwnedWebsitesV2_(links, title) {
   return out.slice(0, 1);
 }
 
-function stIsPlaceholderEmailV2_(email) {
+function stIsInvalidEmailV2_(email) {
   const value = String(email || '').trim().toLowerCase();
   if (!value) return true;
-  const exact = {
-    'user@domain.com':1,
-    'name@domain.com':1,
-    'example@domain.com':1,
-    'email@domain.com':1,
-    'your@email.com':1,
-    'you@example.com':1,
-    'test@test.com':1,
-  };
+  const exact = {'user@domain.com':1,'name@domain.com':1,'example@domain.com':1,'email@domain.com':1,'your@email.com':1,'you@example.com':1,'test@test.com':1,'flags@2x.png':1};
   if (exact[value]) return true;
   if (/@example\.(com|org|net)$/i.test(value)) return true;
+  // CSS/image assets often contain @2x or @3x and can superficially match an email regex.
+  if (/@[23]x\.(png|jpe?g|gif|webp|svg|ico)$/i.test(value)) return true;
+  if (/\.(png|jpe?g|gif|webp|svg|ico|css|js)$/i.test(value)) return true;
   return false;
 }
 
 function stResearchWebsiteForPublicEmailV2_(baseUrl) {
   const paths = ['', 'contact', 'contact-us', 'about', 'about-us'];
-  let fetchCount = 0;
-  let placeholdersRejected = 0;
+  let fetchCount = 0, rejected = 0;
   for (let i = 0; i < paths.length; i++) {
     const url = paths[i] ? baseUrl.replace(/\/$/, '') + '/' + paths[i] : baseUrl;
     try {
-      const response = UrlFetchApp.fetch(url, {
-        method: 'get',
-        followRedirects: true,
-        muteHttpExceptions: true,
-        headers: { 'User-Agent': 'Mozilla/5.0 (compatible; SurvivalTabsPublicResearch/2.3)' },
-      });
+      const response = UrlFetchApp.fetch(url, {method:'get',followRedirects:true,muteHttpExceptions:true,headers:{'User-Agent':'Mozilla/5.0 (compatible; SurvivalTabsPublicResearch/2.4)'}});
       fetchCount += 1;
       const code = response.getResponseCode();
       if (code < 200 || code >= 400) continue;
-      const html = response.getContentText();
-      const emails = publicEmailsFromText_(html);
+      const emails = publicEmailsFromText_(response.getContentText());
       for (let j = 0; j < emails.length; j++) {
-        if (stIsPlaceholderEmailV2_(emails[j])) {
-          placeholdersRejected += 1;
-          continue;
-        }
-        return { email: emails[j], sourceUrl: url, fetchCount: fetchCount, placeholdersRejected: placeholdersRejected };
+        if (stIsInvalidEmailV2_(emails[j])) { rejected += 1; continue; }
+        return {email:emails[j],sourceUrl:url,fetchCount:fetchCount,rejected:rejected};
       }
-    } catch (e) {
-      fetchCount += 1;
-    }
+    } catch (e) { fetchCount += 1; }
   }
-  return { email: null, sourceUrl: null, fetchCount: fetchCount, placeholdersRejected: placeholdersRejected };
+  return {email:null,sourceUrl:null,fetchCount:fetchCount,rejected:rejected};
 }
