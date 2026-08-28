@@ -225,20 +225,44 @@ export function SimpleBulkOutreachPanel() {
       <Card>
         <CardHeader>
           <CardTitle>Replies Needing Attention</CardTitle>
-          <CardDescription>Only replies that need a person to look at them appear here.</CardDescription>
+          <CardDescription>
+            Store first, classify second. Price, sample, shipping and inventory replies always need a person.
+            Nothing here sends or promises anything.
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
-          <Button variant="outline" disabled={busy} onClick={() => run(async () => { await classifyUntriagedCreatorReplies({ data: { limit: 50 } }); await refreshTriage(); })}>Check new replies</Button>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" disabled={busy} onClick={() => run(async () => { await classifyUntriagedCreatorReplies({ data: { limit: 50 } }); await refreshTriage(); })}>Check new replies</Button>
+            <Button variant="outline" disabled={busy} onClick={() => run(async () => {
+              const r = await suppressIneligibleQueueItems({ data: campaignId ? { campaignId } : {} });
+              await refreshQueue();
+              setMessage(`${r.cancelled} planned follow-up${r.cancelled === 1 ? "" : "s"} cancelled for replied / do-not-contact creators.`);
+            })}>Stop follow-ups for replied / do-not-contact</Button>
+          </div>
           {triage.length === 0 && <p className="text-sm text-muted-foreground">No replies need attention.</p>}
           {triage.map((row) => (
-            <div key={row.gmail_message_id} className="rounded-lg border p-3">
-              <div className="font-medium text-sm">{row.category}</div>
-              <div className="mt-1 text-sm text-muted-foreground">{row.next_action || "Please review this reply."}</div>
+            <div key={row.gmail_message_id} className={`rounded-lg border p-3 ${row.category === "rejected" ? "border-destructive/60 bg-destructive/5" : ""}`}>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="font-medium text-sm">{row.creator_name || row.from_email || row.creator_id || "Unknown creator"}</div>
+                <div className="text-xs text-muted-foreground">{row.sent_at ? new Date(row.sent_at).toLocaleString() : new Date(row.created_at).toLocaleString()}</div>
+              </div>
+              {row.snippet && <div className="mt-1 line-clamp-3 text-sm text-muted-foreground">“{row.snippet}”</div>}
+              <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                <Badge variant={row.category === "rejected" ? "destructive" : "secondary"}>{row.category}</Badge>
+                <span className="text-xs text-muted-foreground">{Math.round(row.confidence * 100)}% confidence</span>
+                {row.risk_flags.map((flag) => <Badge key={flag} variant="destructive">{flag.replace(/_/g, " ")}</Badge>)}
+                <Badge variant="outline">{row.reviewed_at ? "Reviewed" : row.requires_human_review ? "Needs a person" : "No action needed"}</Badge>
+              </div>
+              <div className="mt-2 text-sm">{row.next_action || "Please review this reply."}</div>
+              {row.category === "rejected" && (
+                <div className="mt-1 text-xs font-medium text-destructive">Declined / unsubscribe — stop all follow-ups for this creator.</div>
+              )}
               <Button className="mt-2" size="sm" variant="outline" disabled={busy} onClick={() => run(async () => { await markReplyTriageReviewed({ data: { gmailMessageId: row.gmail_message_id } }); await refreshTriage(); })}>Mark Reviewed</Button>
             </div>
           ))}
         </CardContent>
       </Card>
+
 
       {message && <div className="rounded-md border bg-secondary/20 px-3 py-2 text-sm">{message}</div>}
     </div>
