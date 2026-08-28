@@ -8,6 +8,10 @@ import { classifyCreatorReplyDeterministically } from "@/lib/reply-classifier";
 export type ReplyTriageRow = {
   gmail_message_id: string;
   creator_id: string | null;
+  creator_name: string | null;
+  snippet: string | null;
+  sent_at: string | null;
+  from_email: string | null;
   category: string;
   confidence: number;
   risk_flags: unknown;
@@ -17,6 +21,7 @@ export type ReplyTriageRow = {
   reviewed_at: string | null;
   created_at: string;
 };
+
 
 /**
  * Classify stored incoming Gmail replies that do not yet have a classification.
