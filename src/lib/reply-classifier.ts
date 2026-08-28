@@ -79,7 +79,7 @@ export function classifyCreatorReplyDeterministically(input: string): ReplyClass
   // Rejections/unsubscribes must be surfaced to a person so pending
   // follow-ups can be stopped, even though nothing is auto-sent.
   const requiresHumanReview =
-    category === "needs_human" || category === "rejected" || category === "invalid" || riskFlags.length > 0;
+    category === "needs_human" || category === "rejected" || riskFlags.length > 0;
 
 
   return { category, confidence, riskFlags, nextAction, requiresHumanReview };
