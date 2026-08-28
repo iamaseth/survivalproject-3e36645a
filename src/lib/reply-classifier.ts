@@ -76,8 +76,11 @@ export function classifyCreatorReplyDeterministically(input: string): ReplyClass
     nextAction = "Review and continue the conversation; confirm any business terms manually.";
   }
 
+  // Rejections/unsubscribes must be surfaced to a person so pending
+  // follow-ups can be stopped, even though nothing is auto-sent.
   const requiresHumanReview =
-    category === "needs_human" || riskFlags.length > 0;
+    category === "needs_human" || category === "rejected" || category === "invalid" || riskFlags.length > 0;
+
 
   return { category, confidence, riskFlags, nextAction, requiresHumanReview };
 }
