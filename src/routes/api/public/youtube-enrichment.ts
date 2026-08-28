@@ -192,7 +192,7 @@ async function runSafeClassification(limit: number) {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const { data, error } = await supabaseAdmin.from("youtube_candidates").select("id,channel_title,topic_keyword,video_count,subscriber_count,last_upload_at,notes,external_links").eq("status", "pending").order("created_at", { ascending: false }).limit(limit);
   if (error) throw new Error(error.message);
-  const counts = { creator: 0, brand_company: 0, competitor: 0, organization: 0, left_for_review: 0, already_classified: 0 };
+  const counts: Record<string, number> = { creator: 0, brand_company: 0, competitor: 0, organization: 0, needs_review: 0, left_for_review: 0, already_classified: 0 };
   let examined = 0;
   for (const raw of data ?? []) {
     const row = raw as unknown as { id: string; channel_title?: string | null; topic_keyword?: string | null; video_count?: number | null; subscriber_count?: number | null; last_upload_at?: string | null; notes?: string | null; external_links?: unknown; };

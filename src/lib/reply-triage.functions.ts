@@ -8,15 +8,20 @@ import { classifyCreatorReplyDeterministically } from "@/lib/reply-classifier";
 export type ReplyTriageRow = {
   gmail_message_id: string;
   creator_id: string | null;
+  creator_name: string | null;
+  snippet: string | null;
+  sent_at: string | null;
+  from_email: string | null;
   category: string;
   confidence: number;
-  risk_flags: unknown;
+  risk_flags: string[];
   next_action: string | null;
   requires_human_review: boolean;
   reviewed_by: string | null;
   reviewed_at: string | null;
   created_at: string;
 };
+
 
 /**
  * Classify stored incoming Gmail replies that do not yet have a classification.
@@ -112,9 +117,49 @@ export const listReplyTriage = createServerFn({ method: "POST" })
 
     const { data: rows, error } = await query;
     if (error) throw new Error(error.message);
+    if (!rows?.length) return { rows: [] as ReplyTriageRow[] };
 
-    return { rows: (rows ?? []) as ReplyTriageRow[] };
+    // Read-only enrichment: raw Gmail rows are never modified here.
+    const messageIds = rows.map((r) => r.gmail_message_id);
+    const { data: messages } = await context.supabase
+      .from("gmail_messages")
+      .select("gmail_message_id, snippet, sent_at, from_email")
+      .in("gmail_message_id", messageIds);
+    const byMessage = new Map((messages ?? []).map((m) => [m.gmail_message_id, m]));
+
+    const creatorIds = Array.from(new Set(rows.map((r) => r.creator_id).filter(Boolean) as string[]));
+    const nameById = new Map<string, string>();
+    if (creatorIds.length) {
+      const { data: creators } = await context.supabase
+        .from("creators")
+        .select("id, name")
+        .in("id", creatorIds);
+      (creators ?? []).forEach((c) => nameById.set(c.id, c.name));
+    }
+
+    const enriched: ReplyTriageRow[] = rows.map((r) => {
+      const m = byMessage.get(r.gmail_message_id);
+      return {
+        gmail_message_id: r.gmail_message_id,
+        creator_id: r.creator_id,
+        creator_name: r.creator_id ? nameById.get(r.creator_id) ?? null : null,
+        snippet: m?.snippet ?? null,
+        sent_at: m?.sent_at ?? null,
+        from_email: m?.from_email ?? null,
+        category: r.category,
+        confidence: Number(r.confidence),
+        risk_flags: Array.isArray(r.risk_flags) ? r.risk_flags.map((f) => String(f)) : [],
+        next_action: r.next_action,
+        requires_human_review: r.requires_human_review,
+        reviewed_by: r.reviewed_by,
+        reviewed_at: r.reviewed_at,
+        created_at: r.created_at,
+      };
+    });
+
+    return { rows: enriched };
   });
+
 
 /**
  * Mark a classification reviewed. This is the only state change here and it
