@@ -36,80 +36,45 @@ Build a controlled creator outreach system that can operate on hundreds to thous
 - [ ] Verify thread/reply round-trip into CRM.
 
 ## Milestone 3 — Bulk queue
-Design an additive queue model with:
-- campaign id
-- creator id
-- sequence step
-- template id/version
-- subject/body snapshot
-- image reference
-- scheduled/not-before time
-- status: pending/approved/sending/sent/failed/skipped/cancelled
-- Gmail message/thread id
-- attempt count
-- error reason
-- idempotency key unique across campaign + creator + step
-
-Acceptance criteria:
-- adding a queue never modifies/deletes creator rows;
-- re-running preparation cannot duplicate planned sends;
-- sent items are never sent again by retry;
-- auth/systemic error stops the batch;
-- individual bad records are logged and skipped safely.
+- [x] `outreach_campaigns` and `outreach_queue_items` tables (additive, team RLS, no DELETE).
+- [x] Durable idempotency key unique across campaign + creator + step.
+- [x] Guard trigger: sent items immutable, cancelled items cannot be reactivated.
+- [x] `prepareQueue` / `listQueueItems` / `setQueueItemStatus` / `suppressIneligibleQueueItems`.
+- [x] KISS preparation/review UI (`/creators/outreach`, linked from the Creators page).
+- [x] Sending stays locked; there is no send action and `sending_locked` defaults to true.
 
 ## Milestone 4 — Reply triage
-- Store incoming reply first.
-- Run deterministic classification fallback.
-- Categories: interested, ask_price, ask_sample, rejected, posted, needs_human, invalid.
-- Add risk flags for price/sample/shipping/inventory.
-- Never auto-commit business terms.
-- Surface classification + recommended next action for human review.
+- [x] Store first, classify second: raw `gmail_messages` rows untouched.
+- [x] `creator_reply_classifications` stores category, confidence, risk flags, next action, human-review flag.
+- [x] Categories: interested, ask_price, ask_sample, rejected, posted, needs_human, invalid.
+- [x] Price/sample/shipping/inventory risk always requires human review.
+- [x] Rejected/unsubscribe surfaced in the triage view and flagged for human review.
+- [x] Compact triage view: creator, reply snippet/date, classification, risk flags, next action, review status.
+- [x] No business terms are auto-committed.
 
 ## Milestone 5 — Follow-up sequence
-Default candidate sequence, subject to user approval:
-- Initial outreach
-- Follow-up 1 after 5 days if no reply
-- Follow-up 2 after 10 days if no reply
-
-Rules:
-- Any reply cancels pending automated follow-up steps.
-- Declined/inactive creators receive no further sends.
-- Follow-ups use the existing Gmail thread when possible.
-- Daily cap is configurable.
+- [x] Steps modelled only (initial / +5 days / +10 days) in `src/lib/outreach.ts`.
+- [x] Replied, declined, and do-not-contact creators are ineligible for queued follow-ups.
+- [x] "Stop follow-ups for replied / do-not-contact" cancels pending items.
+- [ ] Automated sending — blocked.
 
 ## Milestone 6 — Campaign context
-Add campaign context without replacing existing creator data:
-- name
-- goal
-- product context
-- sample policy
-- allowed offer/commission notes
-- forbidden promises
-- brand tone
-- default template
-- daily send cap
-- status
+- [x] Campaign fields: name, goal, product context, sample policy, allowed offer notes,
+      forbidden promises, brand tone, default template, daily send cap, status.
 
 ## Milestone 7 — Analytics
-Track per campaign:
-- queued
-- sent
-- failed
-- replies
-- positive replies
-- declined
-- sample requested/shipped
-- content published
+- [ ] Per-campaign analytics — pending, after sending is enabled.
 
-## Verification plan
-Before any production schema/application change:
-1. Verify exact backend identity.
-2. Record baseline row counts.
-3. Confirm current recovery snapshot/checkpoint.
-4. Apply additive migration only.
-5. Verify counts unchanged for existing tables.
-6. Test with test/internal creator records first.
-7. Enable production queue only after round-trip mailbox test passes.
+## Verification (2026-08-28 continuation)
+- Row counts before and after: creators 165, creator_workspace 3, gmail_messages 1,
+  youtube_candidates 1061, reviewed_creators 11, creators_archive 250 — unchanged.
+- Typecheck passes.
+- Idempotency: same campaign + creator + step inserted twice → 1 row, 0 duplicates; test rows removed.
+- Classifier verified on synthetic text for interested, ask_price, ask_sample, rejected, posted, needs_human.
+- RLS on the three outreach tables matches the team-role pattern (SELECT/INSERT/UPDATE for
+  authenticated team members via `user_roles`; no DELETE policy).
 
-## Current next step
-Wait for production mailbox connection details while continuing creator enrichment and list expansion. In parallel, safe code-only helpers for deterministic reply classification and queue design may be staged in GitHub without activating production sends.
+## Remaining blocker
+Production sender mailbox connection plus round-trip verification before any bulk or
+automated sending can be enabled.
+
