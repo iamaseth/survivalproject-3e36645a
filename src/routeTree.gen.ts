@@ -25,6 +25,7 @@ import { Route as CreatorsRouteImport } from './routes/creators'
 import { Route as ContentRouteImport } from './routes/content'
 import { Route as CommunicationsRouteImport } from './routes/communications'
 import { Route as CommentsRouteImport } from './routes/comments'
+import { Route as ClassificationImportRouteImport } from './routes/classification-import'
 import { Route as CampaignsRouteImport } from './routes/campaigns'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AssetsRouteImport } from './routes/assets'
@@ -35,10 +36,12 @@ import { Route as AmazonCreatorsRouteImport } from './routes/amazon-creators'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as KnowledgeIdRouteImport } from './routes/knowledge.$id'
+import { Route as CreatorsOutreachRouteImport } from './routes/creators.outreach'
 import { Route as CreatorsIdRouteImport } from './routes/creators.$id'
 import { Route as AssetsIdRouteImport } from './routes/assets.$id'
 import { Route as ApiPublicYoutubeEnrichmentRouteImport } from './routes/api/public/youtube-enrichment'
 import { Route as ApiPublicYoutubeCandidatesRouteImport } from './routes/api/public/youtube-candidates'
+import { Route as ApiPublicCreatorContactQueueRouteImport } from './routes/api/public/creator-contact-queue'
 
 const WebsiteRoute = WebsiteRouteImport.update({
   id: '/website',
@@ -120,6 +123,11 @@ const CommentsRoute = CommentsRouteImport.update({
   path: '/comments',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ClassificationImportRoute = ClassificationImportRouteImport.update({
+  id: '/classification-import',
+  path: '/classification-import',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const CampaignsRoute = CampaignsRouteImport.update({
   id: '/campaigns',
   path: '/campaigns',
@@ -170,6 +178,11 @@ const KnowledgeIdRoute = KnowledgeIdRouteImport.update({
   path: '/$id',
   getParentRoute: () => KnowledgeRoute,
 } as any)
+const CreatorsOutreachRoute = CreatorsOutreachRouteImport.update({
+  id: '/outreach',
+  path: '/outreach',
+  getParentRoute: () => CreatorsRoute,
+} as any)
 const CreatorsIdRoute = CreatorsIdRouteImport.update({
   id: '/$id',
   path: '/$id',
@@ -192,6 +205,12 @@ const ApiPublicYoutubeCandidatesRoute =
     path: '/api/public/youtube-candidates',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicCreatorContactQueueRoute =
+  ApiPublicCreatorContactQueueRouteImport.update({
+    id: '/api/public/creator-contact-queue',
+    path: '/api/public/creator-contact-queue',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -203,6 +222,7 @@ export interface FileRoutesByFullPath {
   '/assets': typeof AssetsRouteWithChildren
   '/auth': typeof AuthRoute
   '/campaigns': typeof CampaignsRoute
+  '/classification-import': typeof ClassificationImportRoute
   '/comments': typeof CommentsRoute
   '/communications': typeof CommunicationsRoute
   '/content': typeof ContentRoute
@@ -221,7 +241,9 @@ export interface FileRoutesByFullPath {
   '/website': typeof WebsiteRoute
   '/assets/$id': typeof AssetsIdRoute
   '/creators/$id': typeof CreatorsIdRoute
+  '/creators/outreach': typeof CreatorsOutreachRoute
   '/knowledge/$id': typeof KnowledgeIdRoute
+  '/api/public/creator-contact-queue': typeof ApiPublicCreatorContactQueueRoute
   '/api/public/youtube-candidates': typeof ApiPublicYoutubeCandidatesRoute
   '/api/public/youtube-enrichment': typeof ApiPublicYoutubeEnrichmentRoute
 }
@@ -235,6 +257,7 @@ export interface FileRoutesByTo {
   '/assets': typeof AssetsRouteWithChildren
   '/auth': typeof AuthRoute
   '/campaigns': typeof CampaignsRoute
+  '/classification-import': typeof ClassificationImportRoute
   '/comments': typeof CommentsRoute
   '/communications': typeof CommunicationsRoute
   '/content': typeof ContentRoute
@@ -253,7 +276,9 @@ export interface FileRoutesByTo {
   '/website': typeof WebsiteRoute
   '/assets/$id': typeof AssetsIdRoute
   '/creators/$id': typeof CreatorsIdRoute
+  '/creators/outreach': typeof CreatorsOutreachRoute
   '/knowledge/$id': typeof KnowledgeIdRoute
+  '/api/public/creator-contact-queue': typeof ApiPublicCreatorContactQueueRoute
   '/api/public/youtube-candidates': typeof ApiPublicYoutubeCandidatesRoute
   '/api/public/youtube-enrichment': typeof ApiPublicYoutubeEnrichmentRoute
 }
@@ -268,6 +293,7 @@ export interface FileRoutesById {
   '/assets': typeof AssetsRouteWithChildren
   '/auth': typeof AuthRoute
   '/campaigns': typeof CampaignsRoute
+  '/classification-import': typeof ClassificationImportRoute
   '/comments': typeof CommentsRoute
   '/communications': typeof CommunicationsRoute
   '/content': typeof ContentRoute
@@ -286,7 +312,9 @@ export interface FileRoutesById {
   '/website': typeof WebsiteRoute
   '/assets/$id': typeof AssetsIdRoute
   '/creators/$id': typeof CreatorsIdRoute
+  '/creators/outreach': typeof CreatorsOutreachRoute
   '/knowledge/$id': typeof KnowledgeIdRoute
+  '/api/public/creator-contact-queue': typeof ApiPublicCreatorContactQueueRoute
   '/api/public/youtube-candidates': typeof ApiPublicYoutubeCandidatesRoute
   '/api/public/youtube-enrichment': typeof ApiPublicYoutubeEnrichmentRoute
 }
@@ -302,6 +330,7 @@ export interface FileRouteTypes {
     | '/assets'
     | '/auth'
     | '/campaigns'
+    | '/classification-import'
     | '/comments'
     | '/communications'
     | '/content'
@@ -320,7 +349,9 @@ export interface FileRouteTypes {
     | '/website'
     | '/assets/$id'
     | '/creators/$id'
+    | '/creators/outreach'
     | '/knowledge/$id'
+    | '/api/public/creator-contact-queue'
     | '/api/public/youtube-candidates'
     | '/api/public/youtube-enrichment'
   fileRoutesByTo: FileRoutesByTo
@@ -334,6 +365,7 @@ export interface FileRouteTypes {
     | '/assets'
     | '/auth'
     | '/campaigns'
+    | '/classification-import'
     | '/comments'
     | '/communications'
     | '/content'
@@ -352,7 +384,9 @@ export interface FileRouteTypes {
     | '/website'
     | '/assets/$id'
     | '/creators/$id'
+    | '/creators/outreach'
     | '/knowledge/$id'
+    | '/api/public/creator-contact-queue'
     | '/api/public/youtube-candidates'
     | '/api/public/youtube-enrichment'
   id:
@@ -366,6 +400,7 @@ export interface FileRouteTypes {
     | '/assets'
     | '/auth'
     | '/campaigns'
+    | '/classification-import'
     | '/comments'
     | '/communications'
     | '/content'
@@ -384,7 +419,9 @@ export interface FileRouteTypes {
     | '/website'
     | '/assets/$id'
     | '/creators/$id'
+    | '/creators/outreach'
     | '/knowledge/$id'
+    | '/api/public/creator-contact-queue'
     | '/api/public/youtube-candidates'
     | '/api/public/youtube-enrichment'
   fileRoutesById: FileRoutesById
@@ -399,6 +436,7 @@ export interface RootRouteChildren {
   AssetsRoute: typeof AssetsRouteWithChildren
   AuthRoute: typeof AuthRoute
   CampaignsRoute: typeof CampaignsRoute
+  ClassificationImportRoute: typeof ClassificationImportRoute
   CommentsRoute: typeof CommentsRoute
   CommunicationsRoute: typeof CommunicationsRoute
   ContentRoute: typeof ContentRoute
@@ -415,6 +453,7 @@ export interface RootRouteChildren {
   TemplatesRoute: typeof TemplatesRoute
   VideoRoute: typeof VideoRoute
   WebsiteRoute: typeof WebsiteRoute
+  ApiPublicCreatorContactQueueRoute: typeof ApiPublicCreatorContactQueueRoute
   ApiPublicYoutubeCandidatesRoute: typeof ApiPublicYoutubeCandidatesRoute
   ApiPublicYoutubeEnrichmentRoute: typeof ApiPublicYoutubeEnrichmentRoute
 }
@@ -533,6 +572,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CommentsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/classification-import': {
+      id: '/classification-import'
+      path: '/classification-import'
+      fullPath: '/classification-import'
+      preLoaderRoute: typeof ClassificationImportRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/campaigns': {
       id: '/campaigns'
       path: '/campaigns'
@@ -603,6 +649,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof KnowledgeIdRouteImport
       parentRoute: typeof KnowledgeRoute
     }
+    '/creators/outreach': {
+      id: '/creators/outreach'
+      path: '/outreach'
+      fullPath: '/creators/outreach'
+      preLoaderRoute: typeof CreatorsOutreachRouteImport
+      parentRoute: typeof CreatorsRoute
+    }
     '/creators/$id': {
       id: '/creators/$id'
       path: '/$id'
@@ -631,6 +684,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicYoutubeCandidatesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/creator-contact-queue': {
+      id: '/api/public/creator-contact-queue'
+      path: '/api/public/creator-contact-queue'
+      fullPath: '/api/public/creator-contact-queue'
+      preLoaderRoute: typeof ApiPublicCreatorContactQueueRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -647,10 +707,12 @@ const AssetsRouteWithChildren =
 
 interface CreatorsRouteChildren {
   CreatorsIdRoute: typeof CreatorsIdRoute
+  CreatorsOutreachRoute: typeof CreatorsOutreachRoute
 }
 
 const CreatorsRouteChildren: CreatorsRouteChildren = {
   CreatorsIdRoute: CreatorsIdRoute,
+  CreatorsOutreachRoute: CreatorsOutreachRoute,
 }
 
 const CreatorsRouteWithChildren = CreatorsRoute._addFileChildren(
@@ -679,6 +741,7 @@ const rootRouteChildren: RootRouteChildren = {
   AssetsRoute: AssetsRouteWithChildren,
   AuthRoute: AuthRoute,
   CampaignsRoute: CampaignsRoute,
+  ClassificationImportRoute: ClassificationImportRoute,
   CommentsRoute: CommentsRoute,
   CommunicationsRoute: CommunicationsRoute,
   ContentRoute: ContentRoute,
@@ -695,6 +758,7 @@ const rootRouteChildren: RootRouteChildren = {
   TemplatesRoute: TemplatesRoute,
   VideoRoute: VideoRoute,
   WebsiteRoute: WebsiteRoute,
+  ApiPublicCreatorContactQueueRoute: ApiPublicCreatorContactQueueRoute,
   ApiPublicYoutubeCandidatesRoute: ApiPublicYoutubeCandidatesRoute,
   ApiPublicYoutubeEnrichmentRoute: ApiPublicYoutubeEnrichmentRoute,
 }
