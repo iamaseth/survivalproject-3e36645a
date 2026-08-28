@@ -28,8 +28,10 @@ function CreatorPipeline() {
   const grouped = useMemo(() => { const out: Record<StageKey, CreatorRow[]> = { not_contacted: [], contacted: [], follow_up: [], responded: [], sample: [] }; creators.forEach((c) => out[stageFor(c)].push(c)); return out; }, [creators]);
   const { rows: ytRows, totals, refresh: refreshYT } = useYouTubePipeline();
   return <div className="mx-auto max-w-[1500px]">
-    <div className="mb-4 flex flex-wrap items-end justify-between gap-3"><div><div className="text-[11px] uppercase tracking-[0.18em] text-[color:var(--gold)]">Creator outreach</div><h1 className="font-display text-3xl text-foreground">Creators</h1></div><Link to="/amazon-creators" className="rounded-md border border-input bg-background px-3 py-2 text-sm hover:bg-secondary">Amazon creators</Link></div>
+    <div className="mb-4 flex flex-wrap items-end justify-between gap-3"><div><div className="text-[11px] uppercase tracking-[0.18em] text-[color:var(--gold)]">Creator outreach</div><h1 className="font-display text-3xl text-foreground">Creators</h1></div><div className="flex gap-2"><Link to="/creators/outreach" className="rounded-md border border-input bg-background px-3 py-2 text-sm hover:bg-secondary">Bulk outreach queue</Link><Link to="/amazon-creators" className="rounded-md border border-input bg-background px-3 py-2 text-sm hover:bg-secondary">Amazon creators</Link></div></div>
+    <div className="mb-4 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">Bulk sending is locked — the queue only prepares and reviews emails until the production mailbox is verified.</div>
     <PipelineCounters counts={totals}/>
+
     <div className="mb-4 relative"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"/><input value={query} onChange={(e)=>setQuery(e.target.value)} placeholder="Search creator, followers, email…" className="w-full max-w-xl rounded-md border border-input bg-card py-2.5 pl-9 pr-3 text-sm"/></div>
     <div className="space-y-3">{STAGES.map((stage)=><StageSection key={stage.key} stage={stage} rows={grouped[stage.key]} open={openStages[stage.key]} toggle={()=>setOpenStages((s)=>({...s,[stage.key]:!s[stage.key]}))}/>)}<YouTubeCandidatesSection rows={ytRows} refresh={refreshYT}/></div>
   </div>;
