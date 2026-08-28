@@ -14,7 +14,7 @@ export type ReplyTriageRow = {
   from_email: string | null;
   category: string;
   confidence: number;
-  risk_flags: unknown;
+  risk_flags: string[];
   next_action: string | null;
   requires_human_review: boolean;
   reviewed_by: string | null;
