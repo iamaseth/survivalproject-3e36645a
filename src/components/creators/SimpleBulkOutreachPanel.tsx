@@ -129,6 +129,11 @@ export function SimpleBulkOutreachPanel() {
 
   return (
     <div className="space-y-6">
+      <div className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+        <strong>Sending is locked.</strong> This page only prepares and reviews emails. No email can be sent
+        until the production sender mailbox is connected and a round-trip test passes.
+      </div>
+
       <Card>
         <CardHeader>
           <CardTitle>1. Choose Campaign & Email</CardTitle>
