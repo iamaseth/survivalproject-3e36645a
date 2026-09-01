@@ -53,5 +53,5 @@ jobs:
             exit 1
           fi
 
-      - name: Enrich qualified creators from YouTube public data
+      - name: Enrich qualified creators from YouTube public data and public links
         run: node tools/creator-enrichment/src/deep-youtube.mjs
