@@ -67,6 +67,37 @@ async function ytJson(args) {
   return JSON.parse(stdout);
 }
 
+function uploadsPlaylistUrl(channelId) {
+  if (!/^UC[\w-]{20,}$/.test(String(channelId || ''))) return null;
+  return `https://www.youtube.com/playlist?list=UU${String(channelId).slice(2)}`;
+}
+
+async function recentVideoEntries(row) {
+  const candidates = [];
+  const uploads = uploadsPlaylistUrl(row.channel_id);
+  if (uploads) candidates.push(uploads);
+  const channelUrl = row.channel_url || (row.channel_id ? `https://www.youtube.com/channel/${row.channel_id}` : null);
+  if (channelUrl) candidates.push(channelUrl.replace(/\/$/, '') + '/videos');
+
+  let lastError = null;
+  for (const url of uniq(candidates)) {
+    try {
+      const playlist = await ytJson([
+        '--flat-playlist',
+        '--playlist-end', String(videosPerChannel),
+        '--dump-single-json',
+        url,
+      ]);
+      const entries = Array.isArray(playlist.entries) ? playlist.entries.filter(Boolean) : [];
+      if (entries.length) return entries.slice(0, videosPerChannel);
+    } catch (e) {
+      lastError = e;
+    }
+  }
+  if (lastError) throw lastError;
+  return [];
+}
+
 const queueResponse = await rpc('youtube_deep_enrichment_queue', {
   p_secret: ingestSecret,
   p_limit: maxCreators,
@@ -82,22 +113,14 @@ let errors = 0;
 for (const row of queue) {
   checked += 1;
   const title = row.channel_title || row.channel_id;
-  const channelUrl = row.channel_url || `https://www.youtube.com/channel/${row.channel_id}`;
   let checkedVideos = 0;
   const foundEmails = [];
   const foundLinks = [];
   let errorText = null;
 
   try {
-    const playlist = await ytJson([
-      '--flat-playlist',
-      '--playlist-end', String(videosPerChannel),
-      '--dump-single-json',
-      channelUrl.replace(/\/$/, '') + '/videos',
-    ]);
-    const entries = Array.isArray(playlist.entries) ? playlist.entries : [];
-
-    for (const entry of entries.slice(0, videosPerChannel)) {
+    const entries = await recentVideoEntries(row);
+    for (const entry of entries) {
       const id = entry && (entry.id || entry.url);
       if (!id) continue;
       const videoUrl = String(id).startsWith('http') ? String(id) : `https://www.youtube.com/watch?v=${id}`;
@@ -110,10 +133,17 @@ for (const row of queue) {
           foundLinks.push({ kind: kind(url), url, source: `Public YouTube video description: ${videoUrl}` });
         }
         if (foundEmails.length) break;
-      } catch {}
+      } catch (e) {
+        if (!errorText) errorText = `Video read failed: ${String(e && e.message ? e.message : e).slice(0, 300)}`;
+      }
     }
   } catch (e) {
     errorText = String(e && e.message ? e.message : e).slice(0, 500);
+    errors += 1;
+  }
+
+  if (checkedVideos === 0 && !errorText) {
+    errorText = 'No recent public videos could be retrieved from uploads playlist or channel videos tab';
     errors += 1;
   }
 
