@@ -1,6 +1,10 @@
 name: Deep YouTube Enrichment
 
 on:
+  push:
+    paths:
+      - "tools/creator-enrichment/src/deep-youtube.mjs"
+      - ".github/workflows/deep-youtube-enrichment.yml"
   workflow_dispatch:
     inputs:
       limit:
@@ -20,10 +24,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 300
     env:
-      APP_BASE_URL: https://survivalproject.lovable.app
+      SUPABASE_URL: https://oqeebbimamcyzzbfrlws.supabase.co
+      SUPABASE_PUBLISHABLE_KEY: sb_publishable__g2gVvguqn_rzf5H0IJdqw_m4HO6hZi
       YOUTUBE_INGEST_SECRET: ${{ secrets.YOUTUBE_INGEST_SECRET }}
-      DEEP_YOUTUBE_LIMIT: ${{ github.event.inputs.limit || '500' }}
-      DEEP_YOUTUBE_VIDEOS: ${{ github.event.inputs.videos_per_channel || '10' }}
+      DEEP_YOUTUBE_LIMIT: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.limit || '5' }}
+      DEEP_YOUTUBE_VIDEOS: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.videos_per_channel || '10' }}
 
     steps:
       - uses: actions/checkout@v4
@@ -36,10 +41,14 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Verify required secret exists
+      - name: Verify required configuration exists
         run: |
           if [ -z "$YOUTUBE_INGEST_SECRET" ]; then
             echo "Missing GitHub Actions secret: YOUTUBE_INGEST_SECRET"
+            exit 1
+          fi
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_PUBLISHABLE_KEY" ]; then
+            echo "Missing Supabase public connection settings"
             exit 1
           fi
 
