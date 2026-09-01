@@ -1,16 +1,12 @@
 name: Deep YouTube Enrichment
 
 on:
-  push:
-    paths:
-      - "tools/creator-enrichment/src/deep-youtube.mjs"
-      - ".github/workflows/deep-youtube-enrichment.yml"
   workflow_dispatch:
     inputs:
       limit:
         description: "Max qualified no-email creators"
         required: false
-        default: "500"
+        default: "5"
       videos_per_channel:
         description: "Recent videos to inspect per creator"
         required: false
@@ -27,8 +23,9 @@ jobs:
       SUPABASE_URL: https://oqeebbimamcyzzbfrlws.supabase.co
       SUPABASE_PUBLISHABLE_KEY: sb_publishable__g2gVvguqn_rzf5H0IJdqw_m4HO6hZi
       YOUTUBE_INGEST_SECRET: ${{ secrets.YOUTUBE_INGEST_SECRET }}
-      DEEP_YOUTUBE_LIMIT: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.limit || '5' }}
-      DEEP_YOUTUBE_VIDEOS: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.videos_per_channel || '10' }}
+      YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
+      DEEP_YOUTUBE_LIMIT: ${{ github.event.inputs.limit || '5' }}
+      DEEP_YOUTUBE_VIDEOS: ${{ github.event.inputs.videos_per_channel || '10' }}
 
     steps:
       - uses: actions/checkout@v4
@@ -37,14 +34,14 @@ jobs:
         with:
           node-version: "20"
 
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-
       - name: Verify required configuration exists
         run: |
           if [ -z "$YOUTUBE_INGEST_SECRET" ]; then
             echo "Missing GitHub Actions secret: YOUTUBE_INGEST_SECRET"
+            exit 1
+          fi
+          if [ -z "$YOUTUBE_API_KEY" ]; then
+            echo "Missing GitHub Actions secret: YOUTUBE_API_KEY"
             exit 1
           fi
           if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_PUBLISHABLE_KEY" ]; then
@@ -52,8 +49,5 @@ jobs:
             exit 1
           fi
 
-      - name: Install yt-dlp
-        run: python -m pip install --disable-pip-version-check yt-dlp
-
-      - name: Enrich qualified creators from recent public video descriptions
+      - name: Enrich qualified creators from YouTube public data
         run: node tools/creator-enrichment/src/deep-youtube.mjs
