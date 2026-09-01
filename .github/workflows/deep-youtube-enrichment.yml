@@ -53,5 +53,6 @@ jobs:
             exit 1
           fi
 
+      # Batch marker: 2026-09-01 next qualified creator pass.
       - name: Enrich qualified creators from YouTube public data and public links
         run: node tools/creator-enrichment/src/deep-youtube.mjs
