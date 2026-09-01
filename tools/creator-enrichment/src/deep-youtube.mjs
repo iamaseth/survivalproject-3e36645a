@@ -2,11 +2,14 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 
 const execFileAsync = promisify(execFile);
-const appBaseUrl = (process.env.APP_BASE_URL || 'https://survivalproject.lovable.app').replace(/\/$/, '');
+const supabaseUrl = (process.env.SUPABASE_URL || '').replace(/\/$/, '');
+const publishableKey = process.env.SUPABASE_PUBLISHABLE_KEY || '';
 const ingestSecret = process.env.YOUTUBE_INGEST_SECRET || '';
-const maxCreators = Math.max(1, Math.min(Number(process.env.DEEP_YOUTUBE_LIMIT || 500), 500));
+const maxCreators = Math.max(1, Math.min(Number(process.env.DEEP_YOUTUBE_LIMIT || 5), 500));
 const videosPerChannel = Math.max(1, Math.min(Number(process.env.DEEP_YOUTUBE_VIDEOS || 10), 15));
 
+if (!supabaseUrl) throw new Error('SUPABASE_URL is required');
+if (!publishableKey) throw new Error('SUPABASE_PUBLISHABLE_KEY is required');
 if (!ingestSecret) throw new Error('YOUTUBE_INGEST_SECRET is required');
 
 const emailRx = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi;
@@ -41,17 +44,17 @@ function bestEmail(found) {
   return [...found].sort((a, b) => scoreEmail(b.email) - scoreEmail(a.email))[0] || null;
 }
 
-async function api(path, options = {}) {
-  const res = await fetch(`${appBaseUrl}${path}`, {
-    ...options,
+async function rpc(name, body) {
+  const res = await fetch(`${supabaseUrl}/rest/v1/rpc/${name}`, {
+    method: 'POST',
     headers: {
-      'x-ingest-secret': ingestSecret,
+      apikey: publishableKey,
       'Content-Type': 'application/json',
-      ...(options.headers || {}),
     },
+    body: JSON.stringify(body),
   });
   const text = await res.text();
-  if (!res.ok) throw new Error(`Lovable enrichment API ${res.status}: ${text.slice(0, 500)}`);
+  if (!res.ok) throw new Error(`Supabase RPC ${name} ${res.status}: ${text.slice(0, 500)}`);
   return text ? JSON.parse(text) : null;
 }
 
@@ -64,8 +67,11 @@ async function ytJson(args) {
   return JSON.parse(stdout);
 }
 
-const queueResponse = await api(`/api/public/youtube-deep-enrichment?limit=${encodeURIComponent(maxCreators)}`);
-const queue = Array.isArray(queueResponse?.rows) ? queueResponse.rows : [];
+const queueResponse = await rpc('youtube_deep_enrichment_queue', {
+  p_secret: ingestSecret,
+  p_limit: maxCreators,
+});
+const queue = Array.isArray(queueResponse) ? queueResponse : [];
 console.log(`Qualified no-email creators queued: ${queue.length}`);
 
 let checked = 0;
@@ -115,19 +121,17 @@ for (const row of queue) {
   const uniqueLinks = [...new Map(foundLinks.map(item => [`${item.kind}:${item.url}`, item])).values()].slice(0, 100);
   linksFound += uniqueLinks.length;
 
-  const applied = await api('/api/public/youtube-deep-enrichment', {
-    method: 'POST',
-    body: JSON.stringify({
-      rows: [{
-        id: row.id,
-        business_email: best ? best.email : null,
-        email_source: best ? best.source : null,
-        external_links: uniqueLinks,
-        checked_videos: checkedVideos,
-        status: best || uniqueLinks.length ? 'found' : errorText ? 'error' : 'no_email_found',
-        error: errorText,
-      }],
-    }),
+  const applied = await rpc('youtube_deep_enrichment_apply', {
+    p_secret: ingestSecret,
+    p_rows: [{
+      id: row.id,
+      business_email: best ? best.email : null,
+      email_source: best ? `Public YouTube video description: ${best.source}` : null,
+      external_links: uniqueLinks,
+      checked_videos: checkedVideos,
+      status: best || uniqueLinks.length ? 'found' : errorText ? 'error' : 'no_email_found',
+      error: errorText,
+    }],
   });
 
   emailsAdded += Number(applied?.emailAdded || 0);
