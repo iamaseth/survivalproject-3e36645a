@@ -10,7 +10,7 @@ on:
       limit:
         description: "Max qualified no-email creators"
         required: false
-        default: "50"
+        default: "300"
       videos_per_channel:
         description: "Recent videos to inspect per creator"
         required: false
@@ -28,7 +28,7 @@ jobs:
       SUPABASE_PUBLISHABLE_KEY: sb_publishable__g2gVvguqn_rzf5H0IJdqw_m4HO6hZi
       YOUTUBE_INGEST_SECRET: ${{ secrets.YOUTUBE_INGEST_SECRET }}
       YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
-      DEEP_YOUTUBE_LIMIT: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.limit || '50' }}
+      DEEP_YOUTUBE_LIMIT: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.limit || '300' }}
       DEEP_YOUTUBE_VIDEOS: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.videos_per_channel || '10' }}
 
     steps:
@@ -53,6 +53,6 @@ jobs:
             exit 1
           fi
 
-      # Batch marker: 2026-09-01 next qualified creator pass.
+      # Queue now excludes creators whose deep public-web pass already completed.
       - name: Enrich qualified creators from YouTube public data and public links
         run: node tools/creator-enrichment/src/deep-youtube.mjs
