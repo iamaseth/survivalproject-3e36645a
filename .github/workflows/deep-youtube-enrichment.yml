@@ -1,6 +1,10 @@
 name: Deep YouTube Enrichment
 
 on:
+  push:
+    paths:
+      - "tools/creator-enrichment/src/deep-youtube.mjs"
+      - ".github/workflows/deep-youtube-enrichment.yml"
   workflow_dispatch:
     inputs:
       limit:
@@ -24,8 +28,8 @@ jobs:
       SUPABASE_PUBLISHABLE_KEY: sb_publishable__g2gVvguqn_rzf5H0IJdqw_m4HO6hZi
       YOUTUBE_INGEST_SECRET: ${{ secrets.YOUTUBE_INGEST_SECRET }}
       YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
-      DEEP_YOUTUBE_LIMIT: ${{ github.event.inputs.limit || '5' }}
-      DEEP_YOUTUBE_VIDEOS: ${{ github.event.inputs.videos_per_channel || '10' }}
+      DEEP_YOUTUBE_LIMIT: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.limit || '5' }}
+      DEEP_YOUTUBE_VIDEOS: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.videos_per_channel || '10' }}
 
     steps:
       - uses: actions/checkout@v4
