@@ -52,7 +52,7 @@ import { purgeTestCreatorArtifacts, listCreatorMessages } from "@/lib/gmail.func
 import { suggestShippingNoteFromThread } from "@/lib/ai-research.functions";
 
 import { useAuth } from "@/lib/current-user";
-import { externalLinkProps } from "@/lib/external-link";
+import { externalLinkProps, outlookComposeUrl } from "@/lib/external-link";
 
 
 export const Route = createFileRoute("/creators/$id")({
@@ -814,7 +814,7 @@ function EmailDrafter({ c }: { c: CreatorRow }) {
   };
 
   const to = c.email ?? "";
-  const mailto = `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  const outlook = outlookComposeUrl(to, subject, body);
   const gmail = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(to)}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 
   return (
@@ -877,10 +877,10 @@ function EmailDrafter({ c }: { c: CreatorRow }) {
             <Send className="h-4 w-4" /> Open in Gmail
           </a>
           <a
-            href={mailto}
+            {...externalLinkProps(outlook)}
             className={`inline-flex items-center gap-1.5 rounded-md border border-input px-3 py-1.5 text-sm hover:bg-secondary ${!to ? "pointer-events-none opacity-50" : ""}`}
           >
-            <Mail className="h-4 w-4" /> Default mail app
+            <Mail className="h-4 w-4" /> Open in Outlook
           </a>
           <button
             onClick={() => { navigator.clipboard.writeText(`Subject: ${subject}\n\n${body}`); }}

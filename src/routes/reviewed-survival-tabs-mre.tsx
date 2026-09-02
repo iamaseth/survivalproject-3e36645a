@@ -3,7 +3,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { ChevronDown, ChevronRight, ExternalLink, Mail, Search, Youtube } from "lucide-react";
-import { externalLinkProps } from "@/lib/external-link";
+import { externalLinkProps, survivalTabsOutreachUrl } from "@/lib/external-link";
 import { listReviewedCreators, updateReviewedCreatorWorkflow } from "@/lib/reviewed-creators.functions";
 
 export const Route = createFileRoute("/reviewed-survival-tabs-mre")({
@@ -143,7 +143,7 @@ function ReviewerLine({ row, reload }: { row: Row; reload: () => Promise<void> }
       <div className="min-w-0"><div className="text-[10px] uppercase tracking-wide text-muted-foreground">Original review</div><div className="truncate text-sm font-medium">{review.title || "Verified review"}</div>{reviewUrl ? <><a {...externalLinkProps(reviewUrl)} className="mt-1 inline-flex items-center gap-1 rounded-md border border-input px-2 py-1 text-xs"><Youtube className="h-3.5 w-3.5" /> Original review</a><div className="mt-1 select-all break-all font-mono text-[10px] text-muted-foreground">{reviewUrl}</div></> : <span className="text-xs text-amber-700">Review URL pending</span>}</div>
       <div><div className="text-[10px] uppercase tracking-wide text-muted-foreground">Published</div><div className="font-semibold">{review.year || "—"}</div></div>
       <div><div className="text-[10px] uppercase tracking-wide text-muted-foreground">Views</div><div className="font-semibold">{review.views || "—"}</div></div>
-      <div>{row.email ? <a href={`mailto:${row.email}`} className="inline-flex items-center gap-1 rounded-md bg-primary px-2.5 py-1.5 text-xs font-medium text-primary-foreground"><Mail className="h-3.5 w-3.5" /> Write email</a> : row.contact_route?.startsWith("http") ? <a {...externalLinkProps(row.contact_route)} className="inline-flex items-center gap-1 text-xs underline">Contact <ExternalLink className="h-3 w-3" /></a> : <span className="text-xs text-muted-foreground">No email</span>}</div>
+      <div>{row.email ? <a {...externalLinkProps(survivalTabsOutreachUrl(row.email, row.name))} className="inline-flex items-center gap-1 rounded-md bg-primary px-2.5 py-1.5 text-xs font-medium text-primary-foreground"><Mail className="h-3.5 w-3.5" /> Email in Outlook</a> : row.contact_route?.startsWith("http") ? <a {...externalLinkProps(row.contact_route)} className="inline-flex items-center gap-1 text-xs underline">Contact <ExternalLink className="h-3 w-3" /></a> : <span className="text-xs text-muted-foreground">No email</span>}</div>
       <div><div className="text-[10px] uppercase tracking-wide text-muted-foreground">Response</div><div className="text-sm">{response}</div><div className="text-[10px] text-muted-foreground">{days == null ? "Not contacted" : `${days} days`}</div></div>
       <div><div className="text-[10px] uppercase tracking-wide text-muted-foreground">Sample / next</div><div className="truncate text-sm">{sample !== "Not Sent" ? sample : "—"}</div></div>
       <button onClick={() => setOpen((v) => !v)} className="rounded-md p-1 hover:bg-secondary">{open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}</button>

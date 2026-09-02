@@ -16,7 +16,7 @@ import {
   setYouTubeCandidateClassification,
   type CandidateClassification,
 } from "@/lib/youtube-candidate-classification.functions";
-import { externalLinkProps } from "@/lib/external-link";
+import { externalLinkProps, survivalTabsOutreachUrl } from "@/lib/external-link";
 
 const fmt = (n: number | null | undefined) =>
   n == null ? "—" : n >= 1000 ? `${(n / 1000).toFixed(n >= 10000 ? 0 : 1)}k` : String(n);
@@ -415,7 +415,7 @@ export function YouTubeCandidatesSection({
 
   return (
     <section className="overflow-hidden rounded-xl border border-border bg-card">
-      <button onClick={() => setOpen((v) => !v)} className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-secondary/40">
+      <button onClick={() => setOpen((v) => !v)} aria-expanded={open} className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-secondary/40">
         {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
         <div className="grid h-7 w-7 place-items-center rounded-full bg-[color:var(--gold)] text-xs font-semibold text-[color:var(--forest)]">R</div>
         <div className="min-w-0 flex-1">
@@ -424,6 +424,7 @@ export function YouTubeCandidatesSection({
           </div>
           <div className="text-xs text-muted-foreground">Classify first. Only records explicitly classified as Creator can be recommended or added to the main creator list.</div>
         </div>
+        <span className="rounded-md border border-input bg-background px-2.5 py-1 text-xs font-medium text-foreground">{open ? "Close" : "Open"}</span>
       </button>
       {open ? (
         <div className="border-t border-border">
@@ -567,7 +568,7 @@ export function YouTubeCandidatesSection({
                         </td>
                         <td className="px-2 py-2">
                           {email ? (
-                            <a href={`mailto:${email}`} title={email} aria-label={`Email ${c.channel_title || c.channel_id}`} className="inline-flex h-7 items-center gap-1 rounded border border-input px-2 hover:bg-secondary">
+                            <a {...externalLinkProps(survivalTabsOutreachUrl(email, c.channel_title || c.channel_id))} title={`Open Outlook for ${email}`} aria-label={`Email ${c.channel_title || c.channel_id} in Outlook`} className="inline-flex h-7 items-center gap-1 rounded border border-input px-2 hover:bg-secondary">
                               <Mail className="h-3.5 w-3.5" /> Email
                             </a>
                           ) : <span className="text-muted-foreground">—</span>}

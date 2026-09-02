@@ -21,6 +21,7 @@ import {
   setAmazonDiscoveryStatus,
 } from "@/lib/amazon-discovery.functions";
 import { updateCreatorWorkflow } from "@/lib/creators.functions";
+import { externalLinkProps, survivalTabsOutreachUrl } from "@/lib/external-link";
 
 export const Route = createFileRoute("/amazon-creators")({
   component: AmazonCreatorsPage,
@@ -369,7 +370,7 @@ function CreatorLine({ row, stage, onDone }: { row: AmazonCreatorRow; stage: Sta
 
         <div>
           {row.email ? (
-            <a href={`mailto:${row.email}?subject=${encodeURIComponent("Survival Tabs creator collaboration")}`} className="inline-flex items-center gap-1 rounded-md bg-primary px-2.5 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90"><Mail className="h-3.5 w-3.5" /> Write email</a>
+            <a {...externalLinkProps(survivalTabsOutreachUrl(row.email, row.name))} className="inline-flex items-center gap-1 rounded-md bg-primary px-2.5 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90"><Mail className="h-3.5 w-3.5" /> Email in Outlook</a>
           ) : row.contact_route?.startsWith("http") ? (
             <a href={row.contact_route} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs underline">Contact <ExternalLink className="h-3 w-3" /></a>
           ) : <span className="text-xs text-muted-foreground">No email</span>}
