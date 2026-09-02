@@ -1,11 +1,14 @@
 import { createFileRoute, Link, Outlet, useRouterState } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
+import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
-import { ChevronDown, ChevronRight, ExternalLink, Facebook, Globe, Instagram, Mail, MessageCircle, Search, Youtube, X } from "lucide-react";
+import { ChevronDown, ChevronRight, Copy, ExternalLink, Facebook, Globe, Image as ImageIcon, Instagram, Loader2, Mail, MessageCircle, Search, Youtube, X } from "lucide-react";
 import { CREATORS, type CreatorRow, useCreatorsVersion } from "@/lib/creator-partnerships";
 import { updateCreatorWorkflow } from "@/lib/creators.functions";
-import { externalLinkProps, survivalTabsOutreachUrl } from "@/lib/external-link";
+import { externalLinkProps, outlookComposeUrl } from "@/lib/external-link";
+import { listEmailTemplates } from "@/lib/templates.functions";
+import { applyMergeFields, mergeContextForCreator, orderTemplatesForCreator, type EmailTemplate } from "@/lib/templates";
 import { PipelineCounters, YouTubeCandidatesSection, useYouTubePipeline } from "@/components/creators/YouTubeCandidates";
 
 export const Route = createFileRoute("/creators")({ component: CreatorsLayout, head: () => ({ meta: [{ title: "Creators — Survival Tabs" }, { name: "description", content: "Simple creator outreach workflow." }] }) });
@@ -135,11 +138,11 @@ function ExternalButton({href,children,className}:{href:string;children:React.Re
 function CreatorLine({ creator }: { creator: CreatorRow }) {
   const updateFn = useServerFn(updateCreatorWorkflow);
   const [open,setOpen]=useState(false); const [busy,setBusy]=useState(false);
+  const [emailComposerOpen,setEmailComposerOpen]=useState(false);
   const [manualMethod,setManualMethod]=useState(""); const [manualNote,setManualNote]=useState("");
   const followers=creator.followersSignal||creator.reachSignal||"—"; const days=daysSince(creator.contactedDate); const stage=stageFor(creator);
   const platforms=creatorPlatforms(creator); const category=contactCategory(creator); const niche=nicheLabel(creator);
   const update=async(patch:any)=>{setBusy(true);try{await updateFn({data:{id:creator.id,...patch}});toast.success("Updated");window.location.reload();}catch(e:any){toast.error(e?.message??"Could not update creator");}finally{setBusy(false);}};
-  const emailHref=creator.email?survivalTabsOutreachUrl(creator.email, creator.name):null;
   const markManualContacted=()=>{
     if(!manualMethod){toast.error("Choose how you contacted the creator");return;}
     if(!manualNote.trim()){toast.error("Add a short contact note before marking contacted");return;}
@@ -152,7 +155,7 @@ function CreatorLine({ creator }: { creator: CreatorRow }) {
       <div className="min-w-0"><Link to="/creators/$id" params={{id:creator.id}} className="block truncate font-medium hover:text-primary hover:underline hover:underline-offset-4">{creator.name}</Link><div className="truncate text-xs text-muted-foreground" title={niche}>{niche}</div></div>
       <div><div className="text-[10px] uppercase tracking-wide text-muted-foreground">Followers</div><div className="font-semibold">{followers}</div></div>
       <div><div className="mb-1 text-[10px] uppercase tracking-wide text-muted-foreground">Publishes on</div><div className="flex flex-wrap gap-1">{platforms.length?platforms.map((platform)=><PlatformBadge key={platform} platform={platform}/>):<span className="text-xs text-muted-foreground">Platform unverified</span>}</div></div>
-      <div><div className="mb-1 text-[10px] uppercase tracking-wide text-muted-foreground">Contact via · {CONTACT_OPTIONS.find((x)=>x.value===category)?.label}</div><div className="flex flex-wrap gap-1">{emailHref?<a {...externalLinkProps(emailHref)} title="The message is prefilled. Attach the approved product photo before sending." className="inline-flex items-center gap-1 rounded-md bg-primary px-2 py-1 text-xs font-medium text-primary-foreground hover:bg-primary/90"><Mail className="h-3.5 w-3.5"/> Email · attach photo</a>:null}{creator.tiktok?<ContactButton href={creator.tiktok} label="TikTok" icon={<MessageCircle className="h-3.5 w-3.5"/>}/>:null}{creator.instagram?<ContactButton href={creator.instagram} label="Instagram" icon={<Instagram className="h-3.5 w-3.5"/>}/>:null}{creator.facebook?<ContactButton href={creator.facebook} label="Facebook" icon={<Facebook className="h-3.5 w-3.5"/>}/>:null}{isContactForm(creator)&&creator.contactRoute?<ContactButton href={creator.contactRoute} label="Contact form" icon={<Globe className="h-3.5 w-3.5"/>}/>:null}{category==="youtube_only"&&creator.youtube?<ContactButton href={creator.youtube} label="YouTube only" icon={<Youtube className="h-3.5 w-3.5"/>}/>:null}{category==="none"?<span className="text-xs font-medium text-amber-700">Research needed</span>:null}</div></div>
+      <div><div className="mb-1 text-[10px] uppercase tracking-wide text-muted-foreground">Contact via · {CONTACT_OPTIONS.find((x)=>x.value===category)?.label}</div><div className="flex flex-wrap gap-1">{creator.email?<button type="button" onClick={()=>setEmailComposerOpen(true)} className="inline-flex items-center gap-1 rounded-md bg-primary px-2 py-1 text-xs font-medium text-primary-foreground hover:bg-primary/90"><Mail className="h-3.5 w-3.5"/> Email</button>:null}{creator.tiktok?<ContactButton href={creator.tiktok} label="TikTok" icon={<MessageCircle className="h-3.5 w-3.5"/>}/>:null}{creator.instagram?<ContactButton href={creator.instagram} label="Instagram" icon={<Instagram className="h-3.5 w-3.5"/>}/>:null}{creator.facebook?<ContactButton href={creator.facebook} label="Facebook" icon={<Facebook className="h-3.5 w-3.5"/>}/>:null}{isContactForm(creator)&&creator.contactRoute?<ContactButton href={creator.contactRoute} label="Contact form" icon={<Globe className="h-3.5 w-3.5"/>}/>:null}{category==="youtube_only"&&creator.youtube?<ContactButton href={creator.youtube} label="YouTube only" icon={<Youtube className="h-3.5 w-3.5"/>}/>:null}{category==="none"?<span className="text-xs font-medium text-amber-700">Research needed</span>:null}</div></div>
       <div><div className="text-[10px] uppercase tracking-wide text-muted-foreground">Days</div><div>{days==null?"—":days}</div></div>
       <div><div className="text-[10px] uppercase tracking-wide text-muted-foreground">Response</div><div className="truncate text-sm">{creator.responseState==="No Response"?"Waiting":creator.responseState.replace("Replied — ","")}</div></div>
       <div><div className="text-[10px] uppercase tracking-wide text-muted-foreground">Sample / next</div><div className="truncate text-sm">{creator.normalizedSampleStatus!=="Not Sent"?creator.normalizedSampleStatus:creator.nextFollowUpDate||"—"}</div></div>
@@ -178,6 +181,42 @@ function CreatorLine({ creator }: { creator: CreatorRow }) {
         <Link to="/creators/$id" params={{id:creator.id}} className="rounded-md border border-input bg-background px-3 py-2 text-center text-sm font-medium hover:bg-secondary">Open full creator record</Link>
       </div>
     </div></div>:null}
+    {emailComposerOpen?<EmailComposerModal creator={creator} onClose={()=>setEmailComposerOpen(false)}/>:null}
+  </div>;
+}
+
+function EmailComposerModal({creator,onClose}:{creator:CreatorRow;onClose:()=>void}) {
+  const list=useServerFn(listEmailTemplates);
+  const q=useQuery({queryKey:["email-templates","active"],queryFn:()=>list({data:{activeOnly:true}})});
+  const templates=useMemo(()=>orderTemplatesForCreator((q.data?.templates??[]) as EmailTemplate[],creator.segment),[q.data,creator.segment]);
+  const [selectedId,setSelectedId]=useState("");
+  const selected=templates.find((t)=>t.id===selectedId)??templates[0]??null;
+  const ctx=useMemo(()=>mergeContextForCreator(creator,"Rena"),[creator]);
+  const subject=selected?applyMergeFields(selected.subject,ctx):"";
+  const body=selected?applyMergeFields(selected.body,ctx):"";
+  const outlook=creator.email&&selected?outlookComposeUrl(creator.email,subject,body):"";
+  const copyMessage=async()=>{
+    await navigator.clipboard.writeText(`To: ${creator.email}\nSubject: ${subject}\n\n${body}`);
+    toast.success("Message copied",{description:selected?.imageUrl?"Attach the template photo before sending.":"Ready to paste into email."});
+  };
+  return <div className="fixed inset-0 z-50 grid place-items-center bg-black/45 p-4" role="dialog" aria-modal="true" aria-labelledby={`email-title-${creator.id}`} onMouseDown={(e)=>{if(e.target===e.currentTarget)onClose();}}>
+    <div className="max-h-[92vh] w-full max-w-3xl overflow-auto rounded-xl border border-border bg-card shadow-2xl">
+      <div className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-border bg-card px-5 py-4">
+        <div><div className="text-[11px] uppercase tracking-[0.18em] text-[color:var(--gold)]">Prepare email</div><h2 id={`email-title-${creator.id}`} className="font-display text-2xl">Email {creator.name}</h2><div className="text-xs text-muted-foreground">Nothing sends automatically.</div></div>
+        <button type="button" onClick={onClose} className="rounded-md p-2 hover:bg-secondary" aria-label="Close email composer"><X className="h-5 w-5"/></button>
+      </div>
+      <div className="space-y-4 p-5">
+        {q.isLoading?<div className="flex items-center gap-2 py-8 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin"/> Loading approved templates…</div>:q.error?<div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">Templates could not be loaded. Close this window and try again.</div>:templates.length===0?<div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">No approved templates are available. Ask Perry or an approved manager to approve one in Email Templates.</div>:<>
+          <label className="block"><span className="mb-1 block text-xs font-semibold">1. Choose template</span><select value={selected?.id??""} onChange={(e)=>setSelectedId(e.target.value)} className="w-full rounded-md border border-input bg-background px-3 py-2.5 text-sm">{templates.map((t)=><option key={t.id} value={t.id}>{t.name}{t.segment?` — ${t.segment}`:""}</option>)}</select></label>
+          <div className="grid gap-4 md:grid-cols-[1fr_220px]">
+            <div className="space-y-3"><div><div className="mb-1 text-xs font-semibold">2. Preview personalized message</div><div className="rounded-md border border-border bg-background p-3"><div className="border-b border-border pb-2 text-sm"><span className="text-muted-foreground">To:</span> {creator.email}</div><div className="border-b border-border py-2 text-sm"><span className="text-muted-foreground">Subject:</span> {subject}</div><div className="whitespace-pre-wrap pt-3 text-sm leading-6">{body}</div></div></div></div>
+            <div><div className="mb-1 text-xs font-semibold">Template photo</div>{selected?.imageUrl?<div className="rounded-md border border-border bg-background p-2"><img src={selected.imageUrl} alt={selected.imageAlt||"Template product photo"} className="aspect-square w-full rounded object-contain"/><a {...externalLinkProps(selected.imageUrl)} className="mt-2 inline-flex w-full items-center justify-center gap-1 rounded-md border border-input px-2 py-2 text-xs font-medium hover:bg-secondary"><ImageIcon className="h-3.5 w-3.5"/> Open photo</a><p className="mt-2 text-[11px] leading-4 text-amber-800">Attach this photo manually in Outlook.</p></div>:<div className="rounded-md border border-dashed border-border p-4 text-xs text-muted-foreground">This template has no photo.</div>}</div>
+          </div>
+          <div className="rounded-md border border-blue-200 bg-blue-50 p-3 text-xs leading-5 text-blue-900"><strong>3. Copy, then open Outlook.</strong> Outlook may be blocked inside Lovable Preview. Rena should use the published site. If Outlook still blocks, the message remains copied and can be pasted into a normal Outlook window.</div>
+          <div className="flex flex-wrap justify-end gap-2"><button type="button" onClick={copyMessage} className="inline-flex items-center gap-1.5 rounded-md border border-input bg-background px-4 py-2 text-sm font-medium hover:bg-secondary"><Copy className="h-4 w-4"/> Copy message</button><a {...externalLinkProps(outlook)} className="inline-flex items-center gap-1.5 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"><Mail className="h-4 w-4"/> Open Outlook</a></div>
+        </>}
+      </div>
+    </div>
   </div>;
 }
 function Detail({label,value,link=false}:{label:string;value:string|null;link?:boolean}) { if(!value)return null; return <div className="flex gap-2"><span className="w-28 shrink-0 text-xs text-muted-foreground">{label}</span>{link&&value.startsWith("http")?<ExternalButton href={value} className="break-all underline underline-offset-4">{value}</ExternalButton>:<span className="break-words">{value}</span>}</div>; }
