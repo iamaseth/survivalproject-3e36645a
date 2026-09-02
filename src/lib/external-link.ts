@@ -28,8 +28,17 @@ export function openExternal(url: string | null | undefined) {
 }
 
 export function outlookComposeUrl(to: string, subject: string, body: string) {
-  const params = new URLSearchParams({ to, subject, body });
-  return `https://outlook.office.com/mail/deeplink/compose?${params.toString()}`;
+  // Outlook Web does not consistently decode application/x-www-form-urlencoded
+  // `+` characters as spaces in its compose route. Encode each value directly
+  // so spaces arrive as `%20` instead.
+  const params = [
+    ["to", to],
+    ["subject", subject],
+    ["body", body],
+  ]
+    .map(([key, value]) => `${key}=${encodeURIComponent(value)}`)
+    .join("&");
+  return `https://outlook.office.com/mail/deeplink/compose?${params}`;
 }
 
 export function survivalTabsOutreachUrl(email: string, creatorName: string) {

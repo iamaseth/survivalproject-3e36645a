@@ -568,8 +568,8 @@ export function YouTubeCandidatesSection({
                         </td>
                         <td className="px-2 py-2">
                           {email ? (
-                            <a {...externalLinkProps(survivalTabsOutreachUrl(email, c.channel_title || c.channel_id))} title={`Open Outlook for ${email}`} aria-label={`Email ${c.channel_title || c.channel_id} in Outlook`} className="inline-flex h-7 items-center gap-1 rounded border border-input px-2 hover:bg-secondary">
-                              <Mail className="h-3.5 w-3.5" /> Email
+                            <a {...externalLinkProps(survivalTabsOutreachUrl(email, c.channel_title || c.channel_id))} title={`Open Outlook for ${email}. Attach the approved product photo before sending.`} aria-label={`Email ${c.channel_title || c.channel_id} in Outlook; attach product photo`} className="inline-flex h-7 items-center gap-1 rounded border border-input px-2 hover:bg-secondary">
+                              <Mail className="h-3.5 w-3.5" /> Email · attach photo
                             </a>
                           ) : <span className="text-muted-foreground">—</span>}
                         </td>

@@ -878,9 +878,10 @@ function EmailDrafter({ c }: { c: CreatorRow }) {
           </a>
           <a
             {...externalLinkProps(outlook)}
+            title="The message is prefilled. Attach the approved product photo before sending."
             className={`inline-flex items-center gap-1.5 rounded-md border border-input px-3 py-1.5 text-sm hover:bg-secondary ${!to ? "pointer-events-none opacity-50" : ""}`}
           >
-            <Mail className="h-4 w-4" /> Open in Outlook
+            <Mail className="h-4 w-4" /> Outlook · attach photo
           </a>
           <button
             onClick={() => { navigator.clipboard.writeText(`Subject: ${subject}\n\n${body}`); }}
