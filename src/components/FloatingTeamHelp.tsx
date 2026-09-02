@@ -20,6 +20,7 @@ type TeamMessage = {
 };
 
 const SETH_EMAIL = "thenxyz@gmail.com";
+const RENA_EMAIL = "renas1503@gmail.com";
 
 export function FloatingTeamHelp() {
   const [open, setOpen] = useState(false);
@@ -29,6 +30,7 @@ export function FloatingTeamHelp() {
   const [status, setStatus] = useState<string | null>(null);
   const [messages, setMessages] = useState<TeamMessage[]>([]);
   const [selectedThread, setSelectedThread] = useState<string | null>(null);
+  const [renaUserId, setRenaUserId] = useState<string | null>(null);
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const auth = useAuth();
   const profile = auth.status === "authenticated" ? auth.profile : null;
@@ -45,16 +47,32 @@ export function FloatingTeamHelp() {
         existing.name = ownerName;
       }
     }
+    if (isSeth && renaUserId && !grouped.has(renaUserId)) {
+      grouped.set(renaUserId, { id: renaUserId, name: "Rena", latest: "" });
+    }
     return [...grouped.values()].sort((a, b) => b.latest.localeCompare(a.latest));
-  }, [messages]);
+  }, [messages, isSeth, renaUserId]);
 
-  const activeThread = isSeth ? selectedThread ?? threads[0]?.id ?? null : profile?.userId ?? null;
+  const activeThread = isSeth ? selectedThread ?? renaUserId ?? threads[0]?.id ?? null : profile?.userId ?? null;
   const visibleMessages = useMemo(
     () => messages.filter((item) => item.thread_owner_id === activeThread),
     [messages, activeThread],
   );
   const unreadCount = messages.filter((item) => item.sender_id !== profile?.userId && !item.read_at).length;
-  const activeThreadName = threads.find((thread) => thread.id === activeThread)?.name ?? "Rena";
+  const activeThreadName = threads.find((thread) => thread.id === activeThread)?.name ?? (activeThread === renaUserId ? "Rena" : "Team member");
+
+  const loadRena = async () => {
+    if (!isSeth) return;
+    const { data } = await (supabase as any)
+      .from("profiles")
+      .select("id")
+      .eq("email", RENA_EMAIL)
+      .maybeSingle();
+    if (data?.id) {
+      setRenaUserId(data.id);
+      setSelectedThread((current) => current ?? data.id);
+    }
+  };
 
   const loadMessages = async () => {
     if (!profile) return;
@@ -68,17 +86,18 @@ export function FloatingTeamHelp() {
     }
     const next = (data ?? []) as TeamMessage[];
     setMessages(next);
-    if (isSeth && !selectedThread && next.length) {
+    if (isSeth && !selectedThread && !renaUserId && next.length) {
       setSelectedThread(next[next.length - 1].thread_owner_id);
     }
   };
 
   useEffect(() => {
     if (!profile) return;
+    if (isSeth) void loadRena();
     void loadMessages();
     const timer = window.setInterval(() => void loadMessages(), open ? 5000 : 15000);
     return () => window.clearInterval(timer);
-  }, [profile?.userId, open]);
+  }, [profile?.userId, open, isSeth]);
 
   useEffect(() => {
     if (!open || !profile || !activeThread) return;
@@ -156,7 +175,7 @@ export function FloatingTeamHelp() {
 
       <div className="flex min-h-0 flex-1 flex-col p-4">
         <div className="mb-3 flex min-h-[180px] max-h-[320px] flex-col gap-2 overflow-y-auto rounded-lg border border-border bg-secondary/20 p-3">
-          {visibleMessages.length === 0 ? <div className="m-auto text-center text-xs text-muted-foreground">{isSeth ? "No team messages yet." : "Send Seth a message here. His replies will appear in this conversation."}</div> : visibleMessages.map((item) => {
+          {visibleMessages.length === 0 ? <div className="m-auto text-center text-xs text-muted-foreground">{isSeth ? `Start a conversation with ${activeThreadName}.` : "Send Seth a message here. His replies will appear in this conversation."}</div> : visibleMessages.map((item) => {
             const mine = item.sender_id === profile.userId;
             return <div key={item.id} className={`max-w-[85%] rounded-lg px-3 py-2 text-sm ${mine ? "ml-auto bg-primary text-primary-foreground" : "mr-auto bg-secondary text-secondary-foreground"}`}>
               <div className="mb-1 text-[10px] font-semibold opacity-70">{mine ? "You" : item.sender_name} · {new Date(item.created_at).toLocaleString()}</div>
