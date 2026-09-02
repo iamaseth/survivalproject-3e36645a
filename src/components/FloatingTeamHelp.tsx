@@ -20,7 +20,6 @@ type TeamMessage = {
 };
 
 const SETH_EMAIL = "thenxyz@gmail.com";
-const RENA_EMAIL = "renas1503@gmail.com";
 
 export function FloatingTeamHelp() {
   const [open, setOpen] = useState(false);
@@ -63,14 +62,14 @@ export function FloatingTeamHelp() {
 
   const loadRena = async () => {
     if (!isSeth) return;
-    const { data } = await (supabase as any)
-      .from("profiles")
-      .select("id")
-      .eq("email", RENA_EMAIL)
-      .maybeSingle();
-    if (data?.id) {
-      setRenaUserId(data.id);
-      setSelectedThread((current) => current ?? data.id);
+    const { data, error } = await (supabase as any).rpc("get_rena_chat_user_id");
+    if (error) {
+      setStatus("Could not open Rena's chat yet. Refresh and try again.");
+      return;
+    }
+    if (data) {
+      setRenaUserId(data as string);
+      setSelectedThread((current) => current ?? (data as string));
     }
   };
 
