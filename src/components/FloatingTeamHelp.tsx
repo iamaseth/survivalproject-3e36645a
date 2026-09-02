@@ -35,8 +35,8 @@ export function FloatingTeamHelp() {
   return <div className="fixed bottom-5 right-5 z-40">
     {open ? <div className="mb-3 w-[min(360px,calc(100vw-2rem))] overflow-hidden rounded-xl border border-border bg-card shadow-2xl">
       <div className="flex items-start justify-between gap-3 bg-primary px-4 py-3 text-primary-foreground">
-        <div><div className="font-semibold">Help & feedback</div><div className="text-xs text-primary-foreground/75">Send Seth a Telegram alert</div></div>
-        <button type="button" onClick={()=>setOpen(false)} className="rounded-md p-1 hover:bg-white/10" aria-label="Close help"><X className="h-4 w-4"/></button>
+        <div><div className="font-semibold">Contact Seth now</div><div className="text-xs text-primary-foreground/75">Send Seth a Telegram alert</div></div>
+        <button type="button" onClick={()=>setOpen(false)} className="rounded-md p-1 hover:bg-white/10" aria-label="Close contact Seth"><X className="h-4 w-4"/></button>
       </div>
       <div className="space-y-3 p-4">
         <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs leading-5 text-emerald-900">If work is blocked or you have a suggestion, send it here. You do not need Telegram on this computer.</div>
@@ -48,6 +48,6 @@ export function FloatingTeamHelp() {
         <div className="text-center text-[11px] text-muted-foreground">Urgent backup: WhatsApp +855 69 859 870 · Viber +84 36 7649513</div>
       </div>
     </div>:null}
-    <button type="button" onClick={()=>setOpen((v)=>!v)} className="ml-auto flex h-14 items-center gap-2 rounded-full bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-xl ring-1 ring-black/10 hover:bg-primary/90" aria-label={open?"Close help and feedback":"Open help and feedback"}>{open?<X className="h-5 w-5"/>:<><MessageCircle className="h-5 w-5"/><span>Help & feedback</span></>}</button>
+    <button type="button" onClick={()=>setOpen((v)=>!v)} className="ml-auto flex h-14 items-center gap-2 rounded-full bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-xl ring-1 ring-black/10 hover:bg-primary/90" aria-label={open?"Close Contact Seth now":"Open Contact Seth now"}>{open?<X className="h-5 w-5"/>:<><MessageCircle className="h-5 w-5"/><span>Contact Seth now</span></>}</button>
   </div>;
 }
