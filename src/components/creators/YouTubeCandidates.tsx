@@ -245,6 +245,16 @@ export function YouTubeCandidatesSection({
     [rows],
   );
 
+  // Read-only audit totals. These make previously processed rows visible in
+  // the UI without changing or restoring any candidate status.
+  const workflowStatusCounts = useMemo(() => ({
+    stored: rows.length,
+    pending: rows.filter((r) => r.status === "pending").length,
+    kept: rows.filter((r) => r.status === "kept").length,
+    skipped: rows.filter((r) => r.status === "skipped").length,
+    other: rows.filter((r) => !["pending", "kept", "skipped"].includes(r.status)).length,
+  }), [rows]);
+
   const classificationCounts = useMemo(() => {
     const result = { creator: 0, brand_company: 0, competitor: 0, organization: 0, needs_review: 0 };
     for (const c of pending) result[candidateClassification(c)] += 1;
@@ -420,7 +430,7 @@ export function YouTubeCandidatesSection({
         <div className="grid h-7 w-7 place-items-center rounded-full bg-[color:var(--gold)] text-xs font-semibold text-[color:var(--forest)]">R</div>
         <div className="min-w-0 flex-1">
           <div className="font-semibold">
-            Candidates — research before adding <span className="ml-1 text-sm font-normal text-muted-foreground">({pending.length})</span>
+            Candidates — research before adding <span className="ml-1 text-sm font-normal text-muted-foreground">({workflowStatusCounts.stored} stored)</span>
           </div>
           <div className="text-xs text-muted-foreground">Classify first. Only records explicitly classified as Creator can be recommended or added to the main creator list.</div>
         </div>
@@ -428,6 +438,14 @@ export function YouTubeCandidatesSection({
       </button>
       {open ? (
         <div className="border-t border-border">
+          <div className="flex flex-wrap items-center gap-2 border-b border-border bg-amber-50 px-3 py-2 text-xs text-amber-950">
+            <span className="font-semibold">Candidate status audit:</span>
+            <span className="rounded-md border border-amber-300 bg-white px-2 py-1">Needs research {workflowStatusCounts.pending}</span>
+            <span className="rounded-md border border-amber-300 bg-white px-2 py-1">Already added {workflowStatusCounts.kept}</span>
+            <span className="rounded-md border border-amber-300 bg-white px-2 py-1">Previously skipped {workflowStatusCounts.skipped}</span>
+            {workflowStatusCounts.other ? <span className="rounded-md border border-amber-300 bg-white px-2 py-1">Other status {workflowStatusCounts.other}</span> : null}
+            <span className="text-amber-800">Read-only totals; no records were changed.</span>
+          </div>
           {pending.length ? (
             <>
               <div className="flex flex-wrap items-center gap-2 border-b border-border bg-secondary/20 px-3 py-2">
@@ -472,7 +490,7 @@ export function YouTubeCandidatesSection({
             </>
           ) : null}
 
-          {pending.length === 0 ? <div className="px-4 py-5 text-sm text-muted-foreground">No candidates waiting for review.</div> : null}
+          {pending.length === 0 ? <div className="px-4 py-5 text-sm text-muted-foreground">No candidates currently marked “Needs research.” Check the status audit above before restoring anything.</div> : null}
 
           {pending.length > 0 ? (
             <div className="w-full overflow-hidden">
