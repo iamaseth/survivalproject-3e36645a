@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.17"
+    PostgrestVersion: "14.5"
   }
   public: {
     Tables: {
@@ -1411,11 +1411,17 @@ export type Database = {
           channel_id: string
           channel_title: string | null
           channel_url: string | null
+          contact_sweep: Json
           country: string | null
           created_at: string
+          deep_public_checked_at: string | null
           description_email: string | null
+          email_confidence: string | null
+          email_deliverability_status: string | null
+          email_ownership_status: string | null
           email_source: string | null
           email_status: string
+          email_validation: Json | null
           enrichment_checked_at: string | null
           enrichment_error: string | null
           enrichment_status: string
@@ -1423,6 +1429,7 @@ export type Database = {
           id: string
           last_upload_at: string | null
           notes: string | null
+          outreach_readiness: string | null
           promoted_creator_id: string | null
           reviewed_at: string | null
           reviewed_by: string | null
@@ -1439,11 +1446,17 @@ export type Database = {
           channel_id: string
           channel_title?: string | null
           channel_url?: string | null
+          contact_sweep?: Json
           country?: string | null
           created_at?: string
+          deep_public_checked_at?: string | null
           description_email?: string | null
+          email_confidence?: string | null
+          email_deliverability_status?: string | null
+          email_ownership_status?: string | null
           email_source?: string | null
           email_status?: string
+          email_validation?: Json | null
           enrichment_checked_at?: string | null
           enrichment_error?: string | null
           enrichment_status?: string
@@ -1451,6 +1464,7 @@ export type Database = {
           id?: string
           last_upload_at?: string | null
           notes?: string | null
+          outreach_readiness?: string | null
           promoted_creator_id?: string | null
           reviewed_at?: string | null
           reviewed_by?: string | null
@@ -1467,11 +1481,17 @@ export type Database = {
           channel_id?: string
           channel_title?: string | null
           channel_url?: string | null
+          contact_sweep?: Json
           country?: string | null
           created_at?: string
+          deep_public_checked_at?: string | null
           description_email?: string | null
+          email_confidence?: string | null
+          email_deliverability_status?: string | null
+          email_ownership_status?: string | null
           email_source?: string | null
           email_status?: string
+          email_validation?: Json | null
           enrichment_checked_at?: string | null
           enrichment_error?: string | null
           enrichment_status?: string
@@ -1479,6 +1499,7 @@ export type Database = {
           id?: string
           last_upload_at?: string | null
           notes?: string | null
+          outreach_readiness?: string | null
           promoted_creator_id?: string | null
           reviewed_at?: string | null
           reviewed_by?: string | null
@@ -1500,6 +1521,20 @@ export type Database = {
       ensure_current_team_access: {
         Args: never
         Returns: Database["public"]["Enums"]["app_role"]
+      }
+      youtube_deep_enrichment_apply: {
+        Args: { p_rows: Json; p_secret: string }
+        Returns: Json
+      }
+      youtube_deep_enrichment_queue: {
+        Args: { p_limit?: number; p_secret: string }
+        Returns: {
+          channel_id: string
+          channel_title: string
+          channel_url: string
+          id: string
+          subscriber_count: number
+        }[]
       }
     }
     Enums: {
