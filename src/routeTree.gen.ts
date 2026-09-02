@@ -40,6 +40,7 @@ import { Route as CreatorsOutreachRouteImport } from './routes/creators.outreach
 import { Route as CreatorsIdRouteImport } from './routes/creators.$id'
 import { Route as AssetsIdRouteImport } from './routes/assets.$id'
 import { Route as ApiPublicYoutubeEnrichmentRouteImport } from './routes/api/public/youtube-enrichment'
+import { Route as ApiPublicYoutubeDeepEnrichmentRouteImport } from './routes/api/public/youtube-deep-enrichment'
 import { Route as ApiPublicYoutubeCandidatesRouteImport } from './routes/api/public/youtube-candidates'
 import { Route as ApiPublicCreatorContactQueueRouteImport } from './routes/api/public/creator-contact-queue'
 
@@ -199,6 +200,12 @@ const ApiPublicYoutubeEnrichmentRoute =
     path: '/api/public/youtube-enrichment',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicYoutubeDeepEnrichmentRoute =
+  ApiPublicYoutubeDeepEnrichmentRouteImport.update({
+    id: '/api/public/youtube-deep-enrichment',
+    path: '/api/public/youtube-deep-enrichment',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicYoutubeCandidatesRoute =
   ApiPublicYoutubeCandidatesRouteImport.update({
     id: '/api/public/youtube-candidates',
@@ -245,6 +252,7 @@ export interface FileRoutesByFullPath {
   '/knowledge/$id': typeof KnowledgeIdRoute
   '/api/public/creator-contact-queue': typeof ApiPublicCreatorContactQueueRoute
   '/api/public/youtube-candidates': typeof ApiPublicYoutubeCandidatesRoute
+  '/api/public/youtube-deep-enrichment': typeof ApiPublicYoutubeDeepEnrichmentRoute
   '/api/public/youtube-enrichment': typeof ApiPublicYoutubeEnrichmentRoute
 }
 export interface FileRoutesByTo {
@@ -280,6 +288,7 @@ export interface FileRoutesByTo {
   '/knowledge/$id': typeof KnowledgeIdRoute
   '/api/public/creator-contact-queue': typeof ApiPublicCreatorContactQueueRoute
   '/api/public/youtube-candidates': typeof ApiPublicYoutubeCandidatesRoute
+  '/api/public/youtube-deep-enrichment': typeof ApiPublicYoutubeDeepEnrichmentRoute
   '/api/public/youtube-enrichment': typeof ApiPublicYoutubeEnrichmentRoute
 }
 export interface FileRoutesById {
@@ -316,6 +325,7 @@ export interface FileRoutesById {
   '/knowledge/$id': typeof KnowledgeIdRoute
   '/api/public/creator-contact-queue': typeof ApiPublicCreatorContactQueueRoute
   '/api/public/youtube-candidates': typeof ApiPublicYoutubeCandidatesRoute
+  '/api/public/youtube-deep-enrichment': typeof ApiPublicYoutubeDeepEnrichmentRoute
   '/api/public/youtube-enrichment': typeof ApiPublicYoutubeEnrichmentRoute
 }
 export interface FileRouteTypes {
@@ -353,6 +363,7 @@ export interface FileRouteTypes {
     | '/knowledge/$id'
     | '/api/public/creator-contact-queue'
     | '/api/public/youtube-candidates'
+    | '/api/public/youtube-deep-enrichment'
     | '/api/public/youtube-enrichment'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -388,6 +399,7 @@ export interface FileRouteTypes {
     | '/knowledge/$id'
     | '/api/public/creator-contact-queue'
     | '/api/public/youtube-candidates'
+    | '/api/public/youtube-deep-enrichment'
     | '/api/public/youtube-enrichment'
   id:
     | '__root__'
@@ -423,6 +435,7 @@ export interface FileRouteTypes {
     | '/knowledge/$id'
     | '/api/public/creator-contact-queue'
     | '/api/public/youtube-candidates'
+    | '/api/public/youtube-deep-enrichment'
     | '/api/public/youtube-enrichment'
   fileRoutesById: FileRoutesById
 }
@@ -455,6 +468,7 @@ export interface RootRouteChildren {
   WebsiteRoute: typeof WebsiteRoute
   ApiPublicCreatorContactQueueRoute: typeof ApiPublicCreatorContactQueueRoute
   ApiPublicYoutubeCandidatesRoute: typeof ApiPublicYoutubeCandidatesRoute
+  ApiPublicYoutubeDeepEnrichmentRoute: typeof ApiPublicYoutubeDeepEnrichmentRoute
   ApiPublicYoutubeEnrichmentRoute: typeof ApiPublicYoutubeEnrichmentRoute
 }
 
@@ -677,6 +691,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicYoutubeEnrichmentRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/youtube-deep-enrichment': {
+      id: '/api/public/youtube-deep-enrichment'
+      path: '/api/public/youtube-deep-enrichment'
+      fullPath: '/api/public/youtube-deep-enrichment'
+      preLoaderRoute: typeof ApiPublicYoutubeDeepEnrichmentRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/youtube-candidates': {
       id: '/api/public/youtube-candidates'
       path: '/api/public/youtube-candidates'
@@ -760,6 +781,7 @@ const rootRouteChildren: RootRouteChildren = {
   WebsiteRoute: WebsiteRoute,
   ApiPublicCreatorContactQueueRoute: ApiPublicCreatorContactQueueRoute,
   ApiPublicYoutubeCandidatesRoute: ApiPublicYoutubeCandidatesRoute,
+  ApiPublicYoutubeDeepEnrichmentRoute: ApiPublicYoutubeDeepEnrichmentRoute,
   ApiPublicYoutubeEnrichmentRoute: ApiPublicYoutubeEnrichmentRoute,
 }
 export const routeTree = rootRouteImport
