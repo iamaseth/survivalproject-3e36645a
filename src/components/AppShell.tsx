@@ -22,6 +22,7 @@ import { setCurrentActor, hydrateWorkspaceFromDB } from "@/lib/creator-workspace
 import { hydrateCreatorsFromDB } from "@/lib/creator-partnerships";
 import { SignInCard } from "@/routes/auth";
 import { TestModeBanner } from "@/components/TestModeBanner";
+import { FloatingTeamHelp } from "@/components/FloatingTeamHelp";
 
 const navSections = [
   {
@@ -171,6 +172,7 @@ export function AppShell() {
           <Outlet />
         </main>
       </div>
+      <FloatingTeamHelp />
     </div>
   );
 }
