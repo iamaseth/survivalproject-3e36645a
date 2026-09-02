@@ -30,14 +30,25 @@ export type YouTubeCandidate = {
 export const listYouTubeCandidates = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const { data, error } = await context.supabase
-      .from("youtube_candidates")
-      .select("*")
-      .order("status", { ascending: true })
-      .order("created_at", { ascending: false })
-      .limit(2000);
-    if (error) throw new Error(error.message);
-    return (data ?? []) as unknown as YouTubeCandidate[];
+    // Supabase projects commonly cap a response at 1,000 rows even when a
+    // larger limit is requested. Page explicitly so the audit and queue totals
+    // include every staged candidate. This is read-only.
+    const pageSize = 1000;
+    const rows: YouTubeCandidate[] = [];
+    for (let from = 0; ; from += pageSize) {
+      const { data, error } = await context.supabase
+        .from("youtube_candidates")
+        .select("*")
+        .order("status", { ascending: true })
+        .order("created_at", { ascending: false })
+        .order("id", { ascending: true })
+        .range(from, from + pageSize - 1);
+      if (error) throw new Error(error.message);
+      const page = (data ?? []) as unknown as YouTubeCandidate[];
+      rows.push(...page);
+      if (page.length < pageSize) break;
+    }
+    return rows;
   });
 
 export const listYouTubeEnrichmentQueue = createServerFn({ method: "GET" })
