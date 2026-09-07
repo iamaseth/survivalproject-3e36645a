@@ -3,9 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import {
   LayoutDashboard,
   Users,
-  ShoppingBag,
   Megaphone,
-  MessageSquare,
   FileText,
   BarChart3,
   Settings as SettingsIcon,
@@ -14,9 +12,10 @@ import {
   ChevronDown,
   LogOut,
   User as UserIcon,
-  ClipboardCheck,
   BookOpen,
   Video,
+  Send,
+  FolderKanban,
 
 } from "lucide-react";
 
@@ -33,52 +32,42 @@ const brands = [
   { id: "microbebio", name: "MicrobeBio", status: "coming" as const },
 ];
 
-const navSections = [
-  {
-    label: null,
-    items: [
-      { to: "/", label: "Dashboard", icon: LayoutDashboard, exact: true },
-    ],
-  },
-  {
-    label: "Promotion",
-    items: [
-      { to: "/creators", label: "Influencers", icon: Users },
-      { to: "/content", label: "Content", icon: FileText },
-      { to: "/preparedness-book", label: "Preparedness Book", icon: BookOpen },
-      { to: "/video", label: "Video", icon: Video },
-      { to: "/campaigns", label: "Campaigns", icon: Megaphone },
-    ],
-  },
-  {
-    label: "Creators",
-    items: [
-      { to: "/reviewed-survival-tabs-mre", label: "Reviewed Creators", icon: ClipboardCheck },
-      { to: "/amazon-creators", label: "Amazon Creators", icon: ShoppingBag },
-    ],
-  },
-  {
-    label: "Outreach",
-    items: [
-      { to: "/creators/outreach", label: "Bulk Outreach", icon: ClipboardCheck },
-      { to: "/communications", label: "Messages", icon: MessageSquare },
-      { to: "/templates", label: "Email Templates", icon: FileText },
-    ],
-  },
-  {
-    label: "Reports",
-    items: [
-      { to: "/analytics", label: "Analytics", icon: BarChart3 },
-    ],
-  },
-  {
-    label: "Admin",
-    items: [
-      { to: "/settings", label: "Settings", icon: SettingsIcon },
-    ],
-  },
-];
+type NavItem = {
+  to: string;
+  label: string;
+  icon: typeof LayoutDashboard;
+  exact?: boolean;
+  children?: { to: string; label: string }[];
+};
 
+const navItems: NavItem[] = [
+  { to: "/", label: "Dashboard", icon: LayoutDashboard, exact: true },
+  {
+    to: "/creators",
+    label: "Influencers",
+    icon: Users,
+    children: [
+      { to: "/reviewed-survival-tabs-mre", label: "Reviewed Creators" },
+      { to: "/amazon-creators", label: "Amazon Creators" },
+    ],
+  },
+  { to: "/content", label: "Content", icon: FileText },
+  { to: "/video", label: "Video", icon: Video },
+  { to: "/campaigns", label: "Campaigns", icon: Megaphone },
+  {
+    to: "/creators/outreach",
+    label: "Outreach",
+    icon: Send,
+    children: [
+      { to: "/communications", label: "Communications" },
+      { to: "/templates", label: "Templates" },
+    ],
+  },
+  { to: "/assets", label: "Assets", icon: FolderKanban },
+  { to: "/analytics", label: "Analytics", icon: BarChart3 },
+  { to: "/preparedness-book", label: "Preparedness Book", icon: BookOpen },
+  { to: "/settings", label: "Settings", icon: SettingsIcon },
+];
 
 export function AppShell() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
@@ -129,55 +118,51 @@ export function AppShell() {
         <div className="border-b border-sidebar-border px-5 py-5">
           <div className="text-[10px] uppercase tracking-[0.22em] text-sidebar-primary">Promotion OS</div>
           <div className="font-display text-xl leading-tight text-sidebar-foreground">Survival Tabs</div>
-          <div className="mt-3 space-y-1">
-            {brands.map((brand) => (
-              <div
-                key={brand.id}
-                className={`flex items-center justify-between rounded-md px-2 py-1.5 text-xs ${
-                  brand.status === "active"
-                    ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                    : "text-sidebar-foreground/50"
-                }`}
-              >
-                <span className="truncate">{brand.name}</span>
-                <span className="ml-2 shrink-0 text-[9px] uppercase tracking-[0.14em]">
-                  {brand.status === "active" ? "Active" : "Coming next"}
-                </span>
-              </div>
-            ))}
-          </div>
+          <BrandSelector />
         </div>
 
         <nav className="flex-1 overflow-y-auto px-3 py-4">
-          {navSections.map((section, sectionIndex) => (
-            <div key={section.label ?? "home"} className={sectionIndex === 0 ? "" : "mt-5"}>
-              {section.label ? (
-                <div className="mb-1 px-3 text-[10px] font-semibold uppercase tracking-[0.18em] text-sidebar-foreground/50">
-                  {section.label}
+          <div className="space-y-0.5">
+            {navItems.map((item) => {
+              const active = item.exact
+                ? pathname === item.to
+                : pathname === item.to || pathname.startsWith(item.to + "/");
+              const childActive = (item.children ?? []).some((c) => pathname.startsWith(c.to));
+              const Icon = item.icon;
+              return (
+                <div key={item.to}>
+                  <Link
+                    to={item.to}
+                    className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm transition ${
+                      active
+                        ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                        : "text-sidebar-foreground/80 hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground"
+                    }`}
+                  >
+                    <Icon className="h-4 w-4 shrink-0" />
+                    <span className="truncate">{item.label}</span>
+                  </Link>
+                  {item.children && (active || childActive) ? (
+                    <div className="mb-1 ml-7 mt-0.5 space-y-0.5 border-l border-sidebar-border pl-3">
+                      {item.children.map((c) => (
+                        <Link
+                          key={c.to}
+                          to={c.to}
+                          className={`block truncate rounded-md px-2 py-1.5 text-xs transition ${
+                            pathname.startsWith(c.to)
+                              ? "text-sidebar-accent-foreground"
+                              : "text-sidebar-foreground/60 hover:text-sidebar-accent-foreground"
+                          }`}
+                        >
+                          {c.label}
+                        </Link>
+                      ))}
+                    </div>
+                  ) : null}
                 </div>
-              ) : null}
-              <div className="space-y-0.5">
-                {section.items.map((item) => {
-                  const active = "exact" in item && item.exact ? pathname === item.to : pathname === item.to || pathname.startsWith(item.to + "/");
-                  const Icon = item.icon;
-                  return (
-                    <Link
-                      key={item.to}
-                      to={item.to}
-                      className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm transition ${
-                        active
-                          ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                          : "text-sidebar-foreground/80 hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground"
-                      }`}
-                    >
-                      <Icon className="h-4 w-4 shrink-0" />
-                      <span className="truncate">{item.label}</span>
-                    </Link>
-                  );
-                })}
-              </div>
-            </div>
-          ))}
+              );
+            })}
+          </div>
         </nav>
       </aside>
 
@@ -209,6 +194,36 @@ export function AppShell() {
         </main>
       </div>
       <FloatingTeamHelp />
+    </div>
+  );
+}
+
+function BrandSelector() {
+  const [open, setOpen] = useState(false);
+  const active = brands.find((b) => b.status === "active")!;
+  const staged = brands.filter((b) => b.status !== "active");
+  return (
+    <div className="mt-3">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-center justify-between rounded-md border border-sidebar-border px-2 py-1.5 text-[11px] text-sidebar-foreground/80 hover:bg-sidebar-accent/50"
+      >
+        <span className="truncate">Brand · {active.name}</span>
+        <ChevronDown className={`ml-2 h-3 w-3 shrink-0 transition ${open ? "rotate-180" : ""}`} />
+      </button>
+      {open ? (
+        <div className="mt-1 space-y-0.5">
+          {staged.map((b) => (
+            <div
+              key={b.id}
+              className="flex items-center justify-between rounded-md px-2 py-1 text-[11px] text-sidebar-foreground/45"
+            >
+              <span className="truncate">{b.name}</span>
+              <span className="ml-2 shrink-0 text-[9px] uppercase tracking-[0.14em]">Coming next</span>
+            </div>
+          ))}
+        </div>
+      ) : null}
     </div>
   );
 }
