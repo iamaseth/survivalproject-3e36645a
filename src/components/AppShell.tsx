@@ -24,6 +24,12 @@ import { SignInCard } from "@/routes/auth";
 import { TestModeBanner } from "@/components/TestModeBanner";
 import { FloatingTeamHelp } from "@/components/FloatingTeamHelp";
 
+const brands = [
+  { id: "survival-tabs", name: "Survival Tabs", status: "active" as const },
+  { id: "swedish-bitters", name: "Swedish Bitters", status: "coming" as const },
+  { id: "microbebio", name: "MicrobeBio", status: "coming" as const },
+];
+
 const navSections = [
   {
     label: null,
@@ -32,9 +38,18 @@ const navSections = [
     ],
   },
   {
+    label: "Promotion",
+    items: [
+      { to: "/creators", label: "Influencers", icon: Users },
+      { to: "/content", label: "Content", icon: FileText },
+      { to: "/preparedness-book", label: "Preparedness Book", icon: BookOpen },
+      { to: "/video", label: "Video", icon: Video },
+      { to: "/campaigns", label: "Campaigns", icon: Megaphone },
+    ],
+  },
+  {
     label: "Creators",
     items: [
-      { to: "/creators", label: "All Creators", icon: Users },
       { to: "/reviewed-survival-tabs-mre", label: "Reviewed Creators", icon: ClipboardCheck },
       { to: "/amazon-creators", label: "Amazon Creators", icon: ShoppingBag },
     ],
@@ -42,7 +57,6 @@ const navSections = [
   {
     label: "Outreach",
     items: [
-      { to: "/campaigns", label: "Campaigns", icon: Megaphone },
       { to: "/creators/outreach", label: "Bulk Outreach", icon: ClipboardCheck },
       { to: "/communications", label: "Messages", icon: MessageSquare },
       { to: "/templates", label: "Email Templates", icon: FileText },
@@ -61,6 +75,7 @@ const navSections = [
     ],
   },
 ];
+
 
 export function AppShell() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });

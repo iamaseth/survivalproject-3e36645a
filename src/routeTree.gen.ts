@@ -17,6 +17,7 @@ import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as SeoRouteImport } from './routes/seo'
 import { Route as ReviewedSurvivalTabsMreRouteImport } from './routes/reviewed-survival-tabs-mre'
 import { Route as ReviewRouteImport } from './routes/review'
+import { Route as PreparednessBookRouteImport } from './routes/preparedness-book'
 import { Route as LeadsRouteImport } from './routes/leads'
 import { Route as KnowledgeRouteImport } from './routes/knowledge'
 import { Route as EmailRouteImport } from './routes/email'
@@ -82,6 +83,11 @@ const ReviewedSurvivalTabsMreRoute = ReviewedSurvivalTabsMreRouteImport.update({
 const ReviewRoute = ReviewRouteImport.update({
   id: '/review',
   path: '/review',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PreparednessBookRoute = PreparednessBookRouteImport.update({
+  id: '/preparedness-book',
+  path: '/preparedness-book',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LeadsRoute = LeadsRouteImport.update({
@@ -238,6 +244,7 @@ export interface FileRoutesByFullPath {
   '/email': typeof EmailRoute
   '/knowledge': typeof KnowledgeRouteWithChildren
   '/leads': typeof LeadsRoute
+  '/preparedness-book': typeof PreparednessBookRoute
   '/review': typeof ReviewRoute
   '/reviewed-survival-tabs-mre': typeof ReviewedSurvivalTabsMreRoute
   '/seo': typeof SeoRoute
@@ -274,6 +281,7 @@ export interface FileRoutesByTo {
   '/email': typeof EmailRoute
   '/knowledge': typeof KnowledgeRouteWithChildren
   '/leads': typeof LeadsRoute
+  '/preparedness-book': typeof PreparednessBookRoute
   '/review': typeof ReviewRoute
   '/reviewed-survival-tabs-mre': typeof ReviewedSurvivalTabsMreRoute
   '/seo': typeof SeoRoute
@@ -311,6 +319,7 @@ export interface FileRoutesById {
   '/email': typeof EmailRoute
   '/knowledge': typeof KnowledgeRouteWithChildren
   '/leads': typeof LeadsRoute
+  '/preparedness-book': typeof PreparednessBookRoute
   '/review': typeof ReviewRoute
   '/reviewed-survival-tabs-mre': typeof ReviewedSurvivalTabsMreRoute
   '/seo': typeof SeoRoute
@@ -349,6 +358,7 @@ export interface FileRouteTypes {
     | '/email'
     | '/knowledge'
     | '/leads'
+    | '/preparedness-book'
     | '/review'
     | '/reviewed-survival-tabs-mre'
     | '/seo'
@@ -385,6 +395,7 @@ export interface FileRouteTypes {
     | '/email'
     | '/knowledge'
     | '/leads'
+    | '/preparedness-book'
     | '/review'
     | '/reviewed-survival-tabs-mre'
     | '/seo'
@@ -421,6 +432,7 @@ export interface FileRouteTypes {
     | '/email'
     | '/knowledge'
     | '/leads'
+    | '/preparedness-book'
     | '/review'
     | '/reviewed-survival-tabs-mre'
     | '/seo'
@@ -458,6 +470,7 @@ export interface RootRouteChildren {
   EmailRoute: typeof EmailRoute
   KnowledgeRoute: typeof KnowledgeRouteWithChildren
   LeadsRoute: typeof LeadsRoute
+  PreparednessBookRoute: typeof PreparednessBookRoute
   ReviewRoute: typeof ReviewRoute
   ReviewedSurvivalTabsMreRoute: typeof ReviewedSurvivalTabsMreRoute
   SeoRoute: typeof SeoRoute
@@ -528,6 +541,13 @@ declare module '@tanstack/react-router' {
       path: '/review'
       fullPath: '/review'
       preLoaderRoute: typeof ReviewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/preparedness-book': {
+      id: '/preparedness-book'
+      path: '/preparedness-book'
+      fullPath: '/preparedness-book'
+      preLoaderRoute: typeof PreparednessBookRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/leads': {
@@ -771,6 +791,7 @@ const rootRouteChildren: RootRouteChildren = {
   EmailRoute: EmailRoute,
   KnowledgeRoute: KnowledgeRouteWithChildren,
   LeadsRoute: LeadsRoute,
+  PreparednessBookRoute: PreparednessBookRoute,
   ReviewRoute: ReviewRoute,
   ReviewedSurvivalTabsMreRoute: ReviewedSurvivalTabsMreRoute,
   SeoRoute: SeoRoute,
