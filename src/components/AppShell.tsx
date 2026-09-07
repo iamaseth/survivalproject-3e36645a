@@ -127,9 +127,27 @@ export function AppShell() {
     <div className="grid min-h-screen w-full grid-cols-[240px_minmax(0,1fr)] bg-background">
       <aside className="sticky top-0 flex h-screen flex-col bg-sidebar text-sidebar-foreground">
         <div className="border-b border-sidebar-border px-5 py-5">
-          <div className="text-[10px] uppercase tracking-[0.22em] text-sidebar-primary">Survival Tabs</div>
-          <div className="font-display text-xl leading-tight text-sidebar-foreground">Creator CRM</div>
+          <div className="text-[10px] uppercase tracking-[0.22em] text-sidebar-primary">Promotion OS</div>
+          <div className="font-display text-xl leading-tight text-sidebar-foreground">Survival Tabs</div>
+          <div className="mt-3 space-y-1">
+            {brands.map((brand) => (
+              <div
+                key={brand.id}
+                className={`flex items-center justify-between rounded-md px-2 py-1.5 text-xs ${
+                  brand.status === "active"
+                    ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                    : "text-sidebar-foreground/50"
+                }`}
+              >
+                <span className="truncate">{brand.name}</span>
+                <span className="ml-2 shrink-0 text-[9px] uppercase tracking-[0.14em]">
+                  {brand.status === "active" ? "Active" : "Coming next"}
+                </span>
+              </div>
+            ))}
+          </div>
         </div>
+
         <nav className="flex-1 overflow-y-auto px-3 py-4">
           {navSections.map((section, sectionIndex) => (
             <div key={section.label ?? "home"} className={sectionIndex === 0 ? "" : "mt-5"}>
