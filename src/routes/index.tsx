@@ -14,7 +14,7 @@ import {
   Clock,
 } from "lucide-react";
 
-import { assets, decisions, tasks, STATUS_ORDER } from "@/lib/mock-data";
+import { assets, decisions, tasks, userById, STATUS_ORDER } from "@/lib/mock-data";
 import { guides } from "@/lib/knowledge-data";
 import { CREATORS, useCreatorsVersion } from "@/lib/creator-partnerships";
 import { PageHeader } from "@/components/PageHeader";
@@ -286,7 +286,7 @@ function Dashboard() {
               )}
               <div className="min-w-0">
                 <div className="text-foreground">
-                  <span className="font-medium">{r.actor}</span> {r.verb}{" "}
+                  <span className="font-medium">{userById(r.actorId)?.name ?? r.actorId}</span> {r.verb}{" "}
                   <Link to="/assets/$id" params={{ id: r.asset.id }} className="hover:text-primary">
                     {r.asset.title}
                   </Link>
