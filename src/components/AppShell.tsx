@@ -15,6 +15,9 @@ import {
   LogOut,
   User as UserIcon,
   ClipboardCheck,
+  BookOpen,
+  Video,
+
 } from "lucide-react";
 
 import { useAuth } from "@/lib/current-user";
