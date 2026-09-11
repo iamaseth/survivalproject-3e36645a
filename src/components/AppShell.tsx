@@ -12,7 +12,6 @@ import {
   ChevronDown,
   LogOut,
   User as UserIcon,
-  BookOpen,
   Video,
   Send,
   FolderKanban,
@@ -65,7 +64,6 @@ const navItems: NavItem[] = [
   },
   { to: "/assets", label: "Assets", icon: FolderKanban },
   { to: "/analytics", label: "Analytics", icon: BarChart3 },
-  { to: "/preparedness-book", label: "Preparedness Book", icon: BookOpen },
   { to: "/settings", label: "Settings", icon: SettingsIcon },
 ];
 
