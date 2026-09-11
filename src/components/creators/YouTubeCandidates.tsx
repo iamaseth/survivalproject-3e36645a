@@ -233,7 +233,7 @@ export function YouTubeCandidatesSection({
   const skip = useServerFn(skipYouTubeCandidate);
   const applyEnrichment = useServerFn(applyReviewedCandidateEnrichmentBatch);
   const setClassification = useServerFn(setYouTubeCandidateClassification);
-  const [open, setOpen] = useState(true);
+  const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [bulkBusy, setBulkBusy] = useState(false);
   const [importBusy, setImportBusy] = useState(false);
@@ -245,8 +245,6 @@ export function YouTubeCandidatesSection({
     [rows],
   );
 
-  // Read-only audit totals. These make previously processed rows visible in
-  // the UI without changing or restoring any candidate status.
   const workflowStatusCounts = useMemo(() => ({
     stored: rows.length,
     pending: rows.filter((r) => r.status === "pending").length,
