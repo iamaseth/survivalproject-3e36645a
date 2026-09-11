@@ -97,7 +97,7 @@ function CreatorPipeline() {
   const [platformFilter, setPlatformFilter] = useState<PlatformFilter>("all");
   const [contactFilter, setContactFilter] = useState<ContactFilter>("all");
   const [nicheFilter, setNicheFilter] = useState("all");
-  const [openStages, setOpenStages] = useState<Record<StageKey, boolean>>({ not_contacted: true, contacted: true, follow_up: true, responded: true, sample: true });
+  const [openStages, setOpenStages] = useState<Record<StageKey, boolean>>({ not_contacted: false, contacted: false, follow_up: false, responded: false, sample: false });
   const nicheOptions = useMemo(() => [...new Set(CREATORS.map(nicheLabel))].sort((a,b)=>a.localeCompare(b)), [version]);
   const creators = useMemo(() => {
     const needle = query.trim().toLowerCase();
