@@ -1,0 +1,36 @@
+name: Verify YouTube Candidates
+
+on:
+  workflow_dispatch:
+    inputs:
+      limit:
+        description: "Maximum pending candidates to verify"
+        required: false
+        default: "1000"
+  schedule:
+    - cron: "20 2 * * *"
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      CRM_BASE_URL: https://survivalproject.lovable.app
+      YOUTUBE_INGEST_SECRET: ${{ secrets.YOUTUBE_INGEST_SECRET }}
+      YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
+      YOUTUBE_VERIFY_LIMIT: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.limit || '1000' }}
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Verify required secrets
+        run: |
+          test -n "$YOUTUBE_INGEST_SECRET" || (echo "Missing YOUTUBE_INGEST_SECRET" && exit 1)
+          test -n "$YOUTUBE_API_KEY" || (echo "Missing YOUTUBE_API_KEY" && exit 1)
+      - name: Verify pending candidates against YouTube
+        run: node tools/creator-enrichment/src/verify-youtube-candidates.mjs
