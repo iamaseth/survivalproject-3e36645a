@@ -300,6 +300,33 @@ export function YouTubeCandidatesSection({
     }
   };
 
+  const approveCreator = async (id: string) => {
+    const candidate = pending.find((c) => c.id === id);
+    if (!candidate) return;
+    if (candidate.subscriber_count != null && candidate.subscriber_count > 20000) {
+      toast.error("This candidate is over the 20,000-subscriber campaign limit.");
+      return;
+    }
+
+    setBusy(id);
+    try {
+      if (candidateClassification(candidate) !== "creator") {
+        await setClassification({ data: { id, classification: "creator" } });
+      }
+      const res = (await keep({ data: { id } })) as { creatorId: string; created: boolean };
+      await refresh();
+      toast.success(
+        res.created
+          ? `Approved as Creator and added ${res.creatorId}`
+          : `Approved as Creator and linked to ${res.creatorId}`,
+      );
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not approve creator");
+    } finally {
+      setBusy(null);
+    }
+  };
+
   const downloadResearchCsv = () => {
     const headers = [
       "Candidate ID", "Creator Name", "YouTube URL", "Subscribers", "Videos", "Country", "Niche", "Last Upload",
@@ -430,7 +457,7 @@ export function YouTubeCandidatesSection({
           <div className="font-semibold">
             Candidates — research before adding <span className="ml-1 text-sm font-normal text-muted-foreground">({workflowStatusCounts.stored} stored)</span>
           </div>
-          <div className="text-xs text-muted-foreground">Classify first. Only records explicitly classified as Creator can be recommended or added to the main creator list.</div>
+          <div className="text-xs text-muted-foreground">Review the channel, then use Approve Creator to classify and add it in one step. Use the classification dropdown for brands, competitors, organizations, or uncertain records.</div>
         </div>
         <span className="rounded-md border border-input bg-background px-2.5 py-1 text-xs font-medium text-foreground">{open ? "Close" : "Open"}</span>
       </button>
@@ -570,7 +597,7 @@ export function YouTubeCandidatesSection({
                         <td className="px-2 py-2">
                           <select
                             value={classification}
-                            disabled={classifyingId === c.id || importBusy || bulkBusy}
+                            disabled={classifyingId === c.id || importBusy || bulkBusy || busy === c.id}
                             onChange={(e) => void changeClassification(c.id, e.target.value as CandidateClassification)}
                             className="h-7 w-full rounded border border-input bg-background px-1 text-[10px]"
                             aria-label={`Classify ${c.channel_title || c.channel_id}`}
@@ -594,8 +621,14 @@ export function YouTubeCandidatesSection({
                         </td>
                         <td className="px-2 py-2">
                           <div className="flex items-center gap-1">
-                            <button title={classification === "creator" ? "Keep candidate" : "Classify as Creator before keeping"} aria-label="Keep candidate" disabled={classification !== "creator" || overLimit || busy === c.id || bulkBusy || importBusy} onClick={() => void act(c.id, "keep")} className="inline-flex h-7 items-center gap-1 rounded-md bg-primary px-2 text-[11px] font-medium text-primary-foreground disabled:opacity-50">
-                              <Check className="h-3 w-3" /> Keep
+                            <button
+                              title={overLimit ? "Over the 20K campaign limit" : "Classify as Creator and add to the main creator list"}
+                              aria-label={`Approve ${c.channel_title || c.channel_id} as creator`}
+                              disabled={overLimit || busy === c.id || bulkBusy || importBusy || classifyingId === c.id}
+                              onClick={() => void approveCreator(c.id)}
+                              className="inline-flex h-7 items-center gap-1 rounded-md bg-primary px-2 text-[11px] font-medium text-primary-foreground disabled:opacity-50"
+                            >
+                              <Check className="h-3 w-3" /> {busy === c.id ? "Approving…" : "Approve Creator"}
                             </button>
                             <button title="Skip candidate" aria-label="Skip candidate" disabled={busy === c.id || bulkBusy || importBusy} onClick={() => void act(c.id, "skip")} className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-input disabled:opacity-50">
                               <X className="h-3.5 w-3.5" />
