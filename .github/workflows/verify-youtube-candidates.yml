@@ -7,6 +7,9 @@ on:
         description: "Maximum pending candidates to verify"
         required: false
         default: "1000"
+  push:
+    paths:
+      - ".github/verify-youtube-candidates.trigger"
   schedule:
     - cron: "20 2 * * *"
 
@@ -21,7 +24,7 @@ jobs:
       CRM_BASE_URL: https://survivalproject.lovable.app
       YOUTUBE_INGEST_SECRET: ${{ secrets.YOUTUBE_INGEST_SECRET }}
       YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
-      YOUTUBE_VERIFY_LIMIT: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.limit || '1000' }}
+      YOUTUBE_VERIFY_LIMIT: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.limit || github.event_name == 'push' && '121' || '1000' }}
 
     steps:
       - uses: actions/checkout@v4
