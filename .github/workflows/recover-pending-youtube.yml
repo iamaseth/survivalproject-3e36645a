@@ -1,0 +1,41 @@
+name: Recover Pending YouTube Creators
+
+on:
+  workflow_dispatch:
+    inputs:
+      limit:
+        description: "Maximum pending candidates to inspect"
+        required: false
+        default: "100"
+      videos_per_channel:
+        description: "Recent videos to inspect"
+        required: false
+        default: "10"
+  push:
+    paths:
+      - ".github/workflows/recover-pending-youtube.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  recover:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      CRM_BASE_URL: https://survivalproject.lovable.app
+      YOUTUBE_INGEST_SECRET: ${{ secrets.YOUTUBE_INGEST_SECRET }}
+      YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
+      RECOVERY_LIMIT: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.limit || '100' }}
+      RECOVERY_VIDEOS: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.videos_per_channel || '10' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Verify required secrets
+        run: |
+          test -n "$YOUTUBE_INGEST_SECRET" || (echo "Missing YOUTUBE_INGEST_SECRET" && exit 1)
+          test -n "$YOUTUBE_API_KEY" || (echo "Missing YOUTUBE_API_KEY" && exit 1)
+      - name: Recover contact routes for verified pending creators
+        run: node tools/creator-enrichment/src/recover-pending-youtube.mjs
