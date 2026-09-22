@@ -64,6 +64,7 @@ const navItems: NavItem[] = [
   },
   { to: "/assets", label: "Assets", icon: FolderKanban },
   { to: "/analytics", label: "Analytics", icon: BarChart3 },
+  { to: "/social-accounts", label: "Social Accounts", icon: SettingsIcon },
   { to: "/settings", label: "Settings", icon: SettingsIcon },
 ];
 
