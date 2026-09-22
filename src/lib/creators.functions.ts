@@ -44,6 +44,36 @@ export type CreatorImportRow = {
   outreach_owner: string | null;
 };
 
+const SOCIAL_FIELDS = ["tiktok", "instagram", "facebook", "youtube", "amazon"] as const;
+
+function normalizeSocialUrl(value: string | null | undefined): string {
+  if (!value) return "";
+  let v = value.trim().toLowerCase();
+  if (!v) return "";
+  try {
+    const u = new URL(v.startsWith("http") ? v : `https://${v}`);
+    u.hash = "";
+    u.search = "";
+    u.hostname = u.hostname.replace(/^www\./, "");
+    u.pathname = u.pathname.replace(/\/$/, "");
+    return `${u.hostname}${u.pathname}`;
+  } catch {
+    return v.replace(/^https?:\/\//, "").replace(/^www\./, "").replace(/\/$/, "");
+  }
+}
+
+function importIdentity(r: CreatorImportRow): string {
+  const code = (r.code ?? "").trim().toLowerCase();
+  if (code) return `code-${code}`;
+  const domain = (r.normalized_domain ?? "").trim().toLowerCase();
+  if (domain) return `domain-${domain}`;
+  for (const field of SOCIAL_FIELDS) {
+    const social = normalizeSocialUrl(r[field]);
+    if (social) return `${field}-${social}`;
+  }
+  return "";
+}
+
 export const importCreators = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((data: { rows: CreatorImportRow[] }) => {
@@ -51,49 +81,59 @@ export const importCreators = createServerFn({ method: "POST" })
     return data;
   })
   .handler(async ({ data, context }) => {
-    const incoming = data.rows.filter(
-      (r) => (r.code && r.code.trim()) || (r.normalized_domain && r.normalized_domain.trim()),
-    );
+    // Universal staging import: a row may be identified by code/domain OR a social profile.
+    // Existing records are never overwritten by this import.
+    const incoming = data.rows.filter((r) => importIdentity(r));
     if (incoming.length === 0) return { inserted: 0, skipped: 0, total: 0 };
 
-    const codes = incoming.map((r) => (r.code ?? "").trim().toLowerCase()).filter(Boolean);
-    const domains = incoming.map((r) => (r.normalized_domain ?? "").trim()).filter(Boolean);
+    const { data: existingRows, error: existingError } = await context.supabase
+      .from("creators")
+      .select("id, code, normalized_domain, tiktok, instagram, facebook, youtube, amazon");
+    if (existingError) throw new Error(existingError.message);
 
-    const [codeRes, domainRes] = await Promise.all([
-      codes.length > 0
-        ? context.supabase.from("creators").select("code, normalized_domain").in("code", codes)
-        : Promise.resolve({ data: [] as Array<{ code: string | null; normalized_domain: string | null }>, error: null }),
-      domains.length > 0
-        ? context.supabase.from("creators").select("code, normalized_domain").in("normalized_domain", domains)
-        : Promise.resolve({ data: [] as Array<{ code: string | null; normalized_domain: string | null }>, error: null }),
-    ]);
-    if (codeRes.error) throw new Error(codeRes.error.message);
-    if (domainRes.error) throw new Error(domainRes.error.message);
-
-    const existingCodes = new Set((codeRes.data ?? []).map((r) => (r.code ?? "").toLowerCase()));
-    const existingDomains = new Set((domainRes.data ?? []).map((r) => r.normalized_domain ?? ""));
+    const existing = new Set<string>();
+    for (const row of (existingRows ?? []) as Array<Record<string, Json>>) {
+      const code = String(row.code ?? "").trim().toLowerCase();
+      const domain = String(row.normalized_domain ?? "").trim().toLowerCase();
+      if (code) existing.add(`code-${code}`);
+      if (domain) existing.add(`domain-${domain}`);
+      for (const field of SOCIAL_FIELDS) {
+        const social = normalizeSocialUrl(row[field] as string | null);
+        if (social) existing.add(`${field}-${social}`);
+      }
+    }
 
     let skipped = 0;
     const toInsert: Array<Record<string, Json>> = [];
-    const seenCodes = new Set<string>();
-    const seenDomains = new Set<string>();
+    const seen = new Set<string>();
 
     for (const r of incoming) {
-      const codeLower = (r.code ?? "").trim().toLowerCase();
-      const dom = (r.normalized_domain ?? "").trim();
-      if (codeLower && existingCodes.has(codeLower)) { skipped++; continue; }
-      if (dom && existingDomains.has(dom)) { skipped++; continue; }
-      if (codeLower && seenCodes.has(codeLower)) { skipped++; continue; }
-      if (dom && seenDomains.has(dom)) { skipped++; continue; }
-      if (codeLower) seenCodes.add(codeLower);
-      if (dom) seenDomains.add(dom);
-      const id = codeLower
-        ? `IMP-${codeLower.toUpperCase().replace(/[^A-Z0-9]/g, "")}`
-        : `IMP-${dom.replace(/[^a-z0-9]/g, "").toUpperCase()}`;
+      const identity = importIdentity(r);
+      if (!identity || existing.has(identity) || seen.has(identity)) {
+        skipped++;
+        continue;
+      }
+      seen.add(identity);
+
+      // Also reject a row when any supplied social profile already exists.
+      const socialKeys = SOCIAL_FIELDS
+        .map((field) => {
+          const social = normalizeSocialUrl(r[field]);
+          return social ? `${field}-${social}` : "";
+        })
+        .filter(Boolean);
+      if (socialKeys.some((key) => existing.has(key) || seen.has(key) && key !== identity)) {
+        skipped++;
+        continue;
+      }
+      socialKeys.forEach((key) => seen.add(key));
+
+      const safeIdentity = identity.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 64);
+      const id = `IMP-${safeIdentity}`;
       toInsert.push({
         id,
         code: r.code,
-        name: r.name || (r.code ?? dom) || "Unnamed",
+        name: r.name || identity || "Unnamed",
         segment: r.segment,
         primary_platforms: r.primary_platforms,
         email: r.email,
@@ -105,7 +145,7 @@ export const importCreators = createServerFn({ method: "POST" })
         amazon: r.amazon,
         research_notes: r.research_notes,
         outreach_owner: r.outreach_owner,
-        normalized_domain: dom || null,
+        normalized_domain: (r.normalized_domain ?? "").trim() || null,
         imported_by: context.userId,
       });
     }
