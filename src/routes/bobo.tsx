@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useRef, useState } from "react";
-import { saveBoboTikTokProfile } from "@/lib/bobo-tiktok.functions";
+import { saveBoboTikTokProfile, getBoboResearchProgress, putBoboResearchProgress } from "@/lib/bobo-tiktok.functions";
 
 export const Route = createFileRoute("/bobo")({
   component: BoboTikTokResearch,
@@ -43,7 +43,7 @@ function handleFromUrl(url: string) {
   return m ? `@${m[1].toLowerCase()}` : url.trim();
 }
 
-const isVideoLink = (line: string) => /\/video\/|\/photo\//i.test(line);
+
 const looksLikeUrl = (line: string) => /tiktok\.com\//i.test(line);
 
 type BatchResult = {
@@ -57,6 +57,8 @@ type BatchResult = {
 
 function BoboTikTokResearch() {
   const saveFn = useServerFn(saveBoboTikTokProfile);
+  const loadProgress = useServerFn(getBoboResearchProgress);
+  const storeProgress = useServerFn(putBoboResearchProgress);
   const [progress, setProgress] = useState<Progress>(EMPTY);
   const [ready, setReady] = useState(false);
   const [batch, setBatch] = useState("");
@@ -66,24 +68,35 @@ function BoboTikTokResearch() {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
-    try {
-      const stored = JSON.parse(localStorage.getItem(KEY) || localStorage.getItem(OLD_KEY) || "null");
-      if (stored && Array.isArray(stored.done)) {
-        setProgress({
-          done: stored.done.filter((n: unknown) => Number.isInteger(n) && Number(n) >= 0 && Number(n) < TERMS.length),
-          index: Number.isInteger(stored.index) && stored.index >= 0 && stored.index < TERMS.length ? stored.index : 0,
-          saved: Number.isInteger(stored.saved) && stored.saved >= 0 ? stored.saved : 0,
-          perTerm: stored.perTerm && typeof stored.perTerm === "object" ? stored.perTerm : {},
-          recent: stored.recent && typeof stored.recent === "object" ? stored.recent : {},
-        });
+    let active = true;
+    void (async () => {
+      try {
+        const remote = await loadProgress();
+        if (!active) return;
+        if (remote.exists) setProgress(remote.progress);
+        else {
+          const stored = JSON.parse(localStorage.getItem(KEY) || localStorage.getItem(OLD_KEY) || "null");
+          if (stored && Array.isArray(stored.done)) {
+            const initial: Progress = {
+              done: stored.done, index: stored.index ?? 0, saved: stored.saved ?? 0,
+              perTerm: stored.perTerm ?? {}, recent: stored.recent ?? {},
+            };
+            await storeProgress({ data: initial });
+            if (active) setProgress(initial);
+          }
+        }
+        if (active) setReady(true);
+      } catch (error) {
+        if (active) setMessage({ tone: "error", text: "Could not load database progress. Please sign in and refresh before saving. " + String(error) });
       }
-    } catch { /* Start fresh if browser storage is unavailable. */ }
-    setReady(true);
+    })();
+    return () => { active = false; };
   }, []);
 
-  useEffect(() => {
-    if (ready) try { localStorage.setItem(KEY, JSON.stringify(progress)); } catch { /* Browser storage disabled. */ }
-  }, [progress, ready]);
+  const persist = async (next: Progress) => {
+    await storeProgress({ data: next });
+    setProgress(next);
+  };
 
   const index = progress.index;
   const term = TERMS[index];
@@ -94,7 +107,7 @@ function BoboTikTokResearch() {
   const lineCount = batch.split("\n").map(l => l.trim()).filter(Boolean).length;
 
   const goTo = (i: number) => {
-    setProgress(p => ({ ...p, index: i }));
+    void persist({ ...progress, index: i }).catch(e => setMessage({ tone: "error", text: String(e) }));
     setMessage(null);
     setBatch("");
     setTimeout(() => textareaRef.current?.focus(), 0);
@@ -109,18 +122,6 @@ function BoboTikTokResearch() {
     if (busy) return;
     const lines = batch.split("\n").map(l => l.trim()).filter(Boolean);
     if (lines.length === 0) return;
-
-    // Anything that is clearly a video link is rejected up front, before saving.
-    const videoLines = lines.filter(isVideoLink);
-    if (videoLines.length > 0) {
-      setMessage({
-        tone: "error",
-        text: `${videoLines.length} line${videoLines.length === 1 ? " is" : "s are"} video links — profile links only. Tap the creator's name to open their profile page, then copy that link. (ចុចឈ្មោះអ្នកបង្កើត ដើម្បីបើកទំព័រប្រវត្តិរូប)`,
-      });
-      setBatch(lines.filter(l => !isVideoLink(l)).join("\n"));
-      textareaRef.current?.focus();
-      return;
-    }
 
     setBusy(true); setMessage(null);
     const result: BatchResult = { saved: 0, duplicates: 0, invalid: 0, failed: 0, savedLines: [], savedHandles: [] };
@@ -148,15 +149,10 @@ function BoboTikTokResearch() {
     }
 
     if (result.saved > 0) {
-      setProgress(p => ({
-        ...p,
-        saved: p.saved + result.saved,
-        perTerm: { ...p.perTerm, [term]: (p.perTerm[term] ?? 0) + result.saved },
-        recent: {
-          ...p.recent,
-          [term]: [...result.savedHandles, ...(p.recent[term] ?? []).filter(h => !result.savedHandles.includes(h))].slice(0, 8),
-        },
-      }));
+      try { await persist({ ...progress, saved: progress.saved + result.saved,
+        perTerm: { ...progress.perTerm, [term]: (progress.perTerm[term] ?? 0) + result.saved },
+        recent: { ...progress.recent, [term]: [...result.savedHandles, ...termRecent.filter(h => !result.savedHandles.includes(h))].slice(0, 8) },
+      }); } catch (e) { setMessage({ tone: "error", text: "Profiles saved, but progress sync failed. Refresh before continuing. " + String(e) }); setBusy(false); return; }
     }
 
     // Keep only lines that were NOT saved, so BoBo can fix or retry them.
@@ -195,22 +191,22 @@ function BoboTikTokResearch() {
          href={`https://www.tiktok.com/search?q=${encodeURIComponent(term)}`} target="_blank" rel="noopener noreferrer">
         Open TikTok search ↗
       </a>
-      <p className="text-sm">Watch videos for this word. When you find a good creator: open their <strong>profile page</strong>, copy the link, and paste it in the box below. You can paste <strong>many links — one per line</strong> — then save them all at once.</p>
-      <p className="text-xs text-muted-foreground">ខ្មែរ៖ ចម្លងតំណទំព័រប្រវត្តិរូប (មិនមែនវីដេអូ) ដាក់មួយបន្ទាត់មួយតំណ រួចចុច Save ទាំងអស់។</p>
+      <p className="text-sm">Open a video, click Copy link, paste it below, and press Save. Repeat for each creator. Profile links also work.</p>
+      <p className="text-xs text-muted-foreground">ខ្មែរ៖ ចម្លងតំណវីដេអូ បិទភ្ជាប់ រួចចុច Save។ ធ្វើម្តងមួយ។</p>
     </section>
 
     <section className="rounded-lg border-2 border-primary/40 p-3 space-y-3">
       <label htmlFor="profiles" className="block text-base font-semibold">
-        Paste MANY TikTok creator PROFILE links here — ONE LINK PER LINE
+        Paste one TikTok video or creator profile link
       </label>
       <textarea
         id="profiles"
         ref={textareaRef}
         autoComplete="off"
-        rows={9}
-        aria-label="TikTok creator profile links, one per line"
+        rows={2}
+        aria-label="TikTok video or creator profile link"
         className="w-full rounded-md border bg-background px-3 py-3 text-base font-mono leading-relaxed"
-        placeholder={"https://www.tiktok.com/@creator1\nhttps://www.tiktok.com/@creator2\nhttps://www.tiktok.com/@creator3"}
+        placeholder={"https://www.tiktok.com/@creator/video/123456789"}
         value={batch}
         onChange={e => setBatch(e.target.value)}
       />
@@ -218,15 +214,15 @@ function BoboTikTokResearch() {
         <span>{lineCount} link{lineCount === 1 ? "" : "s"} in the box</span>
         <span>Links stay here until you press Save</span>
       </div>
-      <button type="button" disabled={busy || lineCount === 0}
+      <button type="button" disabled={!ready || busy || lineCount === 0}
         className="w-full rounded-md bg-primary px-3 py-4 text-lg font-semibold text-primary-foreground disabled:opacity-50"
         onClick={() => void submitBatch()}>
-        {busy ? "Saving… please wait" : `Save ALL profiles for this search${lineCount > 0 ? ` (${lineCount})` : ""}`}
+        {busy ? "Saving… please wait" : `Save creator & add next${lineCount > 0 ? ` (${lineCount})` : ""}`}
       </button>
       {message && <p role="status" className={`rounded-md px-3 py-2 text-sm ${toneClass}`}>{message.text}</p>}
       <div className="rounded-md bg-secondary px-3 py-2">
-        <div className="text-base font-semibold">Profiles saved for this search: {termCount}</div>
-        <div className="text-xs text-muted-foreground">Counted in this browser only — it is not the total number of creators in the CRM.</div>
+        <div className="text-base font-semibold">Creators saved for this search: {termCount} · Next: #{termCount + 1}</div>
+        <div className="text-xs text-muted-foreground">Progress is saved to your signed-in database account. TikTok search results may change order.</div>
       </div>
       {termRecent.length > 0 && (
         <div className="text-xs text-muted-foreground">
@@ -238,9 +234,7 @@ function BoboTikTokResearch() {
     <section className="rounded-lg border p-3 space-y-2">
       <div className="text-sm font-medium">Only when you have finished this search word:</div>
       <label className="flex items-center gap-2 text-sm">
-        <input type="checkbox" checked={done} onChange={e => {
-          setProgress(p => ({ ...p, done: e.target.checked ? [...new Set([...p.done, index])] : p.done.filter(n => n !== index) }));
-        }} />
+        <input type="checkbox" checked={done} onChange={e => { void persist({ ...progress, done: e.target.checked ? [...new Set([...progress.done, index])] : progress.done.filter(n => n !== index) }).catch(err => setMessage({ tone: "error", text: String(err) })); }} />
         Finish this search word
       </label>
       <button disabled={!done || allDone}
@@ -257,6 +251,6 @@ function BoboTikTokResearch() {
         </button>)}</div>}
     </section>
 
-    <p className="text-xs text-muted-foreground">Progress and counts are saved in this browser. Use the same browser and device to continue tomorrow. Saved profiles go to the CRM for review — no messages are sent.</p>
+    <p className="text-xs text-muted-foreground">Progress is saved in the database for this signed-in account. Saved creator profiles go to the CRM; no messages are sent.</p>
   </main>;
 }
