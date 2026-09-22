@@ -50,24 +50,42 @@ function parseCreatorsPaste(text: string): { rows: CreatorImportRow[]; skippedNo
   for (let i = 1; i < lines.length; i++) {
     const cells = split(lines[i]);
     const code = pick(cells, "code", "creator code", "id");
-    const website = pick(cells, "website", "url", "domain");
+    const website = pick(cells, "website", "domain");
     const email = pick(cells, "email");
+    const platform = pick(cells, "platform", "platforms", "primary platforms").toLowerCase();
+    const profileUrl = pick(cells, "profile url", "profile_url", "profile", "url");
     const dom = normalizeDomain(website) || normalizeDomain(email);
-    if (!code && !dom) { skipped++; continue; }
+    let facebook = pick(cells, "facebook", "fb");
+    let instagram = pick(cells, "instagram", "ig");
+    let tiktok = pick(cells, "tiktok", "tt");
+    let youtube = pick(cells, "youtube", "yt");
+    let amazon = pick(cells, "amazon");
+    if (profileUrl) {
+      if (platform.includes("tiktok") || /tiktok\.com/i.test(profileUrl)) tiktok ||= profileUrl;
+      else if (platform.includes("instagram") || /instagram\.com/i.test(profileUrl)) instagram ||= profileUrl;
+      else if (platform.includes("facebook") || /facebook\.com|fb\.com/i.test(profileUrl)) facebook ||= profileUrl;
+      else if (platform.includes("youtube") || /youtube\.com|youtu\.be/i.test(profileUrl)) youtube ||= profileUrl;
+      else if (platform.includes("amazon") || /amazon\./i.test(profileUrl)) amazon ||= profileUrl;
+    }
+    if (!code && !dom && !facebook && !instagram && !tiktok && !youtube && !amazon) { skipped++; continue; }
+    const detectedPlatforms = [
+      tiktok && "TikTok", instagram && "Instagram", facebook && "Facebook",
+      youtube && "YouTube", amazon && "Amazon",
+    ].filter(Boolean).join(", ");
     rows.push({
       code: code || null,
       normalized_domain: dom || null,
-      name: pick(cells, "name", "creator", "channel") || code || dom,
+      name: pick(cells, "name", "creator", "creator name", "channel", "handle") || code || profileUrl || dom,
       segment: pick(cells, "segment", "niche") || null,
-      primary_platforms: pick(cells, "platforms", "primary platforms") || null,
+      primary_platforms: pick(cells, "platforms", "primary platforms", "platform") || detectedPlatforms || null,
       email: email || null,
-      facebook: pick(cells, "facebook", "fb") || null,
-      instagram: pick(cells, "instagram", "ig") || null,
-      tiktok: pick(cells, "tiktok", "tt") || null,
-      youtube: pick(cells, "youtube", "yt") || null,
+      facebook: facebook || null,
+      instagram: instagram || null,
+      tiktok: tiktok || null,
+      youtube: youtube || null,
       priority: pick(cells, "priority") || null,
-      amazon: pick(cells, "amazon") || null,
-      research_notes: pick(cells, "notes", "research notes") || null,
+      amazon: amazon || null,
+      research_notes: pick(cells, "notes", "research notes", "source", "search term") || null,
       outreach_owner: pick(cells, "owner", "outreach owner") || null,
     });
   }
@@ -141,7 +159,7 @@ export function ImportCreatorsSection() {
   const doImport = async () => {
     const parsed = parseCreatorsPaste(text);
     if (parsed.rows.length === 0) {
-      toast.error("No valid rows detected. Provide a Code or Website column.");
+      toast.error("No valid rows detected. Provide a creator Code, Website, or supported social Profile URL.");
       return;
     }
     setBusy(true);
@@ -203,13 +221,13 @@ export function ImportCreatorsSection() {
         <div className="mb-2">
           <h2 className="font-display text-lg flex items-center gap-2"><Upload className="h-4 w-4" /> Import creators</h2>
           <p className="text-xs text-muted-foreground">
-            Paste CSV/TSV rows (with a header). Dedup key is <strong>Code</strong> first, then normalized website domain — existing creators are never overwritten. Newly added creators live in the team database.
+            Paste or upload staging rows from Google Sheets/CSV. Creators can be identified by Code, Website, TikTok, Instagram, Facebook, YouTube, or Amazon profile. Existing creators are never overwritten.
           </p>
         </div>
         <textarea
           value={text}
           onChange={(e) => { setText(e.target.value); setPreview(null); setResult(null); }}
-          placeholder="Recognized columns: Code, Name, Segment, Platforms, Email, Facebook, Instagram, TikTok, YouTube, Priority, Amazon, Owner, Website, Notes"
+          placeholder="Google Sheet/CSV columns: Creator Name, Platform, Profile URL, Handle, Source URL, Search Term, Notes, Followers (optional), Review Status, Import Status. Existing CRM columns also work."
           className="h-40 w-full rounded-md border border-input bg-background p-2 font-mono text-xs"
         />
         <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -225,7 +243,7 @@ export function ImportCreatorsSection() {
           {preview ? (
             <span className="text-xs text-muted-foreground">
               {preview.rows} row{preview.rows === 1 ? "" : "s"} ready
-              {preview.skipped > 0 ? ` · ${preview.skipped} without Code or Website will be skipped` : ""}
+              {preview.skipped > 0 ? ` · ${preview.skipped} without a Code, Website, or supported social profile will be skipped` : ""}
             </span>
           ) : null}
         </div>
