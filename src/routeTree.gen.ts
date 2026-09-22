@@ -28,6 +28,7 @@ import { Route as CommunicationsRouteImport } from './routes/communications'
 import { Route as CommentsRouteImport } from './routes/comments'
 import { Route as ClassificationImportRouteImport } from './routes/classification-import'
 import { Route as CampaignsRouteImport } from './routes/campaigns'
+import { Route as BoboRouteImport } from './routes/bobo'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AssetsRouteImport } from './routes/assets'
 import { Route as ArchiveRouteImport } from './routes/archive'
@@ -40,6 +41,7 @@ import { Route as KnowledgeIdRouteImport } from './routes/knowledge.$id'
 import { Route as CreatorsOutreachRouteImport } from './routes/creators.outreach'
 import { Route as CreatorsIdRouteImport } from './routes/creators.$id'
 import { Route as AssetsIdRouteImport } from './routes/assets.$id'
+import { Route as ApiPublicYoutubeVerificationRouteImport } from './routes/api/public/youtube-verification'
 import { Route as ApiPublicYoutubeEnrichmentRouteImport } from './routes/api/public/youtube-enrichment'
 import { Route as ApiPublicYoutubeDeepEnrichmentRouteImport } from './routes/api/public/youtube-deep-enrichment'
 import { Route as ApiPublicYoutubeCandidatesRouteImport } from './routes/api/public/youtube-candidates'
@@ -140,6 +142,11 @@ const CampaignsRoute = CampaignsRouteImport.update({
   path: '/campaigns',
   getParentRoute: () => rootRouteImport,
 } as any)
+const BoboRoute = BoboRouteImport.update({
+  id: '/bobo',
+  path: '/bobo',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
   path: '/auth',
@@ -200,6 +207,12 @@ const AssetsIdRoute = AssetsIdRouteImport.update({
   path: '/$id',
   getParentRoute: () => AssetsRoute,
 } as any)
+const ApiPublicYoutubeVerificationRoute =
+  ApiPublicYoutubeVerificationRouteImport.update({
+    id: '/api/public/youtube-verification',
+    path: '/api/public/youtube-verification',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicYoutubeEnrichmentRoute =
   ApiPublicYoutubeEnrichmentRouteImport.update({
     id: '/api/public/youtube-enrichment',
@@ -234,6 +247,7 @@ export interface FileRoutesByFullPath {
   '/archive': typeof ArchiveRoute
   '/assets': typeof AssetsRouteWithChildren
   '/auth': typeof AuthRoute
+  '/bobo': typeof BoboRoute
   '/campaigns': typeof CampaignsRoute
   '/classification-import': typeof ClassificationImportRoute
   '/comments': typeof CommentsRoute
@@ -261,6 +275,7 @@ export interface FileRoutesByFullPath {
   '/api/public/youtube-candidates': typeof ApiPublicYoutubeCandidatesRoute
   '/api/public/youtube-deep-enrichment': typeof ApiPublicYoutubeDeepEnrichmentRoute
   '/api/public/youtube-enrichment': typeof ApiPublicYoutubeEnrichmentRoute
+  '/api/public/youtube-verification': typeof ApiPublicYoutubeVerificationRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -271,6 +286,7 @@ export interface FileRoutesByTo {
   '/archive': typeof ArchiveRoute
   '/assets': typeof AssetsRouteWithChildren
   '/auth': typeof AuthRoute
+  '/bobo': typeof BoboRoute
   '/campaigns': typeof CampaignsRoute
   '/classification-import': typeof ClassificationImportRoute
   '/comments': typeof CommentsRoute
@@ -298,6 +314,7 @@ export interface FileRoutesByTo {
   '/api/public/youtube-candidates': typeof ApiPublicYoutubeCandidatesRoute
   '/api/public/youtube-deep-enrichment': typeof ApiPublicYoutubeDeepEnrichmentRoute
   '/api/public/youtube-enrichment': typeof ApiPublicYoutubeEnrichmentRoute
+  '/api/public/youtube-verification': typeof ApiPublicYoutubeVerificationRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -309,6 +326,7 @@ export interface FileRoutesById {
   '/archive': typeof ArchiveRoute
   '/assets': typeof AssetsRouteWithChildren
   '/auth': typeof AuthRoute
+  '/bobo': typeof BoboRoute
   '/campaigns': typeof CampaignsRoute
   '/classification-import': typeof ClassificationImportRoute
   '/comments': typeof CommentsRoute
@@ -336,6 +354,7 @@ export interface FileRoutesById {
   '/api/public/youtube-candidates': typeof ApiPublicYoutubeCandidatesRoute
   '/api/public/youtube-deep-enrichment': typeof ApiPublicYoutubeDeepEnrichmentRoute
   '/api/public/youtube-enrichment': typeof ApiPublicYoutubeEnrichmentRoute
+  '/api/public/youtube-verification': typeof ApiPublicYoutubeVerificationRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -348,6 +367,7 @@ export interface FileRouteTypes {
     | '/archive'
     | '/assets'
     | '/auth'
+    | '/bobo'
     | '/campaigns'
     | '/classification-import'
     | '/comments'
@@ -375,6 +395,7 @@ export interface FileRouteTypes {
     | '/api/public/youtube-candidates'
     | '/api/public/youtube-deep-enrichment'
     | '/api/public/youtube-enrichment'
+    | '/api/public/youtube-verification'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -385,6 +406,7 @@ export interface FileRouteTypes {
     | '/archive'
     | '/assets'
     | '/auth'
+    | '/bobo'
     | '/campaigns'
     | '/classification-import'
     | '/comments'
@@ -412,6 +434,7 @@ export interface FileRouteTypes {
     | '/api/public/youtube-candidates'
     | '/api/public/youtube-deep-enrichment'
     | '/api/public/youtube-enrichment'
+    | '/api/public/youtube-verification'
   id:
     | '__root__'
     | '/'
@@ -422,6 +445,7 @@ export interface FileRouteTypes {
     | '/archive'
     | '/assets'
     | '/auth'
+    | '/bobo'
     | '/campaigns'
     | '/classification-import'
     | '/comments'
@@ -449,6 +473,7 @@ export interface FileRouteTypes {
     | '/api/public/youtube-candidates'
     | '/api/public/youtube-deep-enrichment'
     | '/api/public/youtube-enrichment'
+    | '/api/public/youtube-verification'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -460,6 +485,7 @@ export interface RootRouteChildren {
   ArchiveRoute: typeof ArchiveRoute
   AssetsRoute: typeof AssetsRouteWithChildren
   AuthRoute: typeof AuthRoute
+  BoboRoute: typeof BoboRoute
   CampaignsRoute: typeof CampaignsRoute
   ClassificationImportRoute: typeof ClassificationImportRoute
   CommentsRoute: typeof CommentsRoute
@@ -483,6 +509,7 @@ export interface RootRouteChildren {
   ApiPublicYoutubeCandidatesRoute: typeof ApiPublicYoutubeCandidatesRoute
   ApiPublicYoutubeDeepEnrichmentRoute: typeof ApiPublicYoutubeDeepEnrichmentRoute
   ApiPublicYoutubeEnrichmentRoute: typeof ApiPublicYoutubeEnrichmentRoute
+  ApiPublicYoutubeVerificationRoute: typeof ApiPublicYoutubeVerificationRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -620,6 +647,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CampaignsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/bobo': {
+      id: '/bobo'
+      path: '/bobo'
+      fullPath: '/bobo'
+      preLoaderRoute: typeof BoboRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/auth': {
       id: '/auth'
       path: '/auth'
@@ -704,6 +738,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AssetsIdRouteImport
       parentRoute: typeof AssetsRoute
     }
+    '/api/public/youtube-verification': {
+      id: '/api/public/youtube-verification'
+      path: '/api/public/youtube-verification'
+      fullPath: '/api/public/youtube-verification'
+      preLoaderRoute: typeof ApiPublicYoutubeVerificationRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/youtube-enrichment': {
       id: '/api/public/youtube-enrichment'
       path: '/api/public/youtube-enrichment'
@@ -781,6 +822,7 @@ const rootRouteChildren: RootRouteChildren = {
   ArchiveRoute: ArchiveRoute,
   AssetsRoute: AssetsRouteWithChildren,
   AuthRoute: AuthRoute,
+  BoboRoute: BoboRoute,
   CampaignsRoute: CampaignsRoute,
   ClassificationImportRoute: ClassificationImportRoute,
   CommentsRoute: CommentsRoute,
@@ -804,6 +846,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicYoutubeCandidatesRoute: ApiPublicYoutubeCandidatesRoute,
   ApiPublicYoutubeDeepEnrichmentRoute: ApiPublicYoutubeDeepEnrichmentRoute,
   ApiPublicYoutubeEnrichmentRoute: ApiPublicYoutubeEnrichmentRoute,
+  ApiPublicYoutubeVerificationRoute: ApiPublicYoutubeVerificationRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
