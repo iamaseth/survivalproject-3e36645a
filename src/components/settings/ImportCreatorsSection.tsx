@@ -224,6 +224,21 @@ export function ImportCreatorsSection() {
             Paste or upload staging rows from Google Sheets/CSV. Creators can be identified by Code, Website, TikTok, Instagram, Facebook, YouTube, or Amazon profile. Existing creators are never overwritten.
           </p>
         </div>
+        <input
+          type="file"
+          accept=".csv,text/csv,.tsv,text/tab-separated-values"
+          onChange={(event) => {
+            const file = event.target.files?.[0];
+            if (!file) return;
+            void file.text().then((contents) => {
+              setText(contents);
+              setPreview(null);
+              setResult(null);
+              toast.success(`${file.name} loaded. Preview before importing.`);
+            }).catch(() => toast.error("Could not read creator file"));
+          }}
+          className="mb-3 block w-full text-xs file:mr-3 file:rounded-md file:border-0 file:bg-secondary file:px-3 file:py-2 file:text-xs file:font-medium"
+        />
         <textarea
           value={text}
           onChange={(e) => { setText(e.target.value); setPreview(null); setResult(null); }}
