@@ -125,6 +125,42 @@ export type Database = {
         }
         Relationships: []
       }
+      bobo_research_progress: {
+        Row: {
+          created_at: string
+          current_index: number
+          done_terms: Json
+          per_term: Json
+          recent: Json
+          saved_handles: Json
+          total_saved: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          current_index?: number
+          done_terms?: Json
+          per_term?: Json
+          recent?: Json
+          saved_handles?: Json
+          total_saved?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          current_index?: number
+          done_terms?: Json
+          per_term?: Json
+          recent?: Json
+          saved_handles?: Json
+          total_saved?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       creator_reply_classifications: {
         Row: {
           category: string
