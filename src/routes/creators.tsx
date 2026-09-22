@@ -13,7 +13,7 @@ import { PipelineCounters, YouTubeCandidatesSection, useYouTubePipeline } from "
 
 export const Route = createFileRoute("/creators")({ component: CreatorsLayout, head: () => ({ meta: [{ title: "Creators — Survival Tabs" }, { name: "description", content: "Simple creator outreach workflow." }] }) });
 function CreatorsLayout() { const pathname = useRouterState({ select: (s) => s.location.pathname }); if (pathname !== "/creators") return <Outlet />; return <CreatorPipeline />; }
-type StageKey = "not_contacted" | "contacted" | "follow_up" | "responded" | "sample";
+type StageKey = "not_contacted" | "confirm_contact" | "contacted" | "follow_up" | "responded" | "sample";
 type PlatformFilter = "all" | "youtube" | "tiktok" | "instagram" | "facebook" | "website";
 type ContactFilter = "all" | "multiple" | "email" | "dm" | "form" | "youtube_only" | "none";
 type CreatorPlatform = Exclude<PlatformFilter, "all">;
@@ -39,13 +39,14 @@ const CONTACT_OPTIONS: Array<{ value: ContactFilter; label: string }> = [
 ];
 const STAGES: Array<{ key: StageKey; step: number; label: string; hint: string }> = [
   { key: "not_contacted", step: 1, label: "Not contacted", hint: "Pick a creator and send the first message." },
-  { key: "contacted", step: 2, label: "Contacted / waiting", hint: "Waiting for a reply." },
-  { key: "follow_up", step: 3, label: "Follow up", hint: "No reply after 5 days." },
-  { key: "responded", step: 4, label: "Responded", hint: "Handle the response and move interested creators to sample." },
-  { key: "sample", step: 5, label: "Sample", hint: "Track address, shipping and delivery." },
+  { key: "confirm_contact", step: 2, label: "Needs Contact Confirmation", hint: "Opened for outreach. Confirm that you sent a message, or return to the list." },
+  { key: "contacted", step: 3, label: "Contacted / waiting", hint: "Waiting for a reply." },
+  { key: "follow_up", step: 4, label: "Follow up", hint: "No reply after 5 days." },
+  { key: "responded", step: 5, label: "Responded", hint: "Handle the response and move interested creators to sample." },
+  { key: "sample", step: 6, label: "Sample", hint: "Track address, shipping and delivery." },
 ];
 function daysSince(date: string | null) { if (!date) return null; const start = new Date(`${date}T00:00:00`); if (Number.isNaN(start.getTime())) return null; return Math.max(0, Math.floor((Date.now() - start.getTime()) / 86_400_000)); }
-function stageFor(c: CreatorRow): StageKey { if (c.normalizedSampleStatus !== "Not Sent" && c.normalizedSampleStatus !== "Refused") return "sample"; if (c.responseState === "Replied — Interested" || c.responseState === "Replied — Declined") return "responded"; if (!c.contactedDate) return "not_contacted"; return (daysSince(c.contactedDate) ?? 0) >= 5 ? "follow_up" : "contacted"; }
+function stageFor(c: CreatorRow): StageKey { if (c.normalizedSampleStatus !== "Not Sent" && c.normalizedSampleStatus !== "Refused") return "sample"; if (c.responseState === "Replied — Interested" || c.responseState === "Replied — Declined") return "responded"; if (!c.contactedDate) return c.responseFollowup === "Contact confirmation pending" ? "confirm_contact" : "not_contacted"; return (daysSince(c.contactedDate) ?? 0) >= 5 ? "follow_up" : "contacted"; }
 
 function creatorPlatforms(c: CreatorRow): CreatorPlatform[] {
   const platforms: CreatorPlatform[] = [];
@@ -97,7 +98,7 @@ function CreatorPipeline() {
   const [platformFilter, setPlatformFilter] = useState<PlatformFilter>("all");
   const [contactFilter, setContactFilter] = useState<ContactFilter>("all");
   const [nicheFilter, setNicheFilter] = useState("all");
-  const [openStages, setOpenStages] = useState<Record<StageKey, boolean>>({ not_contacted: false, contacted: false, follow_up: false, responded: false, sample: false });
+  const [openStages, setOpenStages] = useState<Record<StageKey, boolean>>({ not_contacted: false, confirm_contact: false, contacted: false, follow_up: false, responded: false, sample: false });
   const nicheOptions = useMemo(() => [...new Set(CREATORS.map(nicheLabel))].sort((a,b)=>a.localeCompare(b)), [version]);
   const creators = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -111,7 +112,7 @@ function CreatorPipeline() {
     });
   }, [query, platformFilter, contactFilter, nicheFilter, version]);
   const filtersActive = Boolean(query || platformFilter !== "all" || contactFilter !== "all" || nicheFilter !== "all");
-  const grouped = useMemo(() => { const out: Record<StageKey, CreatorRow[]> = { not_contacted: [], contacted: [], follow_up: [], responded: [], sample: [] }; creators.forEach((c) => out[stageFor(c)].push(c)); return out; }, [creators]);
+  const grouped = useMemo(() => { const out: Record<StageKey, CreatorRow[]> = { not_contacted: [], confirm_contact: [], contacted: [], follow_up: [], responded: [], sample: [] }; creators.forEach((c) => out[stageFor(c)].push(c)); return out; }, [creators]);
   const { rows: ytRows, totals, refresh: refreshYT } = useYouTubePipeline();
   return <div className="mx-auto max-w-[1500px]">
     <div className="mb-4 flex flex-wrap items-end justify-between gap-3"><div><div className="text-[11px] uppercase tracking-[0.18em] text-[color:var(--gold)]">Creator outreach</div><h1 className="font-display text-3xl text-foreground">Creators</h1></div><div className="flex gap-2"><Link to="/creators/outreach" className="rounded-md border border-input bg-background px-3 py-2 text-sm hover:bg-secondary">Bulk outreach queue</Link><Link to="/amazon-creators" className="rounded-md border border-input bg-background px-3 py-2 text-sm hover:bg-secondary">Amazon creators</Link></div></div>
@@ -143,6 +144,11 @@ function CreatorLine({ creator }: { creator: CreatorRow }) {
   const followers=creator.followersSignal||creator.reachSignal||"—"; const days=daysSince(creator.contactedDate); const stage=stageFor(creator);
   const platforms=creatorPlatforms(creator); const category=contactCategory(creator); const niche=nicheLabel(creator);
   const update=async(patch:any)=>{setBusy(true);try{await updateFn({data:{id:creator.id,...patch}});toast.success("Updated");window.location.reload();}catch(e:any){toast.error(e?.message??"Could not update creator");}finally{setBusy(false);}};
+  const beginContact = async (href: string) => {
+    // Open synchronously from the click so popup blockers do not prevent outreach.
+    window.open(href, "_blank", "noopener,noreferrer");
+    if (stage === "not_contacted") await update({ response_followup: "Contact confirmation pending" });
+  };
   const markManualContacted=()=>{
     if(!manualMethod){toast.error("Choose how you contacted the creator");return;}
     if(!manualNote.trim()){toast.error("Add a short contact note before marking contacted");return;}
@@ -155,7 +161,7 @@ function CreatorLine({ creator }: { creator: CreatorRow }) {
       <div className="min-w-0"><Link to="/creators/$id" params={{id:creator.id}} className="block truncate font-medium hover:text-primary hover:underline hover:underline-offset-4">{creator.name}</Link><div className="truncate text-xs text-muted-foreground" title={niche}>{niche}</div></div>
       <div><div className="text-[10px] uppercase tracking-wide text-muted-foreground">Followers</div><div className="font-semibold">{followers}</div></div>
       <div><div className="mb-1 text-[10px] uppercase tracking-wide text-muted-foreground">Publishes on</div><div className="flex flex-wrap gap-1">{platforms.length?platforms.map((platform)=><PlatformBadge key={platform} platform={platform}/>):<span className="text-xs text-muted-foreground">Platform unverified</span>}</div></div>
-      <div><div className="mb-1 text-[10px] uppercase tracking-wide text-muted-foreground">Contact via · {CONTACT_OPTIONS.find((x)=>x.value===category)?.label}</div><div className="flex flex-wrap gap-1">{creator.email?<button type="button" onClick={()=>setEmailComposerOpen(true)} className="inline-flex items-center gap-1 rounded-md bg-primary px-2 py-1 text-xs font-medium text-primary-foreground hover:bg-primary/90"><Mail className="h-3.5 w-3.5"/> Email</button>:null}{creator.tiktok?<ContactButton href={creator.tiktok} label="TikTok" icon={<MessageCircle className="h-3.5 w-3.5"/>}/>:null}{creator.instagram?<ContactButton href={creator.instagram} label="Instagram" icon={<Instagram className="h-3.5 w-3.5"/>}/>:null}{creator.facebook?<ContactButton href={creator.facebook} label="Facebook" icon={<Facebook className="h-3.5 w-3.5"/>}/>:null}{isContactForm(creator)&&creator.contactRoute?<ContactButton href={creator.contactRoute} label="Contact form" icon={<Globe className="h-3.5 w-3.5"/>}/>:null}{category==="youtube_only"&&creator.youtube?<ContactButton href={creator.youtube} label="YouTube only" icon={<Youtube className="h-3.5 w-3.5"/>}/>:null}{category==="none"?<span className="text-xs font-medium text-amber-700">Research needed</span>:null}</div></div>
+      <div><div className="mb-1 text-[10px] uppercase tracking-wide text-muted-foreground">Contact via · {CONTACT_OPTIONS.find((x)=>x.value===category)?.label}</div><div className="flex flex-wrap gap-1">{creator.email?<button type="button" onClick={()=>{ setEmailComposerOpen(true); if(stage==="not_contacted") void update({response_followup:"Contact confirmation pending"}); }} className="inline-flex items-center gap-1 rounded-md bg-primary px-2 py-1 text-xs font-medium text-primary-foreground hover:bg-primary/90"><Mail className="h-3.5 w-3.5"/> Email</button>:null}{creator.tiktok?<ContactButton href={creator.tiktok} onContact={() => void beginContact(creator.tiktok!)} label="TikTok" icon={<MessageCircle className="h-3.5 w-3.5"/>}/>:null}{creator.instagram?<ContactButton href={creator.instagram} onContact={() => void beginContact(creator.instagram!)} label="Instagram" icon={<Instagram className="h-3.5 w-3.5"/>}/>:null}{creator.facebook?<ContactButton href={creator.facebook} onContact={() => void beginContact(creator.facebook!)} label="Facebook" icon={<Facebook className="h-3.5 w-3.5"/>}/>:null}{isContactForm(creator)&&creator.contactRoute?<ContactButton href={creator.contactRoute} onContact={() => void beginContact(creator.contactRoute!)} label="Contact form" icon={<Globe className="h-3.5 w-3.5"/>}/>:null}{category==="youtube_only"&&creator.youtube?<ContactButton href={creator.youtube} onContact={() => void beginContact(creator.youtube!)} label="YouTube only" icon={<Youtube className="h-3.5 w-3.5"/>}/>:null}{category==="none"?<span className="text-xs font-medium text-amber-700">Research needed</span>:null}</div></div>
       <div><div className="text-[10px] uppercase tracking-wide text-muted-foreground">Days</div><div>{days==null?"—":days}</div></div>
       <div><div className="text-[10px] uppercase tracking-wide text-muted-foreground">Response</div><div className="truncate text-sm">{creator.responseState==="No Response"?"Waiting":creator.responseState.replace("Replied — ","")}</div></div>
       <div><div className="text-[10px] uppercase tracking-wide text-muted-foreground">Sample / next</div><div className="truncate text-sm">{creator.normalizedSampleStatus!=="Not Sent"?creator.normalizedSampleStatus:creator.nextFollowUpDate||"—"}</div></div>
@@ -165,6 +171,7 @@ function CreatorLine({ creator }: { creator: CreatorRow }) {
       <div className="space-y-1 text-sm"><Detail label="Email" value={creator.email}/><Detail label="Instagram" value={creator.instagram} link/><Detail label="Facebook" value={creator.facebook} link/><Detail label="TikTok" value={creator.tiktok} link/><Detail label="YouTube" value={creator.youtube} link/><Detail label="Contact route" value={creator.contactRoute} link/><Detail label="Contacted" value={creator.contactedDate}/><Detail label="Method" value={creator.contactMethod}/></div>
       <div className="space-y-1 text-sm"><Detail label="Response / follow-up" value={creator.responseFollowup}/><Detail label="Sample" value={creator.sampleStatus}/><Detail label="Notes" value={creator.renaNotes||creator.researchNotes}/><Detail label="Audience" value={creator.targetAudience}/><Detail label="Location" value={creator.geography}/></div>
       <div className="flex min-w-[240px] flex-col gap-2">
+        {stage==="confirm_contact"?<div className="rounded-md border border-amber-300 bg-amber-50 p-3 space-y-2 text-sm text-amber-950"><div className="font-semibold">Was your first message sent?</div><p>Opening a profile does not send a message. Confirm only after sending.</p><button disabled={busy} onClick={()=>update({contacted_date:new Date().toISOString().slice(0,10),contact_method:creator.contactMethod|| (creator.tiktok?"TikTok DM":creator.instagram?"Instagram DM":creator.facebook?"Facebook DM":creator.email?"Email":"Other"),response_followup:"Waiting reply"})} className="w-full rounded-md bg-primary px-3 py-2 text-primary-foreground disabled:opacity-50">Yes — message sent · Confirm contacted</button><button disabled={busy} onClick={()=>update({response_followup:null})} className="w-full rounded-md border border-input bg-background px-3 py-2 disabled:opacity-50">Not sent · Return to list</button></div>:null}
         {stage==="not_contacted"&&creator.email?<button disabled={busy} onClick={()=>update({contacted_date:new Date().toISOString().slice(0,10),contact_method:"Email",response_followup:"Waiting reply"})} className="rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50">Mark contacted today</button>:null}
         {stage==="not_contacted"&&!creator.email?<div className="rounded-md border border-border bg-background p-3 space-y-2">
           <div className="text-xs font-semibold">Manual contact</div>
@@ -226,6 +233,6 @@ function PlatformBadge({platform}:{platform:CreatorPlatform}) {
   return <span className="rounded-md border border-input bg-background px-2 py-1 text-xs font-medium">{labels[platform]}</span>;
 }
 
-function ContactButton({href,label,icon}:{href:string;label:string;icon:React.ReactNode}) {
-  return <ExternalButton href={href} className="inline-flex items-center gap-1 rounded-md border border-input bg-background px-2 py-1 text-xs font-medium hover:bg-secondary">{icon}{label}<ExternalLink className="h-3 w-3"/></ExternalButton>;
+function ContactButton({href,label,icon,onContact}:{href:string;label:string;icon:React.ReactNode;onContact:()=>void}) {
+  return <button type="button" onClick={onContact} className="inline-flex items-center gap-1 rounded-md border border-input bg-background px-2 py-1 text-xs font-medium hover:bg-secondary">{icon}{label}<ExternalLink className="h-3 w-3"/></button>;
 }
