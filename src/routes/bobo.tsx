@@ -10,7 +10,7 @@ export const Route = createFileRoute("/bobo")({
       { title: "BoBo TikTok Creator Research · Survival Tabs" },
       { name: "description", content: "Simple step-by-step tool for saving TikTok creator profile links into the Survival Tabs creator CRM." },
       { property: "og:title", content: "BoBo TikTok Creator Research" },
-      { property: "og:description", content: "Search a keyword, paste creator profile links, save them to the CRM." },
+      { property: "og:description", content: "Search a keyword, paste many creator profile links, save them all to the CRM." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
       { name: "robots", content: "noindex" },
@@ -43,15 +43,27 @@ function handleFromUrl(url: string) {
   return m ? `@${m[1].toLowerCase()}` : url.trim();
 }
 
+const isVideoLink = (line: string) => /\/video\/|\/photo\//i.test(line);
+const looksLikeUrl = (line: string) => /tiktok\.com\//i.test(line);
+
+type BatchResult = {
+  saved: number;
+  duplicates: number;
+  invalid: number;
+  failed: number;
+  savedLines: string[];
+  savedHandles: string[];
+};
+
 function BoboTikTokResearch() {
   const saveFn = useServerFn(saveBoboTikTokProfile);
   const [progress, setProgress] = useState<Progress>(EMPTY);
   const [ready, setReady] = useState(false);
-  const [url, setUrl] = useState("");
+  const [batch, setBatch] = useState("");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ tone: "ok" | "warn" | "error"; text: string } | null>(null);
   const [expanded, setExpanded] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     try {
@@ -79,12 +91,13 @@ function BoboTikTokResearch() {
   const allDone = progress.done.length === TERMS.length;
   const termCount = progress.perTerm[term] ?? 0;
   const termRecent = progress.recent[term] ?? [];
+  const lineCount = batch.split("\n").map(l => l.trim()).filter(Boolean).length;
 
   const goTo = (i: number) => {
     setProgress(p => ({ ...p, index: i }));
     setMessage(null);
-    setUrl("");
-    setTimeout(() => inputRef.current?.focus(), 0);
+    setBatch("");
+    setTimeout(() => textareaRef.current?.focus(), 0);
   };
 
   const nextTerm = () => {
@@ -92,35 +105,74 @@ function BoboTikTokResearch() {
     if (target >= 0) goTo(target);
   };
 
-  const submit = async () => {
-    const value = url.trim();
-    if (!value || busy) return;
-    if (/\/video\/|\/photo\//i.test(value)) {
-      setMessage({ tone: "error", text: "This is a video link. Tap the creator's name to open their profile page, then copy that link. (រូបភាព៖ ចុចឈ្មោះអ្នកបង្កើត ដើម្បីបើកទំព័រប្រវត្តិរូប)" });
+  const submitBatch = async () => {
+    if (busy) return;
+    const lines = batch.split("\n").map(l => l.trim()).filter(Boolean);
+    if (lines.length === 0) return;
+
+    // Anything that is clearly a video link is rejected up front, before saving.
+    const videoLines = lines.filter(isVideoLink);
+    if (videoLines.length > 0) {
+      setMessage({
+        tone: "error",
+        text: `${videoLines.length} line${videoLines.length === 1 ? " is" : "s are"} video links — profile links only. Tap the creator's name to open their profile page, then copy that link. (ចុចឈ្មោះអ្នកបង្កើត ដើម្បីបើកទំព័រប្រវត្តិរូប)`,
+      });
+      setBatch(lines.filter(l => !isVideoLink(l)).join("\n"));
+      textareaRef.current?.focus();
       return;
     }
+
     setBusy(true); setMessage(null);
-    try {
-      const result = await saveFn({ data: { url: value, keyword: term } });
-      if (result.status === "saved") {
-        const handle = handleFromUrl(value);
-        setProgress(p => ({
-          ...p,
-          saved: p.saved + 1,
-          perTerm: { ...p.perTerm, [term]: (p.perTerm[term] ?? 0) + 1 },
-          recent: { ...p.recent, [term]: [handle, ...(p.recent[term] ?? []).filter(h => h !== handle)].slice(0, 8) },
-        }));
-        setMessage({ tone: "ok", text: "Saved! Paste the next creator profile link. (រក្សាទុករួច)" });
-      } else {
-        setMessage({ tone: "warn", text: "Already in the CRM — not counted. Find another creator." });
+    const result: BatchResult = { saved: 0, duplicates: 0, invalid: 0, failed: 0, savedLines: [], savedHandles: [] };
+    const keepLines: string[] = [];
+    const seen = new Set<string>();
+
+    for (const line of lines) {
+      const normalized = line.toLowerCase();
+      if (seen.has(normalized)) { result.duplicates += 1; continue; }
+      seen.add(normalized);
+      if (!looksLikeUrl(line)) { result.invalid += 1; keepLines.push(line); continue; }
+      try {
+        const res = await saveFn({ data: { url: line, keyword: term } });
+        if (res.status === "saved") {
+          result.saved += 1;
+          result.savedLines.push(line);
+          result.savedHandles.push(handleFromUrl(line));
+        } else {
+          result.duplicates += 1;
+        }
+      } catch {
+        result.failed += 1;
+        keepLines.push(line);
       }
-      setUrl("");
-    } catch (e) {
-      setMessage({ tone: "error", text: e instanceof Error ? e.message : "Could not save. Try again." });
-    } finally {
-      setBusy(false);
-      inputRef.current?.focus();
     }
+
+    if (result.saved > 0) {
+      setProgress(p => ({
+        ...p,
+        saved: p.saved + result.saved,
+        perTerm: { ...p.perTerm, [term]: (p.perTerm[term] ?? 0) + result.saved },
+        recent: {
+          ...p.recent,
+          [term]: [...result.savedHandles, ...(p.recent[term] ?? []).filter(h => !result.savedHandles.includes(h))].slice(0, 8),
+        },
+      }));
+    }
+
+    // Keep only lines that were NOT saved, so BoBo can fix or retry them.
+    setBatch(keepLines.join("\n"));
+
+    const parts: string[] = [];
+    if (result.saved > 0) parts.push(`${result.saved} saved ✓`);
+    if (result.duplicates > 0) parts.push(`${result.duplicates} already in CRM (not counted)`);
+    if (result.invalid > 0) parts.push(`${result.invalid} not a TikTok link (kept below to fix)`);
+    if (result.failed > 0) parts.push(`${result.failed} failed (kept below — press Save again to retry)`);
+    setMessage({
+      tone: result.failed > 0 || result.invalid > 0 ? "warn" : result.saved > 0 ? "ok" : "warn",
+      text: parts.length > 0 ? parts.join(" · ") : "Nothing to save.",
+    });
+    setBusy(false);
+    textareaRef.current?.focus();
   };
 
   const toneClass = message?.tone === "ok" ? "bg-primary/10 text-foreground"
@@ -143,28 +195,34 @@ function BoboTikTokResearch() {
          href={`https://www.tiktok.com/search?q=${encodeURIComponent(term)}`} target="_blank" rel="noopener noreferrer">
         Open TikTok search ↗
       </a>
-      <p className="text-sm">Watch many videos for this word. For each good creator: open their <strong>profile page</strong>, copy the link, paste it below, press Save. Repeat as many times as you like.</p>
-      <p className="text-xs text-muted-foreground">ខ្មែរ៖ ចម្លងតំណទំព័រប្រវត្តិរូប (មិនមែនវីដេអូ) រួចចុច Save។</p>
+      <p className="text-sm">Watch videos for this word. When you find a good creator: open their <strong>profile page</strong>, copy the link, and paste it in the box below. You can paste <strong>many links — one per line</strong> — then save them all at once.</p>
+      <p className="text-xs text-muted-foreground">ខ្មែរ៖ ចម្លងតំណទំព័រប្រវត្តិរូប (មិនមែនវីដេអូ) ដាក់មួយបន្ទាត់មួយតំណ រួចចុច Save ទាំងអស់។</p>
     </section>
 
     <section className="rounded-lg border-2 border-primary/40 p-3 space-y-3">
-      <label htmlFor="profile" className="block text-base font-semibold">Paste creator PROFILE link (not video link)</label>
-      <form onSubmit={e => { e.preventDefault(); void submit(); }} className="space-y-2">
-        <input
-          id="profile"
-          ref={inputRef}
-          autoComplete="off"
-          aria-label="TikTok creator profile link"
-          className="w-full rounded-md border bg-background px-3 py-3 text-base"
-          placeholder="https://www.tiktok.com/@creator"
-          value={url}
-          onChange={e => setUrl(e.target.value)}
-        />
-        <button type="submit" disabled={busy || !url.trim()}
-          className="w-full rounded-md bg-primary px-3 py-3 text-base font-semibold text-primary-foreground disabled:opacity-50">
-          {busy ? "Saving…" : "Save profile"}
-        </button>
-      </form>
+      <label htmlFor="profiles" className="block text-base font-semibold">
+        Paste MANY TikTok creator PROFILE links here — ONE LINK PER LINE
+      </label>
+      <textarea
+        id="profiles"
+        ref={textareaRef}
+        autoComplete="off"
+        rows={9}
+        aria-label="TikTok creator profile links, one per line"
+        className="w-full rounded-md border bg-background px-3 py-3 text-base font-mono leading-relaxed"
+        placeholder={"https://www.tiktok.com/@creator1\nhttps://www.tiktok.com/@creator2\nhttps://www.tiktok.com/@creator3"}
+        value={batch}
+        onChange={e => setBatch(e.target.value)}
+      />
+      <div className="flex items-center justify-between text-xs text-muted-foreground">
+        <span>{lineCount} link{lineCount === 1 ? "" : "s"} in the box</span>
+        <span>Links stay here until you press Save</span>
+      </div>
+      <button type="button" disabled={busy || lineCount === 0}
+        className="w-full rounded-md bg-primary px-3 py-4 text-lg font-semibold text-primary-foreground disabled:opacity-50"
+        onClick={() => void submitBatch()}>
+        {busy ? "Saving… please wait" : `Save ALL profiles for this search${lineCount > 0 ? ` (${lineCount})` : ""}`}
+      </button>
       {message && <p role="status" className={`rounded-md px-3 py-2 text-sm ${toneClass}`}>{message.text}</p>}
       <div className="rounded-md bg-secondary px-3 py-2">
         <div className="text-base font-semibold">Profiles saved for this search: {termCount}</div>
