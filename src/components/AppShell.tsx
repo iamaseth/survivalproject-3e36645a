@@ -59,9 +59,9 @@ const navItems: NavItem[] = [
     icon: Send,
     children: [
       { to: "/communications", label: "Communications" },
-      { to: "/templates", label: "Templates" },
     ],
   },
+  { to: "/templates", label: "Templates", icon: FileText },
   { to: "/assets", label: "Assets", icon: FolderKanban },
   { to: "/analytics", label: "Analytics", icon: BarChart3 },
   { to: "/social-accounts", label: "Social Accounts", icon: SettingsIcon },
