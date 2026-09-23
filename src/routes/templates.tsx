@@ -98,8 +98,8 @@ function TemplatesPage() {
     <div>
       <PageHeader
         eyebrow="Outreach"
-        title="Email templates"
-        description="Reusable, human-approved outreach messages. Add an optional product photo; images are stored in Supabase Storage and included when the template is used."
+        title="Templates"
+        description="Reusable team outreach messages for TikTok, email, and other creator contact. Everyone with team access can view, create, and update templates; approval remains controlled."
         actions={
           <div className="flex items-center gap-2">
             <button
@@ -255,7 +255,7 @@ function TemplateEditor({
 
   const previewSubject = useMemo(() => applyMergeFields(subject, SAMPLE_MERGE_CONTEXT), [subject]);
   const previewBody = useMemo(() => applyMergeFields(body, SAMPLE_MERGE_CONTEXT), [body]);
-  const canSave = name.trim().length > 0 && subject.trim().length > 0 && body.trim().length > 0;
+  const canSave = name.trim().length > 0 && body.trim().length > 0;
 
   const uploadImage = async (file: File) => {
     if (!file.type.startsWith("image/")) {
@@ -312,8 +312,8 @@ function TemplateEditor({
               <input value={segment} onChange={(e) => setSegment(e.target.value)} list="template-segments" placeholder="General" className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" />
               <datalist id="template-segments"><option value="General" />{existingSegments.map((s) => <option key={s} value={s} />)}</datalist>
             </Field>
-            <Field label="Subject">
-              <input value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="Quick idea for {{creator_name}} × Survival Tabs" className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" />
+            <Field label="Subject" hint="Optional for TikTok/DM templates.">
+              <input value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="Optional — used for email templates" className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" />
             </Field>
             <Field label="Body">
               <textarea value={body} onChange={(e) => setBody(e.target.value)} rows={12} placeholder={"Hi {{creator_name}},\n\nI came across your work on {{platform}} ({{handle}})…\n\n— {{sender_first_name}}"} className="w-full rounded-md border border-input bg-background px-3 py-2 font-mono text-xs leading-relaxed" />
@@ -357,7 +357,7 @@ function TemplateEditor({
           </div>
 
           <div className="space-y-4 p-6">
-            <div className="text-[11px] uppercase tracking-[0.22em] text-muted-foreground">Email preview</div>
+            <div className="text-[11px] uppercase tracking-[0.22em] text-muted-foreground">Message preview</div>
             <div className="rounded-md border border-border bg-card p-4">
               <div className="text-[11px] text-muted-foreground">Subject</div>
               <div className="mb-3 text-sm font-medium">{previewSubject || <em className="italic text-muted-foreground">(no subject)</em>}</div>
