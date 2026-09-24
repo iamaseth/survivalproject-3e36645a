@@ -45,33 +45,50 @@ export type CreatorImportRow = {
 };
 
 const SOCIAL_FIELDS = ["tiktok", "instagram", "facebook", "youtube", "amazon"] as const;
+type SocialField = typeof SOCIAL_FIELDS[number];
 
-function normalizeSocialUrl(value: string | null | undefined): string {
-  if (!value) return "";
-  let v = value.trim().toLowerCase();
-  if (!v) return "";
+export function normalizeCreatorProfile(value: string | null | undefined, field: SocialField): string {
+  if (!value?.trim()) return "";
   try {
-    const u = new URL(v.startsWith("http") ? v : `https://${v}`);
-    u.hash = "";
-    u.search = "";
-    u.hostname = u.hostname.replace(/^www\./, "");
-    u.pathname = u.pathname.replace(/\/$/, "");
-    return `${u.hostname}${u.pathname}`;
-  } catch {
-    return v.replace(/^https?:\/\//, "").replace(/^www\./, "").replace(/\/$/, "");
-  }
+    const url = new URL(/^https?:\/\//i.test(value.trim()) ? value.trim() : `https://${value.trim()}`);
+    const host = url.hostname.toLowerCase().replace(/^(www|m)\./, "");
+    const domains: Record<SocialField, string[]> = {
+      tiktok: ["tiktok.com"], instagram: ["instagram.com"], facebook: ["facebook.com", "fb.com"],
+      youtube: ["youtube.com", "youtu.be"], amazon: ["amazon.com"],
+    };
+    if (!domains[field].some((domain) => host === domain || host.endsWith(`.${domain}`))) return "";
+    const parts = url.pathname.split("/").filter(Boolean);
+    if (!parts.length) return "";
+    if (field === "tiktok") {
+      const handle = parts[0].startsWith("@") ? parts[0].slice(1) : "";
+      return /^[a-z0-9._]{2,30}$/i.test(handle) ? `tiktok:@${handle.toLowerCase()}` : "";
+    }
+    if (field === "instagram" || field === "facebook") {
+      const handle = parts[0].replace(/^@/, "").toLowerCase();
+      if (["search", "reel", "reels", "watch", "explore", "p", "groups", "marketplace"].includes(handle)) return "";
+      return `${field}:${handle}`;
+    }
+    if (field === "youtube") {
+      if (parts[0].startsWith("@")) return `youtube:${parts[0].toLowerCase()}`;
+      if (["channel", "c", "user"].includes(parts[0].toLowerCase()) && parts[1])
+        return `youtube:${parts[0].toLowerCase()}/${parts[1].toLowerCase()}`;
+      return "";
+    }
+    return parts[0].toLowerCase() === "shop" && parts[1] ? `amazon:shop/${parts[1].toLowerCase()}` : "";
+  } catch { return ""; }
 }
 
-function importIdentity(r: CreatorImportRow): string {
+export function creatorImportKeys(r: CreatorImportRow): string[] {
+  const keys: string[] = [];
   const code = (r.code ?? "").trim().toLowerCase();
-  if (code) return `code-${code}`;
   const domain = (r.normalized_domain ?? "").trim().toLowerCase();
-  if (domain) return `domain-${domain}`;
+  if (code) keys.push(`code:${code}`);
+  if (domain) keys.push(`domain:${domain}`);
   for (const field of SOCIAL_FIELDS) {
-    const social = normalizeSocialUrl(r[field]);
-    if (social) return `${field}-${social}`;
+    const social = normalizeCreatorProfile(r[field], field);
+    if (social) keys.push(social);
   }
-  return "";
+  return keys;
 }
 
 export const importCreators = createServerFn({ method: "POST" })
@@ -81,83 +98,50 @@ export const importCreators = createServerFn({ method: "POST" })
     return data;
   })
   .handler(async ({ data, context }) => {
-    // Universal staging import: a row may be identified by code/domain OR a social profile.
-    // Existing records are never overwritten by this import.
-    const incoming = data.rows.filter((r) => importIdentity(r));
-    if (incoming.length === 0) return { inserted: 0, skipped: 0, total: 0 };
-
     const { data: existingRows, error: existingError } = await context.supabase
       .from("creators")
       .select("id, code, normalized_domain, tiktok, instagram, facebook, youtube, amazon");
     if (existingError) throw new Error(existingError.message);
 
     const existing = new Set<string>();
-    for (const row of (existingRows ?? []) as Array<Record<string, Json>>) {
-      const code = String(row.code ?? "").trim().toLowerCase();
-      const domain = String(row.normalized_domain ?? "").trim().toLowerCase();
-      if (code) existing.add(`code-${code}`);
-      if (domain) existing.add(`domain-${domain}`);
-      for (const field of SOCIAL_FIELDS) {
-        const social = normalizeSocialUrl(row[field] as string | null);
-        if (social) existing.add(`${field}-${social}`);
-      }
+    for (const row of existingRows ?? []) {
+      creatorImportKeys(row as CreatorImportRow).forEach((key) => existing.add(key));
     }
 
     let skipped = 0;
-    const toInsert: Array<Record<string, Json>> = [];
     const seen = new Set<string>();
-
-    for (const r of incoming) {
-      const identity = importIdentity(r);
-      if (!identity || existing.has(identity) || seen.has(identity)) {
+    const toInsert: Array<Record<string, Json>> = [];
+    for (const r of data.rows) {
+      // Reject malformed social URLs even if a supplied code would otherwise allow insertion.
+      if (SOCIAL_FIELDS.some((field) => r[field]?.trim() && !normalizeCreatorProfile(r[field], field))) {
         skipped++;
         continue;
       }
-      seen.add(identity);
-
-      // Also reject a row when any supplied social profile already exists.
-      const socialKeys = SOCIAL_FIELDS
-        .map((field) => {
-          const social = normalizeSocialUrl(r[field]);
-          return social ? `${field}-${social}` : "";
-        })
-        .filter(Boolean);
-      if (socialKeys.some((key) => existing.has(key) || seen.has(key) && key !== identity)) {
+      const keys = creatorImportKeys(r);
+      if (!keys.length || keys.some((key) => existing.has(key) || seen.has(key))) {
         skipped++;
         continue;
       }
-      socialKeys.forEach((key) => seen.add(key));
-
-      const safeIdentity = identity.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 64);
-      const id = `IMP-${safeIdentity}`;
+      // Reserve only after the entire row passes duplicate checks.
+      keys.forEach((key) => seen.add(key));
+      const identity = keys.find((key) => key.startsWith("tiktok:")) ?? keys[0];
+      const id = `IMP-${identity.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 64)}`;
       toInsert.push({
-        id,
-        code: r.code,
-        name: r.name || identity || "Unnamed",
-        segment: r.segment,
-        primary_platforms: r.primary_platforms,
-        email: r.email,
-        facebook: r.facebook,
-        instagram: r.instagram,
-        tiktok: r.tiktok,
-        youtube: r.youtube,
-        priority: r.priority,
-        amazon: r.amazon,
-        research_notes: r.research_notes,
-        outreach_owner: r.outreach_owner,
-        normalized_domain: (r.normalized_domain ?? "").trim() || null,
-        imported_by: context.userId,
+        id, code: r.code, name: r.name || identity, segment: r.segment,
+        primary_platforms: r.primary_platforms, email: r.email,
+        facebook: r.facebook, instagram: r.instagram, tiktok: r.tiktok,
+        youtube: r.youtube, priority: r.priority, amazon: r.amazon,
+        research_notes: r.research_notes, outreach_owner: r.outreach_owner,
+        normalized_domain: r.normalized_domain, imported_by: context.userId,
       });
     }
 
     if (toInsert.length > 0) {
-      const { error } = await context.supabase
-        .from("creators")
+      const { error } = await context.supabase.from("creators")
         .upsert(toInsert as never, { onConflict: "id", ignoreDuplicates: true });
       if (error) throw new Error(error.message);
     }
-
-    return { inserted: toInsert.length, skipped, total: incoming.length };
+    return { inserted: toInsert.length, skipped, total: data.rows.length };
   });
 
 export type ResearchCreatorInput = {
