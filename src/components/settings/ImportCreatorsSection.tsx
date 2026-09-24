@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { TikTokEnrichmentSection } from "./TikTokEnrichmentSection";
+import { OnePassTikTokSection } from "./OnePassTikTokSection";
 import { useServerFn } from "@tanstack/react-start";
 import { Upload, Loader2, CheckCircle2, FileSpreadsheet } from "lucide-react";
 import { toast } from "sonner";
@@ -273,6 +274,7 @@ export function ImportCreatorsSection() {
         ) : null}
       </section>
 
+      <OnePassTikTokSection />
       <TikTokEnrichmentSection />
 
       <section className="rounded-lg border border-border bg-card p-4">
