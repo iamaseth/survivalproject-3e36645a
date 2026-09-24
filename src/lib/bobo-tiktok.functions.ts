@@ -70,3 +70,49 @@ export const putBoboResearchProgress = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return { ok: true };
   });
+
+
+// BoBo active #141-500 search tracker.
+// Stored inside the existing per-user progress row so this feature needs no schema migration.
+const ACTIVE_DONE_KEY = "__active_141_500_done";
+export const getBoboActiveSearchProgress = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { data, error } = await context.supabase.from("bobo_research_progress" as never)
+      .select("recent").eq("user_id", context.userId).maybeSingle();
+    if (error) throw new Error(error.message);
+    const row = data as unknown as Record<string, any> | null;
+    const recent = (row?.recent && typeof row.recent === "object") ? row.recent : {};
+    const raw = Array.isArray(recent[ACTIVE_DONE_KEY]) ? recent[ACTIVE_DONE_KEY] : [];
+    const done = raw.map((v: unknown) => Number(v)).filter((n: number) => Number.isInteger(n) && n >= 141 && n <= 500);
+    return { done: [...new Set(done)].sort((a,b) => a-b) };
+  });
+
+export const putBoboActiveSearchProgress = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: { done: number[] }) => data)
+  .handler(async ({ context, data }) => {
+    if (!Array.isArray(data.done) || !data.done.every(n => Number.isInteger(n) && n >= 141 && n <= 500))
+      throw new Error("Invalid active search progress");
+    const unique = [...new Set(data.done)].sort((a,b) => a-b);
+    const { data: existing, error: readError } = await context.supabase.from("bobo_research_progress" as never)
+      .select("*").eq("user_id", context.userId).maybeSingle();
+    if (readError) throw new Error(readError.message);
+    const row = existing as unknown as Record<string, any> | null;
+    const recent = (row?.recent && typeof row.recent === "object") ? row.recent : {};
+    const payload = row ? {
+      user_id: context.userId,
+      current_index: row.current_index ?? 0,
+      done_terms: row.done_terms ?? [],
+      total_saved: row.total_saved ?? 0,
+      per_term: row.per_term ?? {},
+      recent: { ...recent, [ACTIVE_DONE_KEY]: unique.map(String) },
+    } : {
+      user_id: context.userId, current_index: 0, done_terms: [], total_saved: 0, per_term: {},
+      recent: { [ACTIVE_DONE_KEY]: unique.map(String) },
+    };
+    const { error } = await context.supabase.from("bobo_research_progress" as never)
+      .upsert(payload as never, { onConflict: "user_id" });
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
