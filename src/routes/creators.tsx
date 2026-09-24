@@ -14,7 +14,7 @@ import { PipelineCounters, YouTubeCandidatesSection, useYouTubePipeline } from "
 export const Route = createFileRoute("/creators")({ component: CreatorsLayout, head: () => ({ meta: [{ title: "Creators — Survival Tabs" }, { name: "description", content: "Simple creator outreach workflow." }] }) });
 function CreatorsLayout() { const pathname = useRouterState({ select: (s) => s.location.pathname }); if (pathname !== "/creators") return <Outlet />; return <CreatorPipeline />; }
 type StageKey = "not_contacted" | "confirm_contact" | "contacted" | "follow_up" | "responded" | "sample";
-type PlatformFilter = "all" | "youtube" | "tiktok" | "instagram" | "facebook" | "website";
+type PlatformFilter = "all" | "youtube" | "tiktok" | "instagram" | "facebook" | "amazon" | "website";
 type ContactFilter = "all" | "multiple" | "email" | "dm" | "form" | "youtube_only" | "none";
 type CreatorPlatform = Exclude<PlatformFilter, "all">;
 type ContactCategory = Exclude<ContactFilter, "all">;
@@ -25,6 +25,7 @@ const PLATFORM_OPTIONS: Array<{ value: PlatformFilter; label: string }> = [
   { value: "tiktok", label: "TikTok" },
   { value: "instagram", label: "Instagram" },
   { value: "facebook", label: "Facebook" },
+  { value: "amazon", label: "Amazon" },
   { value: "website", label: "Website" },
 ];
 
@@ -54,6 +55,7 @@ function creatorPlatforms(c: CreatorRow): CreatorPlatform[] {
   if (c.tiktok) platforms.push("tiktok");
   if (c.instagram) platforms.push("instagram");
   if (c.facebook) platforms.push("facebook");
+  if (c.amazon) platforms.push("amazon");
   if (c.otherPlatform?.startsWith("http") || c.contactRoute?.startsWith("http") && !/youtube|youtu\.be|instagram|facebook|tiktok/i.test(c.contactRoute)) platforms.push("website");
   return platforms;
 }
@@ -103,7 +105,7 @@ function CreatorPipeline() {
   const creators = useMemo(() => {
     const needle = query.trim().toLowerCase();
     return CREATORS.filter((c) => {
-      const matchesSearch = !needle || [c.name,c.followersSignal,c.reachSignal,c.email,c.youtube,c.instagram,c.facebook,c.tiktok,c.segment,c.responseFollowup,c.sampleStatus,nicheLabel(c)].some((v) => String(v ?? "").toLowerCase().includes(needle));
+      const matchesSearch = !needle || [c.name,c.followersSignal,c.reachSignal,c.email,c.youtube,c.instagram,c.facebook,c.tiktok,c.amazon,c.segment,c.responseFollowup,c.sampleStatus,nicheLabel(c)].some((v) => String(v ?? "").toLowerCase().includes(needle));
       const matchesPlatform = platformFilter === "all" || creatorPlatforms(c).includes(platformFilter);
       const category = contactCategory(c);
       const matchesContact = contactFilter === "all" || category === contactFilter || (contactFilter !== "multiple" && category === "multiple" && contactMethods(c).includes(contactFilter as "email" | "dm" | "form"));
@@ -229,7 +231,7 @@ function EmailComposerModal({creator,onClose}:{creator:CreatorRow;onClose:()=>vo
 function Detail({label,value,link=false}:{label:string;value:string|null;link?:boolean}) { if(!value)return null; return <div className="flex gap-2"><span className="w-28 shrink-0 text-xs text-muted-foreground">{label}</span>{link&&value.startsWith("http")?<ExternalButton href={value} className="break-all underline underline-offset-4">{value}</ExternalButton>:<span className="break-words">{value}</span>}</div>; }
 
 function PlatformBadge({platform}:{platform:CreatorPlatform}) {
-  const labels: Record<CreatorPlatform,string> = {youtube:"YouTube",tiktok:"TikTok",instagram:"Instagram",facebook:"Facebook",website:"Website"};
+  const labels: Record<CreatorPlatform,string> = {youtube:"YouTube",tiktok:"TikTok",instagram:"Instagram",facebook:"Facebook",amazon:"Amazon",website:"Website"};
   return <span className="rounded-md border border-input bg-background px-2 py-1 text-xs font-medium">{labels[platform]}</span>;
 }
 
