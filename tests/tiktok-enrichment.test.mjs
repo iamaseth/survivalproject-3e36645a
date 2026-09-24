@@ -4,7 +4,7 @@ import vm from "node:vm";
 import ts from "typescript";
 
 const normalizeSource = readFileSync("src/lib/creators.functions.ts", "utf8");
-const normalization = normalizeSource.slice(normalizeSource.indexOf("const SOCIAL_FIELDS ="), normalizeSource.indexOf("export function creatorImportKeys"));
+const normalization = normalizeSource.slice(normalizeSource.indexOf("const SOCIAL_FIELDS ="), normalizeSource.indexOf("export function creatorImportKeys")).replaceAll("export ", "");
 const source = readFileSync("src/lib/tiktok-enrichment.functions.ts", "utf8")
   .replace(/^import .*;\s*$/gm, "")
   .replace(/^export type TikTokEnrichmentRow = \{[\s\S]*?^\};/m, "")
