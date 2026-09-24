@@ -44,6 +44,53 @@ export type CreatorImportRow = {
   outreach_owner: string | null;
 };
 
+const SOCIAL_FIELDS = ["tiktok", "instagram", "facebook", "youtube", "amazon"] as const;
+type SocialField = typeof SOCIAL_FIELDS[number];
+
+export function normalizeCreatorProfile(value: string | null | undefined, field: SocialField): string {
+  if (!value?.trim()) return "";
+  try {
+    const url = new URL(/^https?:\/\//i.test(value.trim()) ? value.trim() : `https://${value.trim()}`);
+    const host = url.hostname.toLowerCase().replace(/^(www|m)\./, "");
+    const domains: Record<SocialField, string[]> = {
+      tiktok: ["tiktok.com"], instagram: ["instagram.com"], facebook: ["facebook.com", "fb.com"],
+      youtube: ["youtube.com", "youtu.be"], amazon: ["amazon.com"],
+    };
+    if (!domains[field].some((domain) => host === domain || host.endsWith(`.${domain}`))) return "";
+    const parts = url.pathname.split("/").filter(Boolean);
+    if (!parts.length) return "";
+    if (field === "tiktok") {
+      const handle = parts[0].startsWith("@") ? parts[0].slice(1) : "";
+      return /^[a-z0-9._]{2,30}$/i.test(handle) ? `tiktok:@${handle.toLowerCase()}` : "";
+    }
+    if (field === "instagram" || field === "facebook") {
+      const handle = parts[0].replace(/^@/, "").toLowerCase();
+      if (["search", "reel", "reels", "watch", "explore", "p", "groups", "marketplace"].includes(handle)) return "";
+      return `${field}:${handle}`;
+    }
+    if (field === "youtube") {
+      if (parts[0].startsWith("@")) return `youtube:${parts[0].toLowerCase()}`;
+      if (["channel", "c", "user"].includes(parts[0].toLowerCase()) && parts[1])
+        return `youtube:${parts[0].toLowerCase()}/${parts[1].toLowerCase()}`;
+      return "";
+    }
+    return parts[0].toLowerCase() === "shop" && parts[1] ? `amazon:shop/${parts[1].toLowerCase()}` : "";
+  } catch { return ""; }
+}
+
+export function creatorImportKeys(r: CreatorImportRow): string[] {
+  const keys: string[] = [];
+  const code = (r.code ?? "").trim().toLowerCase();
+  const domain = (r.normalized_domain ?? "").trim().toLowerCase();
+  if (code) keys.push(`code:${code}`);
+  if (domain) keys.push(`domain:${domain}`);
+  for (const field of SOCIAL_FIELDS) {
+    const social = normalizeCreatorProfile(r[field], field);
+    if (social) keys.push(social);
+  }
+  return keys;
+}
+
 export const importCreators = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((data: { rows: CreatorImportRow[] }) => {
@@ -51,73 +98,45 @@ export const importCreators = createServerFn({ method: "POST" })
     return data;
   })
   .handler(async ({ data, context }) => {
-    const incoming = data.rows.filter(
-      (r) => (r.code && r.code.trim()) || (r.normalized_domain && r.normalized_domain.trim()),
-    );
-    if (incoming.length === 0) return { inserted: 0, skipped: 0, total: 0 };
+    const { data: existingRows, error: existingError } = await context.supabase
+      .from("creators")
+      .select("id, code, normalized_domain, tiktok, instagram, facebook, youtube, amazon");
+    if (existingError) throw new Error(existingError.message);
 
-    const codes = incoming.map((r) => (r.code ?? "").trim().toLowerCase()).filter(Boolean);
-    const domains = incoming.map((r) => (r.normalized_domain ?? "").trim()).filter(Boolean);
-
-    const [codeRes, domainRes] = await Promise.all([
-      codes.length > 0
-        ? context.supabase.from("creators").select("code, normalized_domain").in("code", codes)
-        : Promise.resolve({ data: [] as Array<{ code: string | null; normalized_domain: string | null }>, error: null }),
-      domains.length > 0
-        ? context.supabase.from("creators").select("code, normalized_domain").in("normalized_domain", domains)
-        : Promise.resolve({ data: [] as Array<{ code: string | null; normalized_domain: string | null }>, error: null }),
-    ]);
-    if (codeRes.error) throw new Error(codeRes.error.message);
-    if (domainRes.error) throw new Error(domainRes.error.message);
-
-    const existingCodes = new Set((codeRes.data ?? []).map((r) => (r.code ?? "").toLowerCase()));
-    const existingDomains = new Set((domainRes.data ?? []).map((r) => r.normalized_domain ?? ""));
+    const existing = new Set<string>();
+    for (const row of existingRows ?? []) {
+      creatorImportKeys(row as CreatorImportRow).forEach((key) => existing.add(key));
+    }
 
     let skipped = 0;
+    const seen = new Set<string>();
     const toInsert: Array<Record<string, Json>> = [];
-    const seenCodes = new Set<string>();
-    const seenDomains = new Set<string>();
-
-    for (const r of incoming) {
-      const codeLower = (r.code ?? "").trim().toLowerCase();
-      const dom = (r.normalized_domain ?? "").trim();
-      if (codeLower && existingCodes.has(codeLower)) { skipped++; continue; }
-      if (dom && existingDomains.has(dom)) { skipped++; continue; }
-      if (codeLower && seenCodes.has(codeLower)) { skipped++; continue; }
-      if (dom && seenDomains.has(dom)) { skipped++; continue; }
-      if (codeLower) seenCodes.add(codeLower);
-      if (dom) seenDomains.add(dom);
-      const id = codeLower
-        ? `IMP-${codeLower.toUpperCase().replace(/[^A-Z0-9]/g, "")}`
-        : `IMP-${dom.replace(/[^a-z0-9]/g, "").toUpperCase()}`;
+    for (const r of data.rows) {
+      const keys = creatorImportKeys(r);
+      if (!keys.length || keys.some((key) => existing.has(key) || seen.has(key))) {
+        skipped++;
+        continue;
+      }
+      // Reserve only after the entire row passes duplicate checks.
+      keys.forEach((key) => seen.add(key));
+      const identity = keys.find((key) => key.startsWith("tiktok:")) ?? keys[0];
+      const id = `IMP-${identity.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 64)}`;
       toInsert.push({
-        id,
-        code: r.code,
-        name: r.name || (r.code ?? dom) || "Unnamed",
-        segment: r.segment,
-        primary_platforms: r.primary_platforms,
-        email: r.email,
-        facebook: r.facebook,
-        instagram: r.instagram,
-        tiktok: r.tiktok,
-        youtube: r.youtube,
-        priority: r.priority,
-        amazon: r.amazon,
-        research_notes: r.research_notes,
-        outreach_owner: r.outreach_owner,
-        normalized_domain: dom || null,
-        imported_by: context.userId,
+        id, code: r.code, name: r.name || identity, segment: r.segment,
+        primary_platforms: r.primary_platforms, email: r.email,
+        facebook: r.facebook, instagram: r.instagram, tiktok: r.tiktok,
+        youtube: r.youtube, priority: r.priority, amazon: r.amazon,
+        research_notes: r.research_notes, outreach_owner: r.outreach_owner,
+        normalized_domain: r.normalized_domain, imported_by: context.userId,
       });
     }
 
     if (toInsert.length > 0) {
-      const { error } = await context.supabase
-        .from("creators")
+      const { error } = await context.supabase.from("creators")
         .upsert(toInsert as never, { onConflict: "id", ignoreDuplicates: true });
       if (error) throw new Error(error.message);
     }
-
-    return { inserted: toInsert.length, skipped, total: incoming.length };
+    return { inserted: toInsert.length, skipped, total: data.rows.length };
   });
 
 export type ResearchCreatorInput = {
