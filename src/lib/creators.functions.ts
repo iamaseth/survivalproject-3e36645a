@@ -112,6 +112,11 @@ export const importCreators = createServerFn({ method: "POST" })
     const seen = new Set<string>();
     const toInsert: Array<Record<string, Json>> = [];
     for (const r of data.rows) {
+      // Reject malformed social URLs even if a supplied code would otherwise allow insertion.
+      if (SOCIAL_FIELDS.some((field) => r[field]?.trim() && !normalizeCreatorProfile(r[field], field))) {
+        skipped++;
+        continue;
+      }
       const keys = creatorImportKeys(r);
       if (!keys.length || keys.some((key) => existing.has(key) || seen.has(key))) {
         skipped++;
