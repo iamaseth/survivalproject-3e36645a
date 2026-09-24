@@ -388,3 +388,12 @@ When BoBo types `$bobo` and selects `A1 — Influencers`, do NOT rely on ChatGPT
 ## Completion
 
 When #500 is checked, set Active progress to 360 / 360, Overall progress to 500 / 500, and Next to COMPLETE.
+
+
+## PERMANENT BOBO WORK LINK
+
+- BoBo TikTok Search page: https://survivalproject.lovable.app/bobo-search
+- Lovable project editor: https://lovable.dev/projects/3e36645a
+- When BoBo types `$bobo` and selects `A1 — Influencers`, send her DIRECTLY to the BoBo TikTok Search page above before giving instructions.
+- Do not make BoBo navigate through the app to find it.
+- This is the permanent working page for the active #141–500 TikTok search queue unless this file is deliberately updated later.
