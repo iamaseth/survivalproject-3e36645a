@@ -37,7 +37,7 @@ function parseCreatorsPaste(text: string): { rows: CreatorImportRow[]; skippedNo
   if (lines.length < 2) return { rows: [], skippedNoKey: 0 };
   const delim = lines[0].includes("\t") ? "\t" : ",";
   const split = (l: string) => delim === "\t" ? l.split("\t") : parseCsvLine(l);
-  const header = split(lines[0]).map((h) => h.trim().toLowerCase());
+  const header = split(lines[0]).map((h) => h.replace(/^\uFEFF/, "").trim().toLowerCase());
   const pick = (row: string[], ...keys: string[]) => {
     for (const k of keys) {
       const idx = header.indexOf(k);
