@@ -6,9 +6,12 @@ Build a **6,000-row raw creator pool** before qualification, then reduce it thro
 This is intentionally separate from outreach. Discovery and verification must never send messages or modify existing approved CRM contacts.
 
 ## Platforms
-Initial discovery platforms:
+Discovery platforms:
 - YouTube
 - TikTok
+- Instagram
+- Facebook (MD clipping quality test pending)
+- Amazon Influencer storefronts (discovered through Google `site:amazon.com/shop KEYWORD` searches)
 
 A creator who appears on both platforms should ultimately resolve to one creator identity with multiple platform profiles, not two outreach leads.
 
@@ -82,3 +85,9 @@ Required columns:
 - Never commit API keys/session cookies/tokens.
 - Never treat generated creator names as verified.
 - Never contact creators from the raw discovery list.
+
+
+## BoBo raw-discovery workflow
+BoBo's simplified multi-platform Obsidian clipping instructions are maintained in [BOBO-MULTIPLATFORM-CLIPPING.md](./BOBO-MULTIPLATFORM-CLIPPING.md).
+
+BoBo collects whole search-result pages as MD files only. Seth uploads the completed MD batches to ChatGPT; ChatGPT handles extraction, normalization, deduplication, staging Sheet/CSV creation, and preparation for the existing CRM importer. BoBo does not enter creators into the CRM.

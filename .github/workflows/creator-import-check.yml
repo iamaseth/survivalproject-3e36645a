@@ -1,0 +1,23 @@
+name: Creator import verification
+on:
+  pull_request:
+    paths:
+      - 'src/lib/creators.functions.ts'
+      - 'src/components/settings/ImportCreatorsSection.tsx'
+      - '.github/workflows/creator-import-check.yml'
+      - 'tests/creator-import.test.mjs'
+  push:
+    branches: ['feature/universal-creator-import']
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+      # The existing package-lock.json is out of sync with package.json; install without rewriting the repository.
+      - run: npm install --no-package-lock --no-save
+      - run: node tests/creator-import.test.mjs
+      - run: npm run build
