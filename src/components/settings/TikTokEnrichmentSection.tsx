@@ -39,7 +39,7 @@ function parseRows(text: string): TikTokEnrichmentRow[] {
   }));
 }
 
-type Result = Awaited<ReturnType<ReturnType<typeof useServerFn<typeof importTikTokEnrichment>>>>;
+type Result = { total: number; matched: number; updated: number; unchanged: number; missing: number; duplicates: number; invalid: number; repeated: number; conflicts: number; dryRun: boolean; review: Array<{ tiktok: string; reason: string }> };
 
 export function TikTokEnrichmentSection() {
   const run = useServerFn(importTikTokEnrichment);
