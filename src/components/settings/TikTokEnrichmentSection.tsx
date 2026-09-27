@@ -39,7 +39,7 @@ function parseRows(text: string): TikTokEnrichmentRow[] {
   }));
 }
 
-type Result = { total: number; matched: number; updated: number; unchanged: number; missing: number; duplicates: number; invalid: number; repeated: number; conflicts: number; dryRun: boolean; review: Array<{ tiktok: string; reason: string }> };
+type Result = { total: number; matched: number; created: number; updated: number; unchanged: number; missing: number; duplicates: number; invalid: number; repeated: number; conflicts: number; dryRun: boolean; review: Array<{ tiktok: string; reason: string }> };
 
 export function TikTokEnrichmentSection() {
   const run = useServerFn(importTikTokEnrichment);
@@ -52,9 +52,9 @@ export function TikTokEnrichmentSection() {
     if (!file) return;
     try {
       const parsed = parseRows(await file.text());
-      if (!parsed.length || parsed.length > 1000) throw new Error("CSV must contain 1–1000 enrichment rows");
+      if (!parsed.length || parsed.length > 1000) throw new Error("CSV must contain 1–1000 rows");
       setRows(parsed);
-      toast.success(`${parsed.length} enrichment rows loaded. Preview before applying.`);
+      toast.success(`${parsed.length} TikTok rows loaded. Preview before applying.`);
     } catch (e) { toast.error(e instanceof Error ? e.message : "Invalid CSV"); }
   };
   const execute = async (dryRun: boolean) => {
@@ -62,20 +62,20 @@ export function TikTokEnrichmentSection() {
     try {
       const res = await run({ data: { rows, dryRun } });
       if (dryRun) { setPreview(res); setResult(null); } else { setResult(res); setPreview(null); }
-    } catch (e) { toast.error(e instanceof Error ? e.message : "Enrichment failed"); }
+    } catch (e) { toast.error(e instanceof Error ? e.message : "TikTok import failed"); }
     finally { setBusy(false); }
   };
   return <section className="rounded-lg border border-border bg-card p-4 space-y-3">
-    <h2 className="font-display text-lg">TikTok creator enrichment</h2>
-    <p className="text-xs text-muted-foreground">Upload enrichment CSV with TikTok, Source URL, Search Term, Evidence, Reach Signal, Monetization and Niche columns. Exact TikTok matches only. Missing creators and duplicate CRM identities are flagged; existing verified fields and outreach history are preserved. No new creators are added.</p>
+    <h2 className="font-display text-lg">TikTok creator import + enrichment</h2>
+    <p className="text-xs text-muted-foreground">One-step TikTok workflow. Upload CSV with TikTok, Source URL, Search Term, Evidence, Reach Signal, Monetization and Niche. Exact TikTok matches are enriched; missing creators are created with the enrichment data; duplicate CRM identities are flagged and left unchanged. Existing verified fields and outreach history are preserved.</p>
     <input type="file" accept=".csv,text/csv" onChange={e => void load(e.target.files?.[0])} className="block w-full text-xs" />
     <div className="flex gap-2">
       <button className="rounded-md border px-3 py-2 text-xs disabled:opacity-50" disabled={busy || !rows.length} onClick={() => void execute(true)}>Preview {rows.length} rows</button>
-      <button className="rounded-md bg-primary text-primary-foreground px-3 py-2 text-xs disabled:opacity-50" disabled={busy || !preview || preview.total !== rows.length} onClick={() => void execute(false)}>Apply enrichment</button>
+      <button className="rounded-md bg-primary text-primary-foreground px-3 py-2 text-xs disabled:opacity-50" disabled={busy || !preview || preview.total !== rows.length} onClick={() => void execute(false)}>Import + enrich</button>
     </div>
     {[preview, result].filter(Boolean).map((r, i) => <div key={i} className="rounded-md border p-3 text-xs space-y-1">
-      <strong>{r!.dryRun ? "Preview (no changes)" : "Enrichment result"}</strong>
-      <p>{r!.matched} matched · {r!.updated} {r!.dryRun ? "would update" : "updated"} · {r!.unchanged} unchanged · {r!.missing} missing · {r!.duplicates} duplicate identities · {r!.invalid} invalid · {r!.repeated} repeated · {r!.conflicts} existing-field differences preserved</p>
+      <strong>{r!.dryRun ? "Preview (no changes)" : "Import + enrichment result"}</strong>
+      <p>{r!.matched} existing matched · {r!.created} {r!.dryRun ? "would create" : "created"} · {r!.updated} {r!.dryRun ? "would enrich" : "enriched"} · {r!.unchanged} unchanged · {r!.duplicates} duplicate identities · {r!.invalid} invalid · {r!.repeated} repeated · {r!.conflicts} existing-field differences preserved</p>
       {r!.review.length > 0 && <details><summary>Review {r!.review.length} flagged rows</summary><div className="max-h-40 overflow-auto">{r!.review.map((item, j) => <p key={j}>{item.tiktok}: {item.reason}</p>)}</div></details>}
     </div>)}
   </section>;
