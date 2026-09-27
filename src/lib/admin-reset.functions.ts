@@ -3,6 +3,13 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
+async function isExecutive(userId: string) {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { data } = await supabaseAdmin
+    .from("user_roles").select("role").eq("user_id", userId).eq("role", "executive").maybeSingle();
+  return !!data;
+}
+
 async function requireExecutive(userId: string) {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const { data } = await supabaseAdmin
@@ -31,7 +38,9 @@ async function actorMeta(userId: string) {
 export const getResetPreview = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    await requireExecutive(context.userId);
+    if (!(await isExecutive(context.userId))) {
+      return { gmailMessages: 0, gmailPollStates: 0, gmailConnections: 0, auditRows: 0 };
+    }
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const [messages, pollState, connections, audit] = await Promise.all([
       supabaseAdmin.from("gmail_messages").select("id", { count: "exact", head: true }),
@@ -118,7 +127,7 @@ export const runReset = createServerFn({ method: "POST" })
 export const listAuditLog = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    await requireExecutive(context.userId);
+    if (!(await isExecutive(context.userId))) return { rows: [] };
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data, error } = await supabaseAdmin
       .from("admin_audit_log")
