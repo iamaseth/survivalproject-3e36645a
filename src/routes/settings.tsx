@@ -296,8 +296,8 @@ function PortableBackupSection() {
       // Pin the source archive to the code checkpoint that introduced this backup format.
       // The archive itself is kept as a nested ZIP so the outer portable backup can be
       // assembled in-browser without adding a third-party ZIP dependency.
-      const codeRef = "75deaf542d1f85f313dab7a2281444e8818a088b";
-      const codeUrl = `https://codeload.github.com/iamaseth/survivalproject-3e36645a/zip/${codeRef}`;
+      const codeRef = "refs/heads/main";
+      const codeUrl = "https://codeload.github.com/iamaseth/survivalproject-3e36645a/zip/refs/heads/main";
       const codeResponse = await fetch(codeUrl);
       if (!codeResponse.ok) throw new Error(`Could not download GitHub source archive (HTTP ${codeResponse.status}).`);
       const codeBytes = new Uint8Array(await codeResponse.arrayBuffer());
@@ -318,7 +318,7 @@ function PortableBackupSection() {
         `Created: ${generatedAt}`,
         "",
         "database/survival-influencer-data.json = app database snapshot.",
-        "app/github-repository.zip = GitHub application source at the recorded commit.",
+        "app/github-repository.zip = GitHub application source from the main branch at backup time.",
         "backup-info.json = backup metadata and code commit.",
         "",
         "Security credentials, OAuth connection secrets, service-role keys and ingest tokens are not included.",
