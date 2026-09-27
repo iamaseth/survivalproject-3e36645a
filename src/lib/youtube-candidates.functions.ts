@@ -360,16 +360,25 @@ export type PipelineCounts = {
 export const getPipelineCounts = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }): Promise<PipelineCounts> => {
-    const { data: creators, error } = await context.supabase
-      .from("creators")
-      .select("id, email, subscriber_count")
-      .limit(20000);
-    if (error) throw new Error(error.message);
-    const rows = (creators ?? []) as unknown as Array<{
+    // Fetch every creator explicitly in pages. Supabase/PostgREST can cap a
+    // single response at 1,000 rows even when a larger .limit() is requested.
+    const rows: Array<{
       id: string;
       email: string | null;
       subscriber_count: number | null;
-    }>;
+    }> = [];
+    const pageSize = 1000;
+    for (let from = 0; ; from += pageSize) {
+      const { data: creators, error } = await context.supabase
+        .from("creators")
+        .select("id, email, subscriber_count")
+        .order("created_at", { ascending: true })
+        .range(from, from + pageSize - 1);
+      if (error) throw new Error(error.message);
+      const page = (creators ?? []) as unknown as typeof rows;
+      rows.push(...page);
+      if (page.length < pageSize) break;
+    }
 
     const { data: dnc } = await context.supabase
       .from("creator_workspace")
