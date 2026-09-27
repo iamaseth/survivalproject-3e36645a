@@ -106,7 +106,7 @@ export const importTikTokEnrichment = createServerFn({ method: "POST" })
       }
       if (!Object.keys(patch).length) { summary.unchanged++; continue; }
       if (!data.dryRun) {
-        const { error } = await context.supabase.from("creators").update(patch as never).eq("id", existing.id);
+        const { error } = await context.supabase.from("creators").update(patch as never).eq("id", existing.id as string);
         if (error) throw new Error(`Enrichment failed for ${key}: ${error.message}`);
       }
       summary.updated++;
