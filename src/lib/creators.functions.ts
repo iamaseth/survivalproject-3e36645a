@@ -9,12 +9,22 @@ export type CreatorDBRow = { id: string; name: string; [k: string]: Json };
 export const listCreators = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const { data, error } = await context.supabase
-      .from("creators")
-      .select("*")
-      .order("created_at", { ascending: true });
-    if (error) throw new Error(error.message);
-    return { rows: (data ?? []) as Array<Record<string, Json>> };
+    // Supabase/PostgREST returns at most 1,000 rows per request by default.
+    // Page explicitly so the CRM always hydrates the complete creators table.
+    const rows: Array<Record<string, Json>> = [];
+    const pageSize = 1000;
+    for (let from = 0; ; from += pageSize) {
+      const { data, error } = await context.supabase
+        .from("creators")
+        .select("*")
+        .order("created_at", { ascending: true })
+        .range(from, from + pageSize - 1);
+      if (error) throw new Error(error.message);
+      const page = (data ?? []) as Array<Record<string, Json>>;
+      rows.push(...page);
+      if (page.length < pageSize) break;
+    }
+    return { rows };
   });
 
 // DISABLED: the legacy hard-coded roster (ST-INF-001–250) must never be
