@@ -31,6 +31,7 @@ import {
 } from "@/lib/test-creators";
 import { Link as RouterLink } from "@tanstack/react-router";
 import { toast } from "sonner";
+import { exportPortableBackup } from "@/lib/portable-backup.functions";
 
 const GATEWAY_BASE_URL = "https://connector-gateway.lovable.dev";
 
@@ -58,6 +59,7 @@ function SettingsPage() {
       <ImportProspectsSection />
       <ImportCreatorsSection />
       <TestModeSection />
+      {isExecutive ? <PortableBackupSection /> : null}
       {isExecutive ? <DataManagementSection /> : <NonAdminDataManagementNote />}
     </div>
   );
@@ -234,6 +236,62 @@ function ProfileSection() {
           <div><span className="text-muted-foreground">Role:</span> {auth.profile.roleLabel}</div>
         </div>
       ) : null}
+    </section>
+  );
+}
+
+/* ---------------- Portable backup ---------------- */
+function PortableBackupSection() {
+  const exportBackup = useServerFn(exportPortableBackup);
+  const [busy, setBusy] = useState(false);
+
+  const download = async () => {
+    setBusy(true);
+    try {
+      const backup = await exportBackup();
+      const text = JSON.stringify(backup, null, 2);
+      const blob = new Blob([text], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const stamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `survival-influencer-full-backup-${stamp}.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 5_000);
+      toast.success("Full backup downloaded to this computer.");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Backup failed");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <section className="rounded-xl border border-border bg-card p-6">
+      <div className="flex items-start gap-4">
+        <div className="grid h-12 w-12 place-items-center rounded-lg bg-secondary">
+          <Download className="h-6 w-6 text-[color:var(--forest)]" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <h2 className="font-display text-lg">Backup to disk</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Download a dated portable backup of the app database to this computer. Creator records,
+            research, outreach state, templates, campaigns, BoBo progress and other operational data are included.
+            OAuth connection credentials and security tokens are intentionally excluded.
+          </p>
+          <button
+            onClick={() => void download()}
+            disabled={busy}
+            className="mt-4 inline-flex items-center gap-2 rounded-md bg-[color:var(--forest)] px-4 py-2 text-sm font-medium text-white hover:opacity-95 disabled:opacity-60"
+          >
+            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+            {busy ? "Preparing backup…" : "Download full backup"}
+          </button>
+          <p className="mt-2 text-xs text-muted-foreground">Keep this file somewhere safe. No live data is changed by downloading a backup.</p>
+        </div>
+      </div>
     </section>
   );
 }
