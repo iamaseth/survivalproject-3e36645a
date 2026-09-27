@@ -3,7 +3,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
-import { ChevronDown, ChevronRight, Copy, ExternalLink, Facebook, Globe, Image as ImageIcon, Instagram, Loader2, Mail, MessageCircle, Search, Youtube, X } from "lucide-react";
+import { ChevronDown, ChevronRight, Copy, Download, ExternalLink, Facebook, Globe, Image as ImageIcon, Instagram, Loader2, Mail, MessageCircle, Printer, Search, Youtube, X } from "lucide-react";
 import { CREATORS, type CreatorRow, useCreatorsVersion } from "@/lib/creator-partnerships";
 import { updateCreatorWorkflow } from "@/lib/creators.functions";
 import { externalLinkProps, outlookComposeUrl } from "@/lib/external-link";
@@ -134,7 +134,30 @@ function CreatorPipeline() {
     <div className="space-y-3">{STAGES.map((stage)=><StageSection key={stage.key} stage={stage} rows={grouped[stage.key]} open={openStages[stage.key]} toggle={()=>setOpenStages((s)=>({...s,[stage.key]:!s[stage.key]}))}/>)}<YouTubeCandidatesSection rows={ytRows} refresh={refreshYT}/></div>
   </div>;
 }
-function StageSection({stage,rows,open,toggle}:{stage:{key:StageKey;step:number;label:string;hint:string};rows:CreatorRow[];open:boolean;toggle:()=>void}) { return <section className="overflow-hidden rounded-xl border border-border bg-card"><button onClick={toggle} aria-expanded={open} className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-secondary/40">{open?<ChevronDown className="h-4 w-4"/>:<ChevronRight className="h-4 w-4"/>}<div className="grid h-7 w-7 place-items-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">{stage.step}</div><div className="min-w-0 flex-1"><div className="font-semibold">{stage.label} <span className="ml-1 text-sm font-normal text-muted-foreground">({rows.length})</span></div><div className="text-xs text-muted-foreground">{stage.hint}</div></div><span className="rounded-md border border-input bg-background px-2.5 py-1 text-xs font-medium text-foreground">{open?"Close":"Open"}</span></button>{open?<div className="border-t border-border">{rows.length===0?<div className="px-4 py-5 text-sm text-muted-foreground">Nothing here.</div>:null}{rows.map((creator)=><CreatorLine key={creator.id} creator={creator}/>)}</div>:null}</section>; }
+function StageSection({stage,rows,open,toggle}:{stage:{key:StageKey;step:number;label:string;hint:string};rows:CreatorRow[];open:boolean;toggle:()=>void}) {
+  const today=new Date().toISOString().slice(0,10);
+  const todaysConfirmed=stage.key==="contacted"?CREATORS.filter((creator)=>creator.contactedDate===today&&creator.responseFollowup!=="Contact confirmation pending"):[];
+  return <section className="overflow-hidden rounded-xl border border-border bg-card"><button onClick={toggle} aria-expanded={open} className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-secondary/40">{open?<ChevronDown className="h-4 w-4"/>:<ChevronRight className="h-4 w-4"/>}<div className="grid h-7 w-7 place-items-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">{stage.step}</div><div className="min-w-0 flex-1"><div className="font-semibold">{stage.label} <span className="ml-1 text-sm font-normal text-muted-foreground">({rows.length})</span></div><div className="text-xs text-muted-foreground">{stage.hint}</div></div><span className="rounded-md border border-input bg-background px-2.5 py-1 text-xs font-medium text-foreground">{open?"Close":"Open"}</span></button>{open?<div className="border-t border-border">{stage.key==="contacted"?<RenaDailyReport rows={todaysConfirmed} date={today}/>:null}{rows.length===0?<div className="px-4 py-5 text-sm text-muted-foreground">Nothing here.</div>:null}{rows.map((creator)=><CreatorLine key={creator.id} creator={creator}/>)}</div>:null}</section>;
+}
+
+function RenaDailyReport({rows,date}:{rows:CreatorRow[];date:string}) {
+  const safe=(value:string|null|undefined)=>String(value??"").replace(/"/g,'""').replace(/\r?\n/g," ");
+  const downloadCsv=()=>{
+    const header=["Creator","TikTok","Contact method","Contacted date","Notes","Rena follow-up / reply"];
+    const lines=[header,...rows.map((c)=>[c.name,c.tiktok??"",c.contactMethod??"",c.contactedDate??"",c.renaNotes??"",""])]
+      .map((row)=>row.map((value)=>`"${safe(value)}"`).join(","));
+    const blob=new Blob([lines.join("\n")],{type:"text/csv;charset=utf-8"});
+    const url=URL.createObjectURL(blob); const a=document.createElement("a"); a.href=url; a.download=`rena-outreach-${date}.csv`; a.click(); URL.revokeObjectURL(url);
+  };
+  const printReport=()=>{
+    const esc=(value:string|null|undefined)=>String(value??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+    const reportRows=rows.map((c)=>`<tr><td>${esc(c.name)}</td><td>${esc(c.tiktok)}</td><td>${esc(c.contactMethod)}</td><td>${esc(c.renaNotes)}</td><td class="write"></td></tr>`).join("");
+    const w=window.open("","_blank"); if(!w){toast.error("Allow pop-ups to print the report");return;}
+    w.document.write(`<!doctype html><html><head><title>Rena Outreach Report ${date}</title><style>@page{size:landscape;margin:12mm}body{font-family:Arial,sans-serif;color:#111}h1{font-size:20px;margin:0 0 4px}.meta{margin:0 0 14px;font-size:13px}table{width:100%;border-collapse:collapse;font-size:11px}th,td{border:1px solid #777;padding:6px;vertical-align:top}th{text-align:left;background:#eee}.write{min-width:170px;height:38px}a{color:#111}</style></head><body><h1>Survival Tabs — Creator Outreach Report</h1><div class="meta">${date} · Confirmed contacted: <strong>${rows.length}</strong></div><table><thead><tr><th>Creator</th><th>TikTok</th><th>Method</th><th>Notes</th><th>Rena follow-up / reply</th></tr></thead><tbody>${reportRows||'<tr><td colspan="5">No confirmed contacts today.</td></tr>'}</tbody></table><script>window.onload=()=>window.print()<\/script></body></html>`);
+    w.document.close();
+  };
+  return <div className="border-b border-border bg-secondary/20 px-4 py-3 print:hidden"><div className="flex flex-wrap items-center justify-between gap-3"><div><div className="font-semibold">Rena daily outreach sheet</div><div className="text-xs text-muted-foreground">{date} · {rows.length} confirmed sent today. Only ✓ Sent confirmations are included.</div></div><div className="flex gap-2"><button type="button" onClick={printReport} className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground"><Printer className="h-4 w-4"/> View / Print</button><button type="button" onClick={downloadCsv} className="inline-flex items-center gap-1.5 rounded-md border border-input bg-background px-3 py-2 text-sm font-medium hover:bg-secondary"><Download className="h-4 w-4"/> Download CSV</button></div></div></div>;
+}
 
 function ExternalButton({href,children,className}:{href:string;children:React.ReactNode;className?:string}) { return <a {...externalLinkProps(href)} className={className}>{children}</a>; }
 
