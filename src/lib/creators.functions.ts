@@ -105,7 +105,7 @@ export const importCreators = createServerFn({ method: "POST" })
 
     const existing = new Set<string>();
     for (const row of existingRows ?? []) {
-      creatorImportKeys(row as CreatorImportRow).forEach((key) => existing.add(key));
+      creatorImportKeys(row as unknown as CreatorImportRow).forEach((key) => existing.add(key));
     }
 
     let skipped = 0;

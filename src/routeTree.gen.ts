@@ -13,6 +13,7 @@ import { Route as WebsiteRouteImport } from './routes/website'
 import { Route as VideoRouteImport } from './routes/video'
 import { Route as TemplatesRouteImport } from './routes/templates'
 import { Route as TeamActionsRouteImport } from './routes/team-actions'
+import { Route as SocialAccountsRouteImport } from './routes/social-accounts'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as SeoRouteImport } from './routes/seo'
 import { Route as ReviewedSurvivalTabsMreRouteImport } from './routes/reviewed-survival-tabs-mre'
@@ -28,6 +29,7 @@ import { Route as CommunicationsRouteImport } from './routes/communications'
 import { Route as CommentsRouteImport } from './routes/comments'
 import { Route as ClassificationImportRouteImport } from './routes/classification-import'
 import { Route as CampaignsRouteImport } from './routes/campaigns'
+import { Route as BoboSearchRouteImport } from './routes/bobo-search'
 import { Route as BoboRouteImport } from './routes/bobo'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AssetsRouteImport } from './routes/assets'
@@ -65,6 +67,11 @@ const TemplatesRoute = TemplatesRouteImport.update({
 const TeamActionsRoute = TeamActionsRouteImport.update({
   id: '/team-actions',
   path: '/team-actions',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SocialAccountsRoute = SocialAccountsRouteImport.update({
+  id: '/social-accounts',
+  path: '/social-accounts',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SettingsRoute = SettingsRouteImport.update({
@@ -140,6 +147,11 @@ const ClassificationImportRoute = ClassificationImportRouteImport.update({
 const CampaignsRoute = CampaignsRouteImport.update({
   id: '/campaigns',
   path: '/campaigns',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const BoboSearchRoute = BoboSearchRouteImport.update({
+  id: '/bobo-search',
+  path: '/bobo-search',
   getParentRoute: () => rootRouteImport,
 } as any)
 const BoboRoute = BoboRouteImport.update({
@@ -248,6 +260,7 @@ export interface FileRoutesByFullPath {
   '/assets': typeof AssetsRouteWithChildren
   '/auth': typeof AuthRoute
   '/bobo': typeof BoboRoute
+  '/bobo-search': typeof BoboSearchRoute
   '/campaigns': typeof CampaignsRoute
   '/classification-import': typeof ClassificationImportRoute
   '/comments': typeof CommentsRoute
@@ -263,6 +276,7 @@ export interface FileRoutesByFullPath {
   '/reviewed-survival-tabs-mre': typeof ReviewedSurvivalTabsMreRoute
   '/seo': typeof SeoRoute
   '/settings': typeof SettingsRoute
+  '/social-accounts': typeof SocialAccountsRoute
   '/team-actions': typeof TeamActionsRoute
   '/templates': typeof TemplatesRoute
   '/video': typeof VideoRoute
@@ -287,6 +301,7 @@ export interface FileRoutesByTo {
   '/assets': typeof AssetsRouteWithChildren
   '/auth': typeof AuthRoute
   '/bobo': typeof BoboRoute
+  '/bobo-search': typeof BoboSearchRoute
   '/campaigns': typeof CampaignsRoute
   '/classification-import': typeof ClassificationImportRoute
   '/comments': typeof CommentsRoute
@@ -302,6 +317,7 @@ export interface FileRoutesByTo {
   '/reviewed-survival-tabs-mre': typeof ReviewedSurvivalTabsMreRoute
   '/seo': typeof SeoRoute
   '/settings': typeof SettingsRoute
+  '/social-accounts': typeof SocialAccountsRoute
   '/team-actions': typeof TeamActionsRoute
   '/templates': typeof TemplatesRoute
   '/video': typeof VideoRoute
@@ -327,6 +343,7 @@ export interface FileRoutesById {
   '/assets': typeof AssetsRouteWithChildren
   '/auth': typeof AuthRoute
   '/bobo': typeof BoboRoute
+  '/bobo-search': typeof BoboSearchRoute
   '/campaigns': typeof CampaignsRoute
   '/classification-import': typeof ClassificationImportRoute
   '/comments': typeof CommentsRoute
@@ -342,6 +359,7 @@ export interface FileRoutesById {
   '/reviewed-survival-tabs-mre': typeof ReviewedSurvivalTabsMreRoute
   '/seo': typeof SeoRoute
   '/settings': typeof SettingsRoute
+  '/social-accounts': typeof SocialAccountsRoute
   '/team-actions': typeof TeamActionsRoute
   '/templates': typeof TemplatesRoute
   '/video': typeof VideoRoute
@@ -368,6 +386,7 @@ export interface FileRouteTypes {
     | '/assets'
     | '/auth'
     | '/bobo'
+    | '/bobo-search'
     | '/campaigns'
     | '/classification-import'
     | '/comments'
@@ -383,6 +402,7 @@ export interface FileRouteTypes {
     | '/reviewed-survival-tabs-mre'
     | '/seo'
     | '/settings'
+    | '/social-accounts'
     | '/team-actions'
     | '/templates'
     | '/video'
@@ -407,6 +427,7 @@ export interface FileRouteTypes {
     | '/assets'
     | '/auth'
     | '/bobo'
+    | '/bobo-search'
     | '/campaigns'
     | '/classification-import'
     | '/comments'
@@ -422,6 +443,7 @@ export interface FileRouteTypes {
     | '/reviewed-survival-tabs-mre'
     | '/seo'
     | '/settings'
+    | '/social-accounts'
     | '/team-actions'
     | '/templates'
     | '/video'
@@ -446,6 +468,7 @@ export interface FileRouteTypes {
     | '/assets'
     | '/auth'
     | '/bobo'
+    | '/bobo-search'
     | '/campaigns'
     | '/classification-import'
     | '/comments'
@@ -461,6 +484,7 @@ export interface FileRouteTypes {
     | '/reviewed-survival-tabs-mre'
     | '/seo'
     | '/settings'
+    | '/social-accounts'
     | '/team-actions'
     | '/templates'
     | '/video'
@@ -486,6 +510,7 @@ export interface RootRouteChildren {
   AssetsRoute: typeof AssetsRouteWithChildren
   AuthRoute: typeof AuthRoute
   BoboRoute: typeof BoboRoute
+  BoboSearchRoute: typeof BoboSearchRoute
   CampaignsRoute: typeof CampaignsRoute
   ClassificationImportRoute: typeof ClassificationImportRoute
   CommentsRoute: typeof CommentsRoute
@@ -501,6 +526,7 @@ export interface RootRouteChildren {
   ReviewedSurvivalTabsMreRoute: typeof ReviewedSurvivalTabsMreRoute
   SeoRoute: typeof SeoRoute
   SettingsRoute: typeof SettingsRoute
+  SocialAccountsRoute: typeof SocialAccountsRoute
   TeamActionsRoute: typeof TeamActionsRoute
   TemplatesRoute: typeof TemplatesRoute
   VideoRoute: typeof VideoRoute
@@ -540,6 +566,13 @@ declare module '@tanstack/react-router' {
       path: '/team-actions'
       fullPath: '/team-actions'
       preLoaderRoute: typeof TeamActionsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/social-accounts': {
+      id: '/social-accounts'
+      path: '/social-accounts'
+      fullPath: '/social-accounts'
+      preLoaderRoute: typeof SocialAccountsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/settings': {
@@ -645,6 +678,13 @@ declare module '@tanstack/react-router' {
       path: '/campaigns'
       fullPath: '/campaigns'
       preLoaderRoute: typeof CampaignsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/bobo-search': {
+      id: '/bobo-search'
+      path: '/bobo-search'
+      fullPath: '/bobo-search'
+      preLoaderRoute: typeof BoboSearchRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/bobo': {
@@ -823,6 +863,7 @@ const rootRouteChildren: RootRouteChildren = {
   AssetsRoute: AssetsRouteWithChildren,
   AuthRoute: AuthRoute,
   BoboRoute: BoboRoute,
+  BoboSearchRoute: BoboSearchRoute,
   CampaignsRoute: CampaignsRoute,
   ClassificationImportRoute: ClassificationImportRoute,
   CommentsRoute: CommentsRoute,
@@ -838,6 +879,7 @@ const rootRouteChildren: RootRouteChildren = {
   ReviewedSurvivalTabsMreRoute: ReviewedSurvivalTabsMreRoute,
   SeoRoute: SeoRoute,
   SettingsRoute: SettingsRoute,
+  SocialAccountsRoute: SocialAccountsRoute,
   TeamActionsRoute: TeamActionsRoute,
   TemplatesRoute: TemplatesRoute,
   VideoRoute: VideoRoute,

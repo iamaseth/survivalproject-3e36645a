@@ -17,9 +17,9 @@ const platforms: SocialPlatform[] = ["tiktok", "facebook", "instagram", "youtube
 export const listSocialAccounts = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const { data, error } = await context.supabase.from("social_accounts").select("platform,profile_url,account_handle,account_owner,purpose,connection_status,notes,updated_at");
+    const { data, error } = await (context.supabase as any).from("social_accounts").select("platform,profile_url,account_handle,account_owner,purpose,connection_status,notes,updated_at");
     if (error) throw new Error(error.message);
-    return { accounts: (data ?? []) as SocialAccount[] };
+    return { accounts: (data ?? []) as unknown as SocialAccount[] };
   });
 
 export const saveSocialAccount = createServerFn({ method: "POST" })
@@ -44,7 +44,7 @@ export const saveSocialAccount = createServerFn({ method: "POST" })
   })
   .handler(async ({ data, context }) => {
     const { platform, profile_url, account_handle, account_owner, purpose, connection_status, notes } = data;
-    const { error } = await context.supabase.from("social_accounts").upsert({
+    const { error } = await (context.supabase as any).from("social_accounts").upsert({
       platform, profile_url, account_handle, account_owner, purpose, connection_status, notes,
       updated_by: context.userId, updated_at: new Date().toISOString(),
     } as never, { onConflict: "platform" });
