@@ -241,6 +241,47 @@ function ProfileSection() {
 }
 
 /* ---------------- Portable backup ---------------- */
+function crc32(bytes: Uint8Array) {
+  let crc = 0xffffffff;
+  for (const byte of bytes) {
+    crc ^= byte;
+    for (let i = 0; i < 8; i += 1) crc = (crc >>> 1) ^ (0xedb88320 & -(crc & 1));
+  }
+  return (crc ^ 0xffffffff) >>> 0;
+}
+
+function makePortableZip(files: Array<{ name: string; bytes: Uint8Array }>) {
+  const enc = new TextEncoder();
+  const chunks: Uint8Array[] = [];
+  const central: Uint8Array[] = [];
+  let offset = 0;
+  const u16 = (v: number) => [v & 255, (v >>> 8) & 255];
+  const u32 = (v: number) => [v & 255, (v >>> 8) & 255, (v >>> 16) & 255, (v >>> 24) & 255];
+
+  for (const file of files) {
+    const name = enc.encode(file.name);
+    const crc = crc32(file.bytes);
+    const local = new Uint8Array([
+      ...u32(0x04034b50), ...u16(20), ...u16(0), ...u16(0), ...u16(0), ...u16(0),
+      ...u32(crc), ...u32(file.bytes.length), ...u32(file.bytes.length), ...u16(name.length), ...u16(0), ...name,
+    ]);
+    chunks.push(local, file.bytes);
+    const cd = new Uint8Array([
+      ...u32(0x02014b50), ...u16(20), ...u16(20), ...u16(0), ...u16(0), ...u16(0), ...u16(0),
+      ...u32(crc), ...u32(file.bytes.length), ...u32(file.bytes.length), ...u16(name.length), ...u16(0),
+      ...u16(0), ...u16(0), ...u16(0), ...u32(0), ...u32(offset), ...name,
+    ]);
+    central.push(cd);
+    offset += local.length + file.bytes.length;
+  }
+  const centralSize = central.reduce((n, x) => n + x.length, 0);
+  const end = new Uint8Array([
+    ...u32(0x06054b50), ...u16(0), ...u16(0), ...u16(files.length), ...u16(files.length),
+    ...u32(centralSize), ...u32(offset), ...u16(0),
+  ]);
+  return new Blob([...chunks, ...central, end], { type: "application/zip" });
+}
+
 function PortableBackupSection() {
   const exportBackup = useServerFn(exportPortableBackup);
   const [busy, setBusy] = useState(false);
@@ -248,19 +289,60 @@ function PortableBackupSection() {
   const download = async () => {
     setBusy(true);
     try {
+      const generatedAt = new Date().toISOString();
       const backup = await exportBackup();
-      const text = JSON.stringify(backup, null, 2);
-      const blob = new Blob([text], { type: "application/json" });
-      const url = URL.createObjectURL(blob);
-      const stamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+      const encoder = new TextEncoder();
+
+      // Pin the source archive to the code checkpoint that introduced this backup format.
+      // The archive itself is kept as a nested ZIP so the outer portable backup can be
+      // assembled in-browser without adding a third-party ZIP dependency.
+      const codeRef = "75deaf542d1f85f313dab7a2281444e8818a088b";
+      const codeUrl = `https://codeload.github.com/iamaseth/survivalproject-3e36645a/zip/${codeRef}`;
+      const codeResponse = await fetch(codeUrl);
+      if (!codeResponse.ok) throw new Error(`Could not download GitHub source archive (HTTP ${codeResponse.status}).`);
+      const codeBytes = new Uint8Array(await codeResponse.arrayBuffer());
+
+      const info = {
+        format: "survival-influencer-full-portable-backup",
+        version: 2,
+        generatedAt,
+        repository: "iamaseth/survivalproject-3e36645a",
+        codeRef,
+        databaseFile: "database/survival-influencer-data.json",
+        codeFile: "app/github-repository.zip",
+        secretsExcluded: true,
+      };
+      const readme = [
+        "SURVIVAL INFLUENCER — PORTABLE BACKUP",
+        "",
+        `Created: ${generatedAt}`,
+        "",
+        "database/survival-influencer-data.json = app database snapshot.",
+        "app/github-repository.zip = GitHub application source at the recorded commit.",
+        "backup-info.json = backup metadata and code commit.",
+        "",
+        "Security credentials, OAuth connection secrets, service-role keys and ingest tokens are not included.",
+        "Keep this ZIP in a safe place.",
+        "",
+        "Restore should be performed through the app restore workflow or by an administrator after reviewing conflicts.",
+      ].join("\n");
+
+      const zip = makePortableZip([
+        { name: "database/survival-influencer-data.json", bytes: encoder.encode(JSON.stringify(backup, null, 2)) },
+        { name: "app/github-repository.zip", bytes: codeBytes },
+        { name: "backup-info.json", bytes: encoder.encode(JSON.stringify(info, null, 2)) },
+        { name: "README-RESTORE.txt", bytes: encoder.encode(readme) },
+      ]);
+      const url = URL.createObjectURL(zip);
+      const stamp = generatedAt.slice(0, 10);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `survival-influencer-full-backup-${stamp}.json`;
+      a.download = `Survival-Influencer-Backup-${stamp}.zip`;
       document.body.appendChild(a);
       a.click();
       a.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 5_000);
-      toast.success("Full backup downloaded to this computer.");
+      setTimeout(() => URL.revokeObjectURL(url), 10_000);
+      toast.success("Full app + database ZIP backup downloaded.");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Backup failed");
     } finally {
@@ -277,9 +359,8 @@ function PortableBackupSection() {
         <div className="min-w-0 flex-1">
           <h2 className="font-display text-lg">Backup to disk</h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Download a dated portable backup of the app database to this computer. Creator records,
-            research, outreach state, templates, campaigns, BoBo progress and other operational data are included.
-            OAuth connection credentials and security tokens are intentionally excluded.
+            Download one portable ZIP containing both the GitHub application source and a full database snapshot.
+            The ZIP also includes backup metadata and restore instructions. Security credentials and tokens are excluded.
           </p>
           <button
             onClick={() => void download()}
@@ -287,9 +368,9 @@ function PortableBackupSection() {
             className="mt-4 inline-flex items-center gap-2 rounded-md bg-[color:var(--forest)] px-4 py-2 text-sm font-medium text-white hover:opacity-95 disabled:opacity-60"
           >
             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-            {busy ? "Preparing backup…" : "Download full backup"}
+            {busy ? "Building ZIP backup…" : "Download full ZIP backup"}
           </button>
-          <p className="mt-2 text-xs text-muted-foreground">Keep this file somewhere safe. No live data is changed by downloading a backup.</p>
+          <p className="mt-2 text-xs text-muted-foreground">Includes app code + database data. Downloading does not change live data.</p>
         </div>
       </div>
     </section>
