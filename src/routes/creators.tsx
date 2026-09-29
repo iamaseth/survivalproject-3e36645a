@@ -3,9 +3,9 @@ import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
-import { ChevronDown, ChevronRight, Copy, Download, ExternalLink, Facebook, Globe, Image as ImageIcon, Instagram, Loader2, Mail, MessageCircle, Printer, Search, Youtube, X } from "lucide-react";
+import { ChevronDown, ChevronRight, Copy, Download, ExternalLink, Facebook, Globe, Image as ImageIcon, Instagram, Loader2, Mail, MessageCircle, Printer, Search, Upload, Youtube, X } from "lucide-react";
 import { CREATORS, type CreatorRow, useCreatorsVersion } from "@/lib/creator-partnerships";
-import { updateCreatorWorkflow } from "@/lib/creators.functions";
+import { importCreatorPersonalization, updateCreatorWorkflow } from "@/lib/creators.functions";
 import { externalLinkProps, outlookComposeUrl } from "@/lib/external-link";
 import { listEmailTemplates } from "@/lib/templates.functions";
 import { applyMergeFields, mergeContextForCreator, orderTemplatesForCreator, type EmailTemplate } from "@/lib/templates";
@@ -103,6 +103,8 @@ function CreatorPipeline() {
   const [contactFilter, setContactFilter] = useState<ContactFilter>("all");
   const [nicheFilter, setNicheFilter] = useState("all");
   const [personalizationOpen,setPersonalizationOpen]=useState(false);
+  const [personalizationImporting,setPersonalizationImporting]=useState(false);
+  const importPersonalization=useServerFn(importCreatorPersonalization);
   const [openStages, setOpenStages] = useState<Record<StageKey, boolean>>({ not_contacted: false, confirm_contact: false, contacted: false, follow_up: false, responded: false, sample: false });
   const nicheOptions = useMemo(() => [...new Set(CREATORS.map(nicheLabel))].sort((a,b)=>a.localeCompare(b)), [version]);
   const creators = useMemo(() => {
@@ -126,6 +128,45 @@ function CreatorPipeline() {
     const lines=[header,...batch.map((x)=>[x.id,x.name,x.email??"",x.tiktok??"",x.youtube??"",x.instagram??"",x.facebook??"",x.amazon??"",x.otherPlatform??x.contactRoute??"",nicheLabel(x),x.researchNotes??"","Needs Personalization","","","",""])].map(row=>row.map(v=>`"${safe(v)}"`).join(","));
     const blob=new Blob([lines.join("\n")],{type:"text/csv;charset=utf-8"}); const url=URL.createObjectURL(blob); const a=document.createElement("a"); a.href=url; a.download=`survival-tabs-personalization-next-${batch.length}.csv`; a.click(); URL.revokeObjectURL(url);
   };
+  const importPersonalizationCsv = async (file: File) => {
+    setPersonalizationImporting(true);
+    try {
+      const text = await file.text();
+      const parsed: string[][] = [];
+      let row: string[] = [], field = "", quoted = false;
+      for (let i = 0; i < text.length; i++) {
+        const ch = text[i];
+        if (quoted) {
+          if (ch === '"' && text[i + 1] === '"') { field += '"'; i++; }
+          else if (ch === '"') quoted = false;
+          else field += ch;
+        } else if (ch === '"') quoted = true;
+        else if (ch === ",") { row.push(field); field = ""; }
+        else if (ch === "\n") { row.push(field.replace(/\r$/, "")); parsed.push(row); row = []; field = ""; }
+        else field += ch;
+      }
+      if (field.length || row.length) { row.push(field.replace(/\r$/, "")); parsed.push(row); }
+      const header = (parsed.shift() ?? []).map((h) => h.replace(/^\uFEFF/, "").trim());
+      const col = (name: string) => header.indexOf(name);
+      const required = ["Creator ID", "Personalized DM", "Personalized Email Subject", "Personalized Email Body", "Personalization Source"];
+      if (required.some((name) => col(name) < 0)) throw new Error("This is not a Survival Tabs personalization CSV.");
+      const rows = parsed.filter((r) => r.some((v) => v.trim())).map((r) => ({
+        id: r[col("Creator ID")]?.trim() ?? "",
+        personalized_dm: r[col("Personalized DM")] ?? "",
+        personalized_email_subject: r[col("Personalized Email Subject")] ?? "",
+        personalized_email_body: r[col("Personalized Email Body")] ?? "",
+        personalization_source: r[col("Personalization Source")] ?? "",
+      }));
+      if (!rows.length) throw new Error("No creator rows found in the CSV.");
+      const result = await importPersonalization({ data: { rows } });
+      toast.success(`Personalization imported: ${result.updated} updated, ${result.skipped} skipped.`);
+      window.location.reload();
+    } catch (e: any) {
+      toast.error(e?.message ?? "Could not import personalization CSV");
+    } finally {
+      setPersonalizationImporting(false);
+    }
+  };
   const { rows: ytRows, totals, refresh: refreshYT } = useYouTubePipeline();
   return <div className="mx-auto max-w-[1500px]">
     <div className="mb-4 flex flex-wrap items-end justify-between gap-3"><div><div className="text-[11px] uppercase tracking-[0.18em] text-[color:var(--gold)]">Creator outreach</div><h1 className="font-display text-3xl text-foreground">Creators</h1></div><div className="flex gap-2"><Link to="/creators/outreach" className="rounded-md border border-input bg-background px-3 py-2 text-sm hover:bg-secondary">Bulk outreach queue</Link><Link to="/amazon-creators" className="rounded-md border border-input bg-background px-3 py-2 text-sm hover:bg-secondary">Amazon creators</Link></div></div>
@@ -142,7 +183,7 @@ function CreatorPipeline() {
       </div>
       <div className="mt-2 text-xs text-muted-foreground">Showing {creators.length} of {CREATORS.length} creators. Platform describes where they publish; contact method describes how Rena can reach them.</div>
     </div>
-    <div className="space-y-3"><section className="overflow-hidden rounded-xl border border-border bg-card"><button onClick={()=>setPersonalizationOpen(v=>!v)} aria-expanded={personalizationOpen} className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-secondary/40">{personalizationOpen?<ChevronDown className="h-4 w-4"/>:<ChevronRight className="h-4 w-4"/>}<div className="grid h-7 w-7 place-items-center rounded-full bg-[color:var(--gold)] text-xs font-semibold text-white">P</div><div className="min-w-0 flex-1"><div className="font-semibold">Needs Personalization <span className="ml-1 text-sm font-normal text-muted-foreground">({needsPersonalization.length})</span></div><div className="text-xs text-muted-foreground">Not-contacted creators without a saved personalized DM or email.</div></div><span className="rounded-md border border-input bg-background px-2.5 py-1 text-xs font-medium">{personalizationOpen?"Close":"Open"}</span></button>{personalizationOpen?<div className="border-t border-border p-4"><div className="flex flex-wrap items-center justify-between gap-3"><div className="text-sm"><strong>{needsPersonalization.length}</strong> creators are waiting for personalization. Export a manageable batch, enrich it, then import the completed master data.</div><div className="flex gap-2"><button disabled={!needsPersonalization.length} onClick={()=>exportPersonalization(100)} className="inline-flex items-center gap-1.5 rounded-md border border-input bg-background px-3 py-2 text-sm font-medium hover:bg-secondary disabled:opacity-50"><Download className="h-4 w-4"/> Export next 100</button><button disabled={!needsPersonalization.length} onClick={()=>exportPersonalization(200)} className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"><Download className="h-4 w-4"/> Export next 200</button></div></div></div>:null}</section>{STAGES.map((stage)=><StageSection key={stage.key} stage={stage} rows={grouped[stage.key]} open={openStages[stage.key]} toggle={()=>setOpenStages((s)=>({...s,[stage.key]:!s[stage.key]}))}/>)}<YouTubeCandidatesSection rows={ytRows} refresh={refreshYT}/></div>
+    <div className="space-y-3"><section className="overflow-hidden rounded-xl border border-border bg-card"><button onClick={()=>setPersonalizationOpen(v=>!v)} aria-expanded={personalizationOpen} className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-secondary/40">{personalizationOpen?<ChevronDown className="h-4 w-4"/>:<ChevronRight className="h-4 w-4"/>}<div className="grid h-7 w-7 place-items-center rounded-full bg-[color:var(--gold)] text-xs font-semibold text-white">P</div><div className="min-w-0 flex-1"><div className="font-semibold">Needs Personalization <span className="ml-1 text-sm font-normal text-muted-foreground">({needsPersonalization.length})</span></div><div className="text-xs text-muted-foreground">Not-contacted creators without a saved personalized DM or email.</div></div><span className="rounded-md border border-input bg-background px-2.5 py-1 text-xs font-medium">{personalizationOpen?"Close":"Open"}</span></button>{personalizationOpen?<div className="border-t border-border p-4"><div className="flex flex-wrap items-center justify-between gap-3"><div className="text-sm"><strong>{needsPersonalization.length}</strong> creators are waiting for personalization. Export a manageable batch, enrich it, then import the completed master data.</div><div className="flex flex-wrap gap-2"><label className={`inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-input bg-background px-3 py-2 text-sm font-medium hover:bg-secondary ${personalizationImporting ? "pointer-events-none opacity-50" : ""}`}><Upload className="h-4 w-4"/>{personalizationImporting ? "Importing…" : "Import Personalized Outreach"}<input type="file" accept=".csv,text/csv" className="hidden" disabled={personalizationImporting} onChange={(e)=>{const file=e.target.files?.[0]; if(file) void importPersonalizationCsv(file); e.currentTarget.value="";}}/></label><button disabled={!needsPersonalization.length} onClick={()=>exportPersonalization(100)} className="inline-flex items-center gap-1.5 rounded-md border border-input bg-background px-3 py-2 text-sm font-medium hover:bg-secondary disabled:opacity-50"><Download className="h-4 w-4"/> Export next 100</button><button disabled={!needsPersonalization.length} onClick={()=>exportPersonalization(200)} className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"><Download className="h-4 w-4"/> Export next 200</button></div></div></div>:null}</section>{STAGES.map((stage)=><StageSection key={stage.key} stage={stage} rows={grouped[stage.key]} open={openStages[stage.key]} toggle={()=>setOpenStages((s)=>({...s,[stage.key]:!s[stage.key]}))}/>)}<YouTubeCandidatesSection rows={ytRows} refresh={refreshYT}/></div>
   </div>;
 }
 function StageSection({stage,rows,open,toggle}:{stage:{key:StageKey;step:number;label:string;hint:string};rows:CreatorRow[];open:boolean;toggle:()=>void}) {
