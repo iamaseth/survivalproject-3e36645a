@@ -81,6 +81,10 @@ export interface CreatorRow {
   partnershipTier: string | null;
   offerConfidence: string | null;
   offerReasoning: string | null;
+  personalizedDm: string | null;
+  personalizedEmailSubject: string | null;
+  personalizedEmailBody: string | null;
+  personalizationSource: string | null;
 
   // Derived / workflow additions
   supervisor: "RENA";
@@ -406,6 +410,10 @@ function rowToCreator(r: Record<string, unknown>): CreatorRow {
     partnershipTier: (r.partnership_tier as string | null) ?? null,
     offerConfidence: (r.offer_confidence as string | null) ?? null,
     offerReasoning: (r.offer_reasoning as string | null) ?? null,
+    personalizedDm: (r.personalized_dm as string | null) ?? null,
+    personalizedEmailSubject: (r.personalized_email_subject as string | null) ?? null,
+    personalizedEmailBody: (r.personalized_email_body as string | null) ?? null,
+    personalizationSource: (r.personalization_source as string | null) ?? null,
     supervisor: "RENA" as const,
     perryApproval: normPerry((r.perry_comments as string | null) ?? null),
     responseState,
