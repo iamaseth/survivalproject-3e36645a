@@ -279,7 +279,7 @@ function makePortableZip(files: Array<{ name: string; bytes: Uint8Array }>) {
     ...u32(0x06054b50), ...u16(0), ...u16(0), ...u16(files.length), ...u16(files.length),
     ...u32(centralSize), ...u32(offset), ...u16(0),
   ]);
-  return new Blob([...chunks, ...central, end], { type: "application/zip" });
+  return new Blob([...chunks, ...central, end] as BlobPart[], { type: "application/zip" });
 }
 
 function PortableBackupSection() {

@@ -16,14 +16,18 @@ const BACKUP_TABLES = [
 export const exportPortableBackup = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    if (context.profile?.role !== "executive") throw new Error("Executive role required to export a full backup.");
+    const { data: roleRow } = await context.supabase
+      .from("user_roles").select("role").eq("user_id", context.userId).eq("role", "executive").maybeSingle();
+    if (!roleRow) throw new Error("Executive role required to export a full backup.");
 
-    const tables: Record<string, unknown[]> = {};
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const tables: Record<string, any[]> = {};
     const counts: Record<string, number> = {};
     const pageSize = 1000;
 
     for (const table of BACKUP_TABLES) {
-      const rows: unknown[] = [];
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const rows: any[] = [];
       for (let from = 0; ; from += pageSize) {
         const { data, error } = await context.supabase
           .from(table)
