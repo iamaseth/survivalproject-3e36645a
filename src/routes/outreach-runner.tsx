@@ -62,16 +62,18 @@ function OutreachRunner() {
   const eligible = useMemo(() => {
     void version;
     return CREATORS.filter((c) => {
+      // The CRM screenshot's 212 Ready count is with its current creator filters applied:
+      // TikTok + all contact methods + all niches. Mirror that filtered CRM view
+      // exactly, then require a DM body because this runner pastes TikTok DMs.
       const personalizationReady = Boolean(c.personalizedDm?.trim() || c.personalizedEmailBody?.trim());
       const sampleStage = c.normalizedSampleStatus !== "Not Sent" && c.normalizedSampleStatus !== "Refused";
       const respondedStage = c.responseState === "Replied — Interested" || c.responseState === "Replied — Declined";
-      const readyToContact =
+      const stageNotContacted =
         !sampleStage &&
         !respondedStage &&
         !c.contactedDate &&
-        c.responseFollowup !== "Contact confirmation pending" &&
-        personalizationReady;
-      return Boolean(readyToContact && c.tiktok && c.personalizedDm?.trim());
+        c.responseFollowup !== "Contact confirmation pending";
+      return Boolean(c.tiktok && stageNotContacted && personalizationReady && c.personalizedDm?.trim());
     }).sort((a, b) => a.name.localeCompare(b.name));
   }, [version]);
 
