@@ -67,9 +67,7 @@ function OutreachRunner() {
   const eligible = useMemo(() => {
     void version;
     return CREATORS.filter((c) =>
-      // The CRM Ready-to-Contact handoff is the only authority.
-      // Direct/sidebar visits intentionally produce an empty queue.
-      Boolean(readyIds?.has(c.id)) &&
+      (readyIds ? readyIds.has(c.id) : creatorReadyToContact(c)) &&
       Boolean(c.tiktok && c.personalizedDm?.trim())
     ).sort((a, b) => a.name.localeCompare(b.name));
   }, [version, readyIds]);
