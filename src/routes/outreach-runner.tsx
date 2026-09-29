@@ -67,9 +67,9 @@ function OutreachRunner() {
   const eligible = useMemo(() => {
     void version;
     return CREATORS.filter((c) =>
-      // When launched from the CRM, its Ready-to-Contact IDs are authoritative.
-      // Direct visits fall back to the shared selector.
-      (readyIds ? readyIds.has(c.id) : creatorReadyToContact(c)) &&
+      // The CRM Ready-to-Contact handoff is the only authority.
+      // Direct/sidebar visits intentionally produce an empty queue.
+      Boolean(readyIds?.has(c.id)) &&
       Boolean(c.tiktok && c.personalizedDm?.trim())
     ).sort((a, b) => a.name.localeCompare(b.name));
   }, [version, readyIds]);
