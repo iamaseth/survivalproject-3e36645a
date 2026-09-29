@@ -59,6 +59,7 @@ const navItems: NavItem[] = [
     icon: Send,
     children: [
       { to: "/communications", label: "Communications" },
+      { to: "/outreach-runner", label: "Outreach Runner" },
     ],
   },
   { to: "/templates", label: "Templates", icon: FileText },

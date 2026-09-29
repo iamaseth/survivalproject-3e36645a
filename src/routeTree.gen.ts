@@ -19,6 +19,7 @@ import { Route as SeoRouteImport } from './routes/seo'
 import { Route as ReviewedSurvivalTabsMreRouteImport } from './routes/reviewed-survival-tabs-mre'
 import { Route as ReviewRouteImport } from './routes/review'
 import { Route as PreparednessBookRouteImport } from './routes/preparedness-book'
+import { Route as OutreachRunnerRouteImport } from './routes/outreach-runner'
 import { Route as LeadsRouteImport } from './routes/leads'
 import { Route as KnowledgeRouteImport } from './routes/knowledge'
 import { Route as EmailRouteImport } from './routes/email'
@@ -97,6 +98,11 @@ const ReviewRoute = ReviewRouteImport.update({
 const PreparednessBookRoute = PreparednessBookRouteImport.update({
   id: '/preparedness-book',
   path: '/preparedness-book',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OutreachRunnerRoute = OutreachRunnerRouteImport.update({
+  id: '/outreach-runner',
+  path: '/outreach-runner',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LeadsRoute = LeadsRouteImport.update({
@@ -271,6 +277,7 @@ export interface FileRoutesByFullPath {
   '/email': typeof EmailRoute
   '/knowledge': typeof KnowledgeRouteWithChildren
   '/leads': typeof LeadsRoute
+  '/outreach-runner': typeof OutreachRunnerRoute
   '/preparedness-book': typeof PreparednessBookRoute
   '/review': typeof ReviewRoute
   '/reviewed-survival-tabs-mre': typeof ReviewedSurvivalTabsMreRoute
@@ -312,6 +319,7 @@ export interface FileRoutesByTo {
   '/email': typeof EmailRoute
   '/knowledge': typeof KnowledgeRouteWithChildren
   '/leads': typeof LeadsRoute
+  '/outreach-runner': typeof OutreachRunnerRoute
   '/preparedness-book': typeof PreparednessBookRoute
   '/review': typeof ReviewRoute
   '/reviewed-survival-tabs-mre': typeof ReviewedSurvivalTabsMreRoute
@@ -354,6 +362,7 @@ export interface FileRoutesById {
   '/email': typeof EmailRoute
   '/knowledge': typeof KnowledgeRouteWithChildren
   '/leads': typeof LeadsRoute
+  '/outreach-runner': typeof OutreachRunnerRoute
   '/preparedness-book': typeof PreparednessBookRoute
   '/review': typeof ReviewRoute
   '/reviewed-survival-tabs-mre': typeof ReviewedSurvivalTabsMreRoute
@@ -397,6 +406,7 @@ export interface FileRouteTypes {
     | '/email'
     | '/knowledge'
     | '/leads'
+    | '/outreach-runner'
     | '/preparedness-book'
     | '/review'
     | '/reviewed-survival-tabs-mre'
@@ -438,6 +448,7 @@ export interface FileRouteTypes {
     | '/email'
     | '/knowledge'
     | '/leads'
+    | '/outreach-runner'
     | '/preparedness-book'
     | '/review'
     | '/reviewed-survival-tabs-mre'
@@ -479,6 +490,7 @@ export interface FileRouteTypes {
     | '/email'
     | '/knowledge'
     | '/leads'
+    | '/outreach-runner'
     | '/preparedness-book'
     | '/review'
     | '/reviewed-survival-tabs-mre'
@@ -521,6 +533,7 @@ export interface RootRouteChildren {
   EmailRoute: typeof EmailRoute
   KnowledgeRoute: typeof KnowledgeRouteWithChildren
   LeadsRoute: typeof LeadsRoute
+  OutreachRunnerRoute: typeof OutreachRunnerRoute
   PreparednessBookRoute: typeof PreparednessBookRoute
   ReviewRoute: typeof ReviewRoute
   ReviewedSurvivalTabsMreRoute: typeof ReviewedSurvivalTabsMreRoute
@@ -608,6 +621,13 @@ declare module '@tanstack/react-router' {
       path: '/preparedness-book'
       fullPath: '/preparedness-book'
       preLoaderRoute: typeof PreparednessBookRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/outreach-runner': {
+      id: '/outreach-runner'
+      path: '/outreach-runner'
+      fullPath: '/outreach-runner'
+      preLoaderRoute: typeof OutreachRunnerRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/leads': {
@@ -874,6 +894,7 @@ const rootRouteChildren: RootRouteChildren = {
   EmailRoute: EmailRoute,
   KnowledgeRoute: KnowledgeRouteWithChildren,
   LeadsRoute: LeadsRoute,
+  OutreachRunnerRoute: OutreachRunnerRoute,
   PreparednessBookRoute: PreparednessBookRoute,
   ReviewRoute: ReviewRoute,
   ReviewedSurvivalTabsMreRoute: ReviewedSurvivalTabsMreRoute,
