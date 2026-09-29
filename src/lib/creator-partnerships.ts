@@ -223,6 +223,25 @@ export const isReadyForOutreach = (c: CreatorRow) =>
 export const needsPerryApproval = (c: CreatorRow) =>
   c.perryApproval === "Not Reviewed" && (c.priority === "🔴 High" || c.priority === "🟡 Medium");
 
+// Shared outreach workflow selectors. CRM and browser-assisted outreach must use
+// these same rules so their Ready-to-Contact queues cannot drift apart.
+export function creatorOutreachStage(c: CreatorRow): "sample" | "responded" | "confirm_contact" | "not_contacted" | "contacted" | "follow_up" {
+  if (c.normalizedSampleStatus !== "Not Sent" && c.normalizedSampleStatus !== "Refused") return "sample";
+  if (c.responseState === "Replied — Interested" || c.responseState === "Replied — Declined") return "responded";
+  if (!c.contactedDate) return c.responseFollowup === "Contact confirmation pending" ? "confirm_contact" : "not_contacted";
+  const start = new Date(`${c.contactedDate}T00:00:00`);
+  const days = Number.isNaN(start.getTime()) ? 0 : Math.max(0, Math.floor((Date.now() - start.getTime()) / 86_400_000));
+  return days >= 5 ? "follow_up" : "contacted";
+}
+
+export function creatorPersonalizationReady(c: CreatorRow): boolean {
+  return Boolean(c.personalizedDm?.trim() || c.personalizedEmailBody?.trim());
+}
+
+export function creatorReadyToContact(c: CreatorRow): boolean {
+  return creatorOutreachStage(c) === "not_contacted" && creatorPersonalizationReady(c);
+}
+
 // ------------ Templates (from Templates sheet) ------------
 export interface OutreachTemplate {
   id: string;
