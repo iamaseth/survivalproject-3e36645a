@@ -264,7 +264,7 @@ export const updateCreatorWorkflow = createServerFn({ method: "POST" })
 // and never overwrites CRM/contact/research fields.
 export const importCreatorPersonalization = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: { rows: Array<{ id: string; personalized_dm?: string | null; personalized_email_subject?: string | null; personalized_email_body?: string | null; personalization_source?: string | null }> }) => {
+  .inputValidator((data: { rows: Array<{ id: string; personalized_dm?: string | null; personalized_email_subject?: string | null; personalized_email_body?: string | null; personalization_source?: string | null; personalization_status?: string | null }> }) => {
     if (!data || !Array.isArray(data.rows)) throw new Error("rows required");
     return data;
   })
@@ -272,12 +272,13 @@ export const importCreatorPersonalization = createServerFn({ method: "POST" })
     let updated = 0;
     let skipped = 0;
     for (const row of data.rows) {
-      if (!row.id?.trim() || !(row.personalized_dm?.trim() || row.personalized_email_body?.trim())) { skipped++; continue; }
+      if (!row.id?.trim() || !(row.personalized_dm?.trim() || row.personalized_email_body?.trim() || row.personalization_status?.trim().toLowerCase() === "needs review")) { skipped++; continue; }
       const { data: changed, error } = await context.supabase.from("creators").update({
         personalized_dm: row.personalized_dm?.trim() || null,
         personalized_email_subject: row.personalized_email_subject?.trim() || null,
         personalized_email_body: row.personalized_email_body?.trim() || null,
         personalization_source: row.personalization_source?.trim() || null,
+        personalization_status: row.personalization_status?.trim() || (row.personalized_dm?.trim() || row.personalized_email_body?.trim() ? "Ready" : null),
       } as never).eq("id", row.id.trim()).select("id");
       if (error) throw new Error(error.message);
       if ((changed ?? []).length) updated++; else skipped++;
