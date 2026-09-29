@@ -60,8 +60,8 @@ export function BrowserWorkerPanel({ target }: { target: WorkerTarget | null }) 
       const res = await fetch(`${base}/health`, {
         method: "GET",
         signal: AbortSignal.timeout(10000),
-        targetAddressSpace: "local",
-      } as RequestInit & { targetAddressSpace: "local" });
+        targetAddressSpace: "loopback",
+      } as RequestInit & { targetAddressSpace: "loopback" });
       const json = await res.json().catch(() => null);
       if (res.ok && json?.ok === true && typeof json.version === "string") setConn({ kind: "connected", version: json.version });
       else setConn({ kind: "error", message: `Worker answered but not with the expected health response (HTTP ${res.status}).` });
@@ -80,8 +80,8 @@ export function BrowserWorkerPanel({ target }: { target: WorkerTarget | null }) 
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(target),
         signal: AbortSignal.timeout(90000),
-        targetAddressSpace: "local",
-      } as RequestInit & { targetAddressSpace: "local" });
+        targetAddressSpace: "loopback",
+      } as RequestInit & { targetAddressSpace: "loopback" });
       const json = await res.json().catch(() => null);
       const status = json?.status ?? `http_${res.status}`;
       if (res.ok && json?.success) toast.success(`Worker: ${status}. Review in the browser and send yourself.`);
