@@ -7,7 +7,7 @@ const HOST = process.env.HOST || "127.0.0.1";
 const PORT = Number(process.env.PORT || 4317);
 const ORIGINS = (process.env.ALLOWED_ORIGINS || "").split(",").map((s) => s.trim()).filter(Boolean);
 const USER_DATA_DIR = process.env.USER_DATA_DIR || "./.chrome-outreach-profile";
-const CHANNEL = process.env.BROWSER_CHANNEL || undefined;
+const CDP_URL = process.env.CDP_URL || "http://127.0.0.1:9222";
 const COOLDOWN_MS = Number(process.env.COOLDOWN_MINUTES || 10) * 60_000;
 
 if (HOST !== "127.0.0.1" && HOST !== "localhost") {
@@ -54,9 +54,14 @@ function readBody(req) {
 
 async function getContext() {
   if (context) return context;
-  const { chromium } = await import("playwright"); // lazy: server boots/validates without browsers
-  context = await chromium.launchPersistentContext(USER_DATA_DIR, { headless: false, channel: CHANNEL, viewport: null });
-  context.on("close", () => { context = null; });
+  const { chromium } = await import("playwright");
+  // Attach to a normal Chrome instance started by the user with remote debugging.
+  // This avoids a separate Playwright-managed login profile. Chrome must be started
+  // with --remote-debugging-port=9222 and a non-default user-data-dir.
+  const browser = await chromium.connectOverCDP(CDP_URL);
+  context = browser.contexts()[0];
+  if (!context) throw new Error("No Chrome context available over CDP");
+  browser.on("disconnected", () => { context = null; });
   return context;
 }
 
