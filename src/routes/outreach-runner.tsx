@@ -40,6 +40,11 @@ function handleOf(url: string): string | null {
 
 function OutreachRunner() {
   const version = useCreatorsVersion();
+  const readyIds = useMemo(() => {
+    if (typeof window === "undefined") return null;
+    const raw = new URLSearchParams(window.location.search).get("ids");
+    return raw ? new Set(raw.split(",").filter(Boolean)) : null;
+  }, []);
   const updateFn = useServerFn(updateCreatorWorkflow);
   const [statuses, setStatuses] = useState<Record<string, RunnerStatus>>({});
   const [currentId, setCurrentId] = useState<string | null>(null);
@@ -62,9 +67,12 @@ function OutreachRunner() {
   const eligible = useMemo(() => {
     void version;
     return CREATORS.filter((c) =>
-      creatorReadyToContact(c) && Boolean(c.tiktok && c.personalizedDm?.trim())
+      // When launched from the CRM, its Ready-to-Contact IDs are authoritative.
+      // Direct visits fall back to the shared selector.
+      (readyIds ? readyIds.has(c.id) : creatorReadyToContact(c)) &&
+      Boolean(c.tiktok && c.personalizedDm?.trim())
     ).sort((a, b) => a.name.localeCompare(b.name));
-  }, [version]);
+  }, [version, readyIds]);
 
   const queue = eligible.filter((c) => !statuses[c.id] || statuses[c.id] === "pasted");
   const counts = {
