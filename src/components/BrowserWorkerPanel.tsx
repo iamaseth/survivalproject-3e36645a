@@ -57,7 +57,11 @@ export function BrowserWorkerPanel({ target }: { target: WorkerTarget | null }) 
   const test = async () => {
     setConn({ kind: "checking" });
     try {
-      const res = await fetch(`${base}/health`, { method: "GET", signal: AbortSignal.timeout(4000) });
+      const res = await fetch(`${base}/health`, {
+        method: "GET",
+        signal: AbortSignal.timeout(10000),
+        targetAddressSpace: "local",
+      } as RequestInit & { targetAddressSpace: "local" });
       const json = await res.json().catch(() => null);
       if (res.ok && json?.ok === true && typeof json.version === "string") setConn({ kind: "connected", version: json.version });
       else setConn({ kind: "error", message: `Worker answered but not with the expected health response (HTTP ${res.status}).` });
@@ -76,7 +80,8 @@ export function BrowserWorkerPanel({ target }: { target: WorkerTarget | null }) 
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(target),
         signal: AbortSignal.timeout(90000),
-      });
+        targetAddressSpace: "local",
+      } as RequestInit & { targetAddressSpace: "local" });
       const json = await res.json().catch(() => null);
       const status = json?.status ?? `http_${res.status}`;
       if (res.ok && json?.success) toast.success(`Worker: ${status}. Review in the browser and send yourself.`);
@@ -101,7 +106,7 @@ export function BrowserWorkerPanel({ target }: { target: WorkerTarget | null }) 
         <span className="text-xs text-muted-foreground">{label}</span>
       </div>
       <p className="text-xs text-muted-foreground">
-        Installation not done yet. Later, a small helper on your Ubuntu computer can open the profile and paste the message. It will <strong>never press Send</strong> — you always review and send yourself.
+        The Ubuntu helper can open the profile and paste the message. It will <strong>never press Send</strong> — you always review and send yourself.
       </p>
       <div className="flex flex-wrap items-center gap-2">
         <input value={url} onChange={(e) => setUrl(e.target.value)} className="min-w-[220px] flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm" aria-label="Local worker URL" />
