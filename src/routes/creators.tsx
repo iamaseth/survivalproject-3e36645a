@@ -19,6 +19,8 @@ type ContactFilter = "all" | "multiple" | "email" | "dm" | "form" | "youtube_onl
 type CreatorPlatform = Exclude<PlatformFilter, "all">;
 type ContactCategory = Exclude<ContactFilter, "all">;
 
+function personalizationReady(c: CreatorRow) { return Boolean(c.personalizedDm?.trim() || c.personalizedEmailBody?.trim()); }
+
 const PLATFORM_OPTIONS: Array<{ value: PlatformFilter; label: string }> = [
   { value: "all", label: "All platforms" },
   { value: "youtube", label: "YouTube" },
@@ -100,6 +102,7 @@ function CreatorPipeline() {
   const [platformFilter, setPlatformFilter] = useState<PlatformFilter>("all");
   const [contactFilter, setContactFilter] = useState<ContactFilter>("all");
   const [nicheFilter, setNicheFilter] = useState("all");
+  const [personalizationOpen,setPersonalizationOpen]=useState(false);
   const [openStages, setOpenStages] = useState<Record<StageKey, boolean>>({ not_contacted: false, confirm_contact: false, contacted: false, follow_up: false, responded: false, sample: false });
   const nicheOptions = useMemo(() => [...new Set(CREATORS.map(nicheLabel))].sort((a,b)=>a.localeCompare(b)), [version]);
   const creators = useMemo(() => {
@@ -115,6 +118,14 @@ function CreatorPipeline() {
   }, [query, platformFilter, contactFilter, nicheFilter, version]);
   const filtersActive = Boolean(query || platformFilter !== "all" || contactFilter !== "all" || nicheFilter !== "all");
   const grouped = useMemo(() => { const out: Record<StageKey, CreatorRow[]> = { not_contacted: [], confirm_contact: [], contacted: [], follow_up: [], responded: [], sample: [] }; creators.forEach((c) => out[stageFor(c)].push(c)); return out; }, [creators]);
+  const needsPersonalization = useMemo(() => creators.filter((c) => stageFor(c) === "not_contacted" && !personalizationReady(c)), [creators]);
+  const exportPersonalization = (limit: number) => {
+    const batch = needsPersonalization.slice(0, limit);
+    const safe=(v:string|null|undefined)=>String(v??"").replace(/"/g,'""').replace(/\\r?\\n/g," ");
+    const header=["Creator ID","Creator","Email","TikTok URL","YouTube URL","Instagram URL","Facebook URL","Amazon URL","Other/Profile URL","Niche","Research Notes","Personalization Status","Personalized DM","Personalized Email Subject","Personalized Email Body","Personalization Source"];
+    const lines=[header,...batch.map((x)=>[x.id,x.name,x.email??"",x.tiktok??"",x.youtube??"",x.instagram??"",x.facebook??"",x.amazon??"",x.otherPlatform??x.contactRoute??"",nicheLabel(x),x.researchNotes??"","Needs Personalization","","","",""])].map(row=>row.map(v=>`"${safe(v)}"`).join(","));
+    const blob=new Blob([lines.join("\\n")],{type:"text/csv;charset=utf-8"}); const url=URL.createObjectURL(blob); const a=document.createElement("a"); a.href=url; a.download=`survival-tabs-personalization-next-${batch.length}.csv`; a.click(); URL.revokeObjectURL(url);
+  };
   const { rows: ytRows, totals, refresh: refreshYT } = useYouTubePipeline();
   return <div className="mx-auto max-w-[1500px]">
     <div className="mb-4 flex flex-wrap items-end justify-between gap-3"><div><div className="text-[11px] uppercase tracking-[0.18em] text-[color:var(--gold)]">Creator outreach</div><h1 className="font-display text-3xl text-foreground">Creators</h1></div><div className="flex gap-2"><Link to="/creators/outreach" className="rounded-md border border-input bg-background px-3 py-2 text-sm hover:bg-secondary">Bulk outreach queue</Link><Link to="/amazon-creators" className="rounded-md border border-input bg-background px-3 py-2 text-sm hover:bg-secondary">Amazon creators</Link></div></div>
@@ -131,7 +142,7 @@ function CreatorPipeline() {
       </div>
       <div className="mt-2 text-xs text-muted-foreground">Showing {creators.length} of {CREATORS.length} creators. Platform describes where they publish; contact method describes how Rena can reach them.</div>
     </div>
-    <div className="space-y-3">{STAGES.map((stage)=><StageSection key={stage.key} stage={stage} rows={grouped[stage.key]} open={openStages[stage.key]} toggle={()=>setOpenStages((s)=>({...s,[stage.key]:!s[stage.key]}))}/>)}<YouTubeCandidatesSection rows={ytRows} refresh={refreshYT}/></div>
+    <div className="space-y-3"><section className="overflow-hidden rounded-xl border border-border bg-card"><button onClick={()=>setPersonalizationOpen(v=>!v)} aria-expanded={personalizationOpen} className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-secondary/40">{personalizationOpen?<ChevronDown className="h-4 w-4"/>:<ChevronRight className="h-4 w-4"/>}<div className="grid h-7 w-7 place-items-center rounded-full bg-[color:var(--gold)] text-xs font-semibold text-white">P</div><div className="min-w-0 flex-1"><div className="font-semibold">Needs Personalization <span className="ml-1 text-sm font-normal text-muted-foreground">({needsPersonalization.length})</span></div><div className="text-xs text-muted-foreground">Not-contacted creators without a saved personalized DM or email.</div></div><span className="rounded-md border border-input bg-background px-2.5 py-1 text-xs font-medium">{personalizationOpen?"Close":"Open"}</span></button>{personalizationOpen?<div className="border-t border-border p-4"><div className="flex flex-wrap items-center justify-between gap-3"><div className="text-sm"><strong>{needsPersonalization.length}</strong> creators are waiting for personalization. Export a manageable batch, enrich it, then import the completed master data.</div><div className="flex gap-2"><button disabled={!needsPersonalization.length} onClick={()=>exportPersonalization(100)} className="inline-flex items-center gap-1.5 rounded-md border border-input bg-background px-3 py-2 text-sm font-medium hover:bg-secondary disabled:opacity-50"><Download className="h-4 w-4"/> Export next 100</button><button disabled={!needsPersonalization.length} onClick={()=>exportPersonalization(200)} className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"><Download className="h-4 w-4"/> Export next 200</button></div></div></div>:null}</section>{STAGES.map((stage)=><StageSection key={stage.key} stage={stage} rows={grouped[stage.key]} open={openStages[stage.key]} toggle={()=>setOpenStages((s)=>({...s,[stage.key]:!s[stage.key]}))}/>)}<YouTubeCandidatesSection rows={ytRows} refresh={refreshYT}/></div>
   </div>;
 }
 function StageSection({stage,rows,open,toggle}:{stage:{key:StageKey;step:number;label:string;hint:string};rows:CreatorRow[];open:boolean;toggle:()=>void}) {
