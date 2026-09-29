@@ -57,14 +57,21 @@ function OutreachRunner() {
     });
   };
 
-  // Match the CRM's "Ready to Contact" definition, narrowed to TikTok for
-  // this worker: not contacted + personalized message ready + TikTok profile.
+  // Use the same "Ready to Contact" rules as the CRM, then narrow to
+  // TikTok creators whose saved outreach can actually be pasted as a DM.
   const eligible = useMemo(() => {
     void version;
     return CREATORS.filter((c) => {
       const personalizationReady = Boolean(c.personalizedDm?.trim() || c.personalizedEmailBody?.trim());
-      const notContacted = !c.contactedDate && c.responseFollowup !== "Contact confirmation pending";
-      return Boolean(c.tiktok && c.personalizedDm?.trim() && personalizationReady && notContacted);
+      const sampleStage = c.normalizedSampleStatus !== "Not Sent" && c.normalizedSampleStatus !== "Refused";
+      const respondedStage = c.responseState === "Replied — Interested" || c.responseState === "Replied — Declined";
+      const readyToContact =
+        !sampleStage &&
+        !respondedStage &&
+        !c.contactedDate &&
+        c.responseFollowup !== "Contact confirmation pending" &&
+        personalizationReady;
+      return Boolean(readyToContact && c.tiktok && c.personalizedDm?.trim());
     }).sort((a, b) => a.name.localeCompare(b.name));
   }, [version]);
 
