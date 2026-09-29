@@ -27,11 +27,9 @@ type RunnerStatus = "pasted" | "contacted" | "review" | "skipped";
 const LS_KEY = "outreach-runner-v1";
 
 function profileOf(c: CreatorRow): { platform: string; url: string } | null {
+  // Phase 1 automation is intentionally TikTok-only. Other platforms will get
+  // their own routines because their message buttons and composers differ.
   if (c.tiktok) return { platform: "TikTok", url: c.tiktok };
-  if (c.instagram) return { platform: "Instagram", url: c.instagram };
-  if (c.facebook) return { platform: "Facebook", url: c.facebook };
-  if (c.youtube) return { platform: "YouTube", url: c.youtube };
-  if (c.otherPlatform && /^https?:\/\//.test(c.otherPlatform)) return { platform: "Other", url: c.otherPlatform };
   return null;
 }
 
@@ -59,15 +57,15 @@ function OutreachRunner() {
     });
   };
 
-  // Eligible: has a profile URL + saved personalized DM + not already contacted (contacted_date empty).
+  // Match the CRM's "Ready to Contact" definition, narrowed to TikTok for
+  // this worker: not contacted + personalized message ready + TikTok profile.
   const eligible = useMemo(() => {
     void version;
-    return CREATORS.filter((c) => !!profileOf(c) && !!c.personalizedDm?.trim() && !c.contactedDate)
-      .sort((a, b) => {
-        const ra = /ready|outreach/i.test(a.sethNextAction ?? "") ? 0 : 1;
-        const rb = /ready|outreach/i.test(b.sethNextAction ?? "") ? 0 : 1;
-        return ra - rb || a.name.localeCompare(b.name);
-      });
+    return CREATORS.filter((c) => {
+      const personalizationReady = Boolean(c.personalizedDm?.trim() || c.personalizedEmailBody?.trim());
+      const notContacted = !c.contactedDate && c.responseFollowup !== "Contact confirmation pending";
+      return Boolean(c.tiktok && c.personalizedDm?.trim() && personalizationReady && notContacted);
+    }).sort((a, b) => a.name.localeCompare(b.name));
   }, [version]);
 
   const queue = eligible.filter((c) => !statuses[c.id] || statuses[c.id] === "pasted");
@@ -139,7 +137,7 @@ function OutreachRunner() {
           <p className="mt-1 text-base font-medium text-foreground">One creator at a time. Review before sending.</p>
         </div>
         <div className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1.5 text-xs text-muted-foreground">
-          <Bot className="h-3.5 w-3.5" /> Browser Worker: experimental, not installed yet
+          <Bot className="h-3.5 w-3.5" /> Browser Worker: TikTok test mode
         </div>
       </div>
 
@@ -156,7 +154,7 @@ function OutreachRunner() {
         <section className="rounded-xl border border-border bg-card p-5">
           {!current ? (
             <div className="py-16 text-center text-sm text-muted-foreground">
-              No creators ready. A creator appears here when they have a profile link, a saved personalized message, and no contact date yet.
+              No TikTok creators are currently Ready to Contact with a saved personalized DM.
             </div>
           ) : (
             <div className="space-y-4">
@@ -193,7 +191,7 @@ function OutreachRunner() {
         <div className="space-y-5">
         <BrowserWorkerPanel target={current && profile && current.personalizedDm ? { creatorId: current.id, platform: profile.platform, profileUrl: profile.url, message: current.personalizedDm } : null} />
         <aside className="rounded-xl border border-border bg-card">
-          <div className="border-b border-border px-4 py-3 text-sm font-semibold">Up next ({queue.length})</div>
+          <div className="border-b border-border px-4 py-3 text-sm font-semibold">TikTok — Ready to Contact ({queue.length})</div>
           <ul className="max-h-[560px] divide-y divide-border overflow-y-auto">
             {queue.slice(0, 50).map((c, i) => (
               <li key={c.id}>
