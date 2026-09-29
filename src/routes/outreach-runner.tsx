@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { ExternalLink, Copy, ClipboardCheck, CheckCircle2, AlertTriangle, SkipForward, ArrowRight, Bot } from "lucide-react";
-import { CREATORS, useCreatorsVersion, type CreatorRow } from "@/lib/creator-partnerships";
+import { CREATORS, creatorReadyToContact, useCreatorsVersion, type CreatorRow } from "@/lib/creator-partnerships";
 import { updateCreatorWorkflow } from "@/lib/creators.functions";
 import { externalLinkProps } from "@/lib/external-link";
 import { BrowserWorkerPanel } from "@/components/BrowserWorkerPanel";
@@ -57,24 +57,13 @@ function OutreachRunner() {
     });
   };
 
-  // Use the same "Ready to Contact" rules as the CRM, then narrow to
-  // TikTok creators whose saved outreach can actually be pasted as a DM.
+  // Start with the exact shared CRM Ready-to-Contact selector, then narrow
+  // to TikTok records with a DM body for this platform-specific worker.
   const eligible = useMemo(() => {
     void version;
-    return CREATORS.filter((c) => {
-      // The CRM screenshot's 212 Ready count is with its current creator filters applied:
-      // TikTok + all contact methods + all niches. Mirror that filtered CRM view
-      // exactly, then require a DM body because this runner pastes TikTok DMs.
-      const personalizationReady = Boolean(c.personalizedDm?.trim() || c.personalizedEmailBody?.trim());
-      const sampleStage = c.normalizedSampleStatus !== "Not Sent" && c.normalizedSampleStatus !== "Refused";
-      const respondedStage = c.responseState === "Replied — Interested" || c.responseState === "Replied — Declined";
-      const stageNotContacted =
-        !sampleStage &&
-        !respondedStage &&
-        !c.contactedDate &&
-        c.responseFollowup !== "Contact confirmation pending";
-      return Boolean(c.tiktok && stageNotContacted && personalizationReady && c.personalizedDm?.trim());
-    }).sort((a, b) => a.name.localeCompare(b.name));
+    return CREATORS.filter((c) =>
+      creatorReadyToContact(c) && Boolean(c.tiktok && c.personalizedDm?.trim())
+    ).sort((a, b) => a.name.localeCompare(b.name));
   }, [version]);
 
   const queue = eligible.filter((c) => !statuses[c.id] || statuses[c.id] === "pasted");
