@@ -124,7 +124,7 @@ function CreatorPipeline() {
     const safe=(v:string|null|undefined)=>String(v??"").replace(/"/g,'""').replace(/\\r?\\n/g," ");
     const header=["Creator ID","Creator","Email","TikTok URL","YouTube URL","Instagram URL","Facebook URL","Amazon URL","Other/Profile URL","Niche","Research Notes","Personalization Status","Personalized DM","Personalized Email Subject","Personalized Email Body","Personalization Source"];
     const lines=[header,...batch.map((x)=>[x.id,x.name,x.email??"",x.tiktok??"",x.youtube??"",x.instagram??"",x.facebook??"",x.amazon??"",x.otherPlatform??x.contactRoute??"",nicheLabel(x),x.researchNotes??"","Needs Personalization","","","",""])].map(row=>row.map(v=>`"${safe(v)}"`).join(","));
-    const blob=new Blob([lines.join("\\n")],{type:"text/csv;charset=utf-8"}); const url=URL.createObjectURL(blob); const a=document.createElement("a"); a.href=url; a.download=`survival-tabs-personalization-next-${batch.length}.csv`; a.click(); URL.revokeObjectURL(url);
+    const blob=new Blob([lines.join("\n")],{type:"text/csv;charset=utf-8"}); const url=URL.createObjectURL(blob); const a=document.createElement("a"); a.href=url; a.download=`survival-tabs-personalization-next-${batch.length}.csv`; a.click(); URL.revokeObjectURL(url);
   };
   const { rows: ytRows, totals, refresh: refreshYT } = useYouTubePipeline();
   return <div className="mx-auto max-w-[1500px]">
