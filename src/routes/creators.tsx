@@ -237,8 +237,8 @@ function EmailComposerModal({creator,onClose,onConfirmSent,canConfirm,busy}:{cre
   const [selectedId,setSelectedId]=useState("");
   const selected=templates.find((t)=>t.id===selectedId)??templates[0]??null;
   const ctx=useMemo(()=>mergeContextForCreator(creator,"Rena"),[creator]);
-  const subject=selected?applyMergeFields(selected.subject,ctx):"";
-  const body=selected?applyMergeFields(selected.body,ctx):"";
+  const subject=creator.personalizedEmailSubject?.trim() || (selected?applyMergeFields(selected.subject,ctx):"");
+  const body=creator.personalizedEmailBody?.trim() || (selected?applyMergeFields(selected.body,ctx):"");
   const outlook=creator.email&&selected?outlookComposeUrl(creator.email,subject,body):"";
   const copyMessage=async()=>{
     await navigator.clipboard.writeText(`To: ${creator.email}\nSubject: ${subject}\n\n${body}`);
@@ -247,7 +247,7 @@ function EmailComposerModal({creator,onClose,onConfirmSent,canConfirm,busy}:{cre
   return <div className="fixed inset-0 z-50 grid place-items-center bg-black/45 p-4" role="dialog" aria-modal="true" aria-labelledby={`email-title-${creator.id}`} onMouseDown={(e)=>{if(e.target===e.currentTarget)onClose();}}>
     <div className="max-h-[92vh] w-full max-w-3xl overflow-auto rounded-xl border border-border bg-card shadow-2xl">
       <div className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-border bg-card px-5 py-4">
-        <div><div className="text-[11px] uppercase tracking-[0.18em] text-[color:var(--gold)]">Prepare email</div><h2 id={`email-title-${creator.id}`} className="font-display text-2xl">Email {creator.name}</h2><div className="text-xs text-muted-foreground">Nothing sends automatically.</div></div>
+        <div><div className="text-[11px] uppercase tracking-[0.18em] text-[color:var(--gold)]">Prepare email</div><h2 id={`email-title-${creator.id}`} className="font-display text-2xl">Email {creator.name}</h2><div className="text-xs text-muted-foreground">{creator.personalizedEmailBody?"Saved personalized outreach is ready for review.":"No saved personalization yet — showing the approved base template."}</div></div>
         <button type="button" onClick={onClose} className="rounded-md p-2 hover:bg-secondary" aria-label="Close email composer"><X className="h-5 w-5"/></button>
       </div>
       <div className="space-y-4 p-5">
