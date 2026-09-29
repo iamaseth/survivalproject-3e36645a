@@ -1,0 +1,1 @@
+UPDATE public.creators SET response_followup = NULL WHERE id IN ('IMP-STINF528','IMP-STINF492') AND response_followup = 'Contact confirmation pending' AND contacted_date IS NULL;
