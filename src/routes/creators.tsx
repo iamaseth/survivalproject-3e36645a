@@ -19,7 +19,7 @@ type ContactFilter = "all" | "multiple" | "email" | "dm" | "form" | "youtube_onl
 type CreatorPlatform = Exclude<PlatformFilter, "all">;
 type ContactCategory = Exclude<ContactFilter, "all">;
 
-function personalizationReady(c: CreatorRow) { return creatorPersonalizationReady(c); }
+function personalizationReady(c: CreatorRow) { return Boolean(c.personalizedDm?.trim() || c.personalizedEmailBody?.trim()); }
 
 const PLATFORM_OPTIONS: Array<{ value: PlatformFilter; label: string }> = [
   { value: "all", label: "All platforms" },
@@ -49,7 +49,7 @@ const STAGES: Array<{ key: StageKey; step: number; label: string; hint: string }
   { key: "sample", step: 6, label: "Sample", hint: "Track address, shipping and delivery." },
 ];
 function daysSince(date: string | null) { if (!date) return null; const start = new Date(`${date}T00:00:00`); if (Number.isNaN(start.getTime())) return null; return Math.max(0, Math.floor((Date.now() - start.getTime()) / 86_400_000)); }
-function stageFor(c: CreatorRow): StageKey { return creatorOutreachStage(c); }
+function stageFor(c: CreatorRow): StageKey { if (c.normalizedSampleStatus !== "Not Sent" && c.normalizedSampleStatus !== "Refused") return "sample"; if (c.responseState === "Replied — Interested" || c.responseState === "Replied — Declined") return "responded"; if (!c.contactedDate) return c.responseFollowup === "Contact confirmation pending" ? "confirm_contact" : "not_contacted"; return (daysSince(c.contactedDate) ?? 0) >= 5 ? "follow_up" : "contacted"; }
 
 function creatorPlatforms(c: CreatorRow): CreatorPlatform[] {
   const platforms: CreatorPlatform[] = [];
@@ -124,7 +124,7 @@ function CreatorPipeline() {
   const grouped = useMemo(() => { const out: Record<StageKey, CreatorRow[]> = { not_contacted: [], confirm_contact: [], contacted: [], follow_up: [], responded: [], sample: [] }; creators.forEach((c) => out[stageFor(c)].push(c)); return out; }, [creators]);
   const needsReview = useMemo(() => creators.filter((c) => stageFor(c) === "not_contacted" && c.personalizationStatus?.toLowerCase() === "needs review"), [creators]);
   const needsPersonalization = useMemo(() => creators.filter((c) => stageFor(c) === "not_contacted" && !personalizationReady(c) && c.personalizationStatus?.toLowerCase() !== "needs review"), [creators]);
-  const readyToContact = useMemo(() => creators.filter(creatorReadyToContact), [creators]);
+  const readyToContact = useMemo(() => creators.filter((c) => stageFor(c) === "not_contacted" && personalizationReady(c)), [creators]);
   const outreachGrouped = useMemo(() => ({ ...grouped, not_contacted: grouped.not_contacted.filter((c) => !personalizationReady(c)) }), [grouped]);
   const lastImport = typeof window !== "undefined" ? (() => { try { return JSON.parse(window.localStorage.getItem("survival-tabs-last-personalization-import") ?? "null") as {updated:number;skipped:number;total:number;file:string;at:string}|null; } catch { return null; } })() : null;
   const exportPersonalization = (limit: number) => {
