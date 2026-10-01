@@ -5,7 +5,7 @@ import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { ChevronDown, ChevronRight, Copy, Download, ExternalLink, Facebook, Globe, Image as ImageIcon, Instagram, Loader2, Mail, MessageCircle, Printer, Search, Upload, Youtube, X } from "lucide-react";
 import { CREATORS, creatorOutreachStage, creatorPersonalizationReady, creatorReadyToContact, type CreatorRow, useCreatorsVersion } from "@/lib/creator-partnerships";
-import { importCreatorPersonalization, updateCreatorWorkflow } from "@/lib/creators.functions";
+import { importCreatorPersonalization, importCreatorQualifications, updateCreatorWorkflow } from "@/lib/creators.functions";
 import { externalLinkProps, outlookComposeUrl } from "@/lib/external-link";
 import { listEmailTemplates } from "@/lib/templates.functions";
 import { applyMergeFields, mergeContextForCreator, orderTemplatesForCreator, type EmailTemplate } from "@/lib/templates";
@@ -106,7 +106,9 @@ function CreatorPipeline() {
   const [personalizedOpen,setPersonalizedOpen]=useState(false);
   const [reviewOpen,setReviewOpen]=useState(false);
   const [personalizationImporting,setPersonalizationImporting]=useState(false);
+  const [qualificationImporting,setQualificationImporting]=useState(false);
   const importPersonalization=useServerFn(importCreatorPersonalization);
+  const importQualifications=useServerFn(importCreatorQualifications);
   const [openStages, setOpenStages] = useState<Record<StageKey, boolean>>({ not_contacted: false, confirm_contact: false, contacted: false, follow_up: false, responded: false, sample: false });
   const nicheOptions = useMemo(() => [...new Set(CREATORS.map(nicheLabel))].sort((a,b)=>a.localeCompare(b)), [version]);
   const creators = useMemo(() => {
@@ -124,7 +126,7 @@ function CreatorPipeline() {
   const grouped = useMemo(() => { const out: Record<StageKey, CreatorRow[]> = { not_contacted: [], confirm_contact: [], contacted: [], follow_up: [], responded: [], sample: [] }; creators.forEach((c) => out[stageFor(c)].push(c)); return out; }, [creators]);
   const needsReview = useMemo(() => creators.filter((c) => stageFor(c) === "not_contacted" && c.personalizationStatus?.toLowerCase() === "needs review"), [creators]);
   const needsPersonalization = useMemo(() => creators.filter((c) => stageFor(c) === "not_contacted" && !personalizationReady(c) && c.personalizationStatus?.toLowerCase() !== "needs review"), [creators]);
-  const readyToContact = useMemo(() => creators.filter((c) => stageFor(c) === "not_contacted" && personalizationReady(c)), [creators]);
+  const readyToContact = useMemo(() => creators.filter((c) => stageFor(c) === "not_contacted" && personalizationReady(c) && c.qualificationStatus !== "Not Relevant"), [creators]);
   const outreachGrouped = useMemo(() => ({ ...grouped, not_contacted: grouped.not_contacted.filter((c) => !personalizationReady(c)) }), [grouped]);
   const lastImport = typeof window !== "undefined" ? (() => { try { return JSON.parse(window.localStorage.getItem("survival-tabs-last-personalization-import") ?? "null") as {updated:number;skipped:number;total:number;file:string;at:string}|null; } catch { return null; } })() : null;
   const exportPersonalization = (limit: number) => {
@@ -189,6 +191,44 @@ function CreatorPipeline() {
       setPersonalizationImporting(false);
     }
   };
+  const importQualificationCsv = async (file: File) => {
+    setQualificationImporting(true);
+    try {
+      const text = await file.text();
+      const parsed: string[][] = [];
+      let row: string[] = [], field = "", quoted = false;
+      for (let i = 0; i < text.length; i++) {
+        const ch = text[i];
+        if (quoted) {
+          if (ch === '"' && text[i + 1] === '"') { field += '"'; i++; }
+          else if (ch === '"') quoted = false;
+          else field += ch;
+        } else if (ch === '"') quoted = true;
+        else if (ch === ",") { row.push(field); field = ""; }
+        else if (ch === "\n") { row.push(field.replace(/\r$/, "")); parsed.push(row); row = []; field = ""; }
+        else field += ch;
+      }
+      if (field.length || row.length) { row.push(field.replace(/\r$/, "")); parsed.push(row); }
+      const header = (parsed.shift() ?? []).map((h) => h.replace(/^\uFEFF/, "").trim());
+      const idCol = header.indexOf("Creator ID");
+      const statusCol = header.indexOf("Qualification Status");
+      if (idCol < 0 || statusCol < 0) throw new Error("CSV must contain Creator ID and Qualification Status.");
+      const allowed = new Set(["Qualified", "Needs Review", "Not Relevant"]);
+      const rows = parsed.filter((r) => r.some((v) => v.trim())).map((r) => ({
+        id: r[idCol]?.trim() ?? "",
+        qualification_status: r[statusCol]?.trim() as "Qualified" | "Needs Review" | "Not Relevant",
+      }));
+      if (!rows.length) throw new Error("No creator rows found.");
+      if (rows.some((r) => !r.id || !allowed.has(r.qualification_status))) throw new Error("CSV contains an invalid Creator ID or Qualification Status.");
+      const result = await importQualifications({ data: { rows } });
+      toast.success(`Qualification imported: ${result.updated} updated, ${result.skipped} skipped.`);
+      window.location.reload();
+    } catch (e: any) {
+      toast.error(e?.message ?? "Could not import qualification CSV");
+    } finally {
+      setQualificationImporting(false);
+    }
+  };
   const { rows: ytRows, totals, refresh: refreshYT } = useYouTubePipeline();
   return <div className="mx-auto max-w-[1500px]">
     <div className="mb-4 flex flex-wrap items-end justify-between gap-3"><div><div className="text-[11px] uppercase tracking-[0.18em] text-[color:var(--gold)]">Creator outreach</div><div className="mt-1 flex flex-wrap items-center gap-3"><h1 className="font-display text-3xl text-foreground">Creators</h1><label><span className="sr-only">Choose creator platform</span><select value={platformFilter} onChange={(e)=>setPlatformFilter(e.target.value as PlatformFilter)} className="min-w-[170px] rounded-md border-2 border-input bg-background px-3 py-2 text-base font-semibold">{PLATFORM_OPTIONS.map((option)=><option key={option.value} value={option.value}>{option.label}</option>)}</select></label></div></div><div /></div>
@@ -199,7 +239,7 @@ function CreatorPipeline() {
         <label><span className="sr-only">Filter by niche</span><select value={nicheFilter} onChange={(e)=>setNicheFilter(e.target.value)} className="h-full w-full rounded-md border border-input bg-background px-3 py-2 text-sm"><option value="all">All niches</option>{nicheOptions.map((niche)=><option key={niche} value={niche}>{niche}</option>)}</select></label>
         {filtersActive?<button onClick={()=>{setQuery("");setPlatformFilter("all");setContactFilter("all");setNicheFilter("all");}} className="inline-flex items-center justify-center gap-1 rounded-md border border-input bg-background px-3 py-2 text-sm hover:bg-secondary"><X className="h-4 w-4"/> Clear</button>:<div className="hidden lg:block"/>}
       </div>
-      <div className="mt-2 text-xs text-muted-foreground">Showing {creators.length} of {CREATORS.length} creators. Platform describes where they publish; contact method describes how Rena can reach them.</div>
+      <div className="mt-2 text-xs text-muted-foreground">Showing {creators.length} of {CREATORS.length} creators. Platform describes where they publish; contact method describes how Rena can reach them.</div><div className="mt-3 flex flex-wrap items-center gap-2"><label className={`inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-input bg-background px-3 py-2 text-sm font-medium hover:bg-secondary ${qualificationImporting ? "pointer-events-none opacity-50" : ""}`}><Upload className="h-4 w-4"/>{qualificationImporting ? "Importing qualification…" : "Import Qualification CSV"}<input type="file" accept=".csv,text/csv" className="hidden" disabled={qualificationImporting} onChange={(e)=>{const file=e.target.files?.[0]; if(file) void importQualificationCsv(file); e.currentTarget.value="";}}/></label><span className="text-xs text-muted-foreground">Updates only Creator ID + Qualification Status.</span></div>
     </div>
     <div className="space-y-3"><section className="overflow-hidden rounded-xl border border-border bg-card"><button onClick={()=>setPersonalizationOpen(v=>!v)} aria-expanded={personalizationOpen} className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-secondary/40">{personalizationOpen?<ChevronDown className="h-4 w-4"/>:<ChevronRight className="h-4 w-4"/>}<div className="grid h-7 w-7 place-items-center rounded-full bg-[color:var(--gold)] text-xs font-semibold text-white">P</div><div className="min-w-0 flex-1"><div className="font-semibold">Needs Personalization <span className="ml-1 text-sm font-normal text-muted-foreground">({needsPersonalization.length})</span></div><div className="text-xs text-muted-foreground">Not-contacted creators without a saved personalized DM or email.</div></div><span className="rounded-md border border-input bg-background px-2.5 py-1 text-xs font-medium">{personalizationOpen?"Close":"Open"}</span></button>{personalizationOpen?<div className="border-t border-border p-4"><div className="flex flex-wrap items-center justify-between gap-3"><div className="text-sm"><strong>{needsPersonalization.length}</strong> creators are waiting for personalization. Exports respect the platform filter above, so select TikTok to export TikTok creators only.</div><div className="flex flex-wrap gap-2"><label className={`inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-input bg-background px-3 py-2 text-sm font-medium hover:bg-secondary ${personalizationImporting ? "pointer-events-none opacity-50" : ""}`}><Upload className="h-4 w-4"/>{personalizationImporting ? "Importing…" : "Import Personalized Outreach"}<input type="file" accept=".csv,text/csv" className="hidden" disabled={personalizationImporting} onChange={(e)=>{const file=e.target.files?.[0]; if(file) void importPersonalizationCsv(file); e.currentTarget.value="";}}/></label><button disabled={!needsPersonalization.length} onClick={()=>exportPersonalization(100)} className="inline-flex items-center gap-1.5 rounded-md border border-input bg-background px-3 py-2 text-sm font-medium hover:bg-secondary disabled:opacity-50"><Download className="h-4 w-4"/> Export next 100</button><button disabled={!needsPersonalization.length} onClick={()=>exportPersonalization(200)} className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"><Download className="h-4 w-4"/> Export next 200</button></div>{lastImport?<div className="mt-3 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-900"><strong>Last personalization import:</strong> {lastImport.updated} updated · {lastImport.skipped} skipped · {lastImport.total} rows · {lastImport.file}</div>:null}</div></div>:null}</section><section className="overflow-hidden rounded-xl border border-border bg-card"><button onClick={()=>setReviewOpen(v=>!v)} aria-expanded={reviewOpen} className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-secondary/40">{reviewOpen?<ChevronDown className="h-4 w-4"/>:<ChevronRight className="h-4 w-4"/>}<div className="grid h-7 w-7 place-items-center rounded-full bg-amber-600 text-xs font-semibold text-white">?</div><div className="min-w-0 flex-1"><div className="font-semibold">Needs Manual Review <span className="ml-1 text-sm font-normal text-muted-foreground">({needsReview.length})</span></div><div className="text-xs text-muted-foreground">Could not be safely personalized automatically. Open the profile and review manually.</div></div><span className="rounded-md border border-input bg-background px-2.5 py-1 text-xs font-medium">{reviewOpen?"Close":"Open"}</span></button>{reviewOpen?<div className="border-t border-border">{needsReview.length===0?<div className="px-4 py-5 text-sm text-muted-foreground">Nothing here.</div>:needsReview.map((creator)=><CreatorLine key={creator.id} creator={creator}/>)}</div>:null}</section><section className="overflow-hidden rounded-xl border border-border bg-card"><button onClick={()=>setPersonalizedOpen(v=>!v)} aria-expanded={personalizedOpen} className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-secondary/40">{personalizedOpen?<ChevronDown className="h-4 w-4"/>:<ChevronRight className="h-4 w-4"/>}<div className="grid h-7 w-7 place-items-center rounded-full bg-emerald-700 text-xs font-semibold text-white">R</div><div className="min-w-0 flex-1"><div className="font-semibold">Ready to Contact <span className="ml-1 text-sm font-normal text-muted-foreground">({readyToContact.length})</span></div><div className="text-xs text-muted-foreground">Personalized message is ready and outreach has not been sent yet.</div></div><button type="button" disabled={!readyToContact.length} onClick={(e)=>{e.stopPropagation();exportReadyToContact();}} className="inline-flex items-center gap-1 rounded-md border border-input bg-background px-2.5 py-1 text-xs font-medium hover:bg-secondary disabled:opacity-50"><Download className="h-3.5 w-3.5"/> Export Ready CSV</button><a href={`/outreach-runner?ids=${encodeURIComponent(readyToContact.map((creator)=>creator.id).join(","))}`} onClick={(e)=>e.stopPropagation()} className="rounded-md border border-input bg-background px-2.5 py-1 text-xs font-medium hover:bg-secondary">TikTok Outreach</a><span className="rounded-md border border-input bg-background px-2.5 py-1 text-xs font-medium">{personalizedOpen?"Close":"Open"}</span></button>{personalizedOpen?<div className="border-t border-border">{readyToContact.length===0?<div className="px-4 py-5 text-sm text-muted-foreground">Nothing here yet.</div>:readyToContact.map((creator)=><CreatorLine key={creator.id} creator={creator}/>)}</div>:null}</section>{STAGES.filter((stage)=>stage.key!=="not_contacted").map((stage)=><StageSection key={stage.key} stage={stage} rows={outreachGrouped[stage.key]} open={openStages[stage.key]} toggle={()=>setOpenStages((s)=>({...s,[stage.key]:!s[stage.key]}))}/>)}<YouTubeCandidatesSection rows={ytRows} refresh={refreshYT}/></div>
     <div className="mt-8"><PipelineCounters counts={totals}/></div>
