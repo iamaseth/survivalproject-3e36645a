@@ -285,3 +285,33 @@ export const importCreatorPersonalization = createServerFn({ method: "POST" })
     }
     return { updated, skipped, total: data.rows.length };
   });
+
+
+export type CreatorQualificationStatus = "Qualified" | "Needs Review" | "Not Relevant";
+
+export const importCreatorQualifications = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: { rows: Array<{ id: string; qualification_status: CreatorQualificationStatus }> }) => {
+    if (!data || !Array.isArray(data.rows)) throw new Error("rows required");
+    for (const row of data.rows) {
+      if (!row.id?.trim()) throw new Error("Creator ID required");
+      if (!["Qualified", "Needs Review", "Not Relevant"].includes(row.qualification_status)) {
+        throw new Error(`Invalid qualification status for ${row.id}`);
+      }
+    }
+    return data;
+  })
+  .handler(async ({ data, context }) => {
+    let updated = 0;
+    let skipped = 0;
+    for (const row of data.rows) {
+      const { data: changed, error } = await context.supabase
+        .from("creators")
+        .update({ qualification_status: row.qualification_status } as never)
+        .eq("id", row.id.trim())
+        .select("id");
+      if (error) throw new Error(error.message);
+      if ((changed ?? []).length) updated++; else skipped++;
+    }
+    return { updated, skipped, total: data.rows.length };
+  });
