@@ -9,190 +9,50 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as WebsiteRouteImport } from './routes/website'
-import { Route as VideoRouteImport } from './routes/video'
-import { Route as TemplatesRouteImport } from './routes/templates'
-import { Route as TeamActionsRouteImport } from './routes/team-actions'
-import { Route as SocialAccountsRouteImport } from './routes/social-accounts'
-import { Route as SettingsRouteImport } from './routes/settings'
-import { Route as SeoRouteImport } from './routes/seo'
-import { Route as ReviewedSurvivalTabsMreRouteImport } from './routes/reviewed-survival-tabs-mre'
-import { Route as ReviewRouteImport } from './routes/review'
-import { Route as PreparednessBookRouteImport } from './routes/preparedness-book'
-import { Route as OutreachRunnerRouteImport } from './routes/outreach-runner'
-import { Route as LeadsRouteImport } from './routes/leads'
-import { Route as KnowledgeRouteImport } from './routes/knowledge'
-import { Route as EmailRouteImport } from './routes/email'
-import { Route as DecisionsRouteImport } from './routes/decisions'
-import { Route as CreatorsRouteImport } from './routes/creators'
-import { Route as ContentRouteImport } from './routes/content'
-import { Route as CommunicationsRouteImport } from './routes/communications'
-import { Route as CommentsRouteImport } from './routes/comments'
-import { Route as ClassificationImportRouteImport } from './routes/classification-import'
-import { Route as CampaignsRouteImport } from './routes/campaigns'
-import { Route as BoboSearchRouteImport } from './routes/bobo-search'
-import { Route as BoboRouteImport } from './routes/bobo'
-import { Route as AuthRouteImport } from './routes/auth'
-import { Route as AssetsRouteImport } from './routes/assets'
-import { Route as ArchiveRouteImport } from './routes/archive'
-import { Route as AnalyticsRouteImport } from './routes/analytics'
-import { Route as AmazonDiscoveryRouteImport } from './routes/amazon-discovery'
-import { Route as AmazonCreatorsRouteImport } from './routes/amazon-creators'
-import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as KnowledgeIdRouteImport } from './routes/knowledge.$id'
-import { Route as CreatorsOutreachRouteImport } from './routes/creators.outreach'
-import { Route as CreatorsIdRouteImport } from './routes/creators.$id'
+import { Route as AdminRouteImport } from './routes/admin'
+import { Route as AmazonCreatorsRouteImport } from './routes/amazon-creators'
+import { Route as AmazonDiscoveryRouteImport } from './routes/amazon-discovery'
+import { Route as AnalyticsRouteImport } from './routes/analytics'
+import { Route as ArchiveRouteImport } from './routes/archive'
+import { Route as AssetsRouteImport } from './routes/assets'
+import { Route as AuthRouteImport } from './routes/auth'
+import { Route as BoboRouteImport } from './routes/bobo'
+import { Route as BoboSearchRouteImport } from './routes/bobo-search'
+import { Route as CampaignsRouteImport } from './routes/campaigns'
+import { Route as ClassificationImportRouteImport } from './routes/classification-import'
+import { Route as CommentsRouteImport } from './routes/comments'
+import { Route as CommunicationsRouteImport } from './routes/communications'
+import { Route as ContentRouteImport } from './routes/content'
+import { Route as CreatorsRouteImport } from './routes/creators'
+import { Route as DecisionsRouteImport } from './routes/decisions'
+import { Route as EmailRouteImport } from './routes/email'
+import { Route as KnowledgeRouteImport } from './routes/knowledge'
+import { Route as LeadsRouteImport } from './routes/leads'
+import { Route as OutreachRunnerRouteImport } from './routes/outreach-runner'
+import { Route as PreparednessBookRouteImport } from './routes/preparedness-book'
+import { Route as ReviewRouteImport } from './routes/review'
+import { Route as ReviewedSurvivalTabsMreRouteImport } from './routes/reviewed-survival-tabs-mre'
+import { Route as SeoRouteImport } from './routes/seo'
+import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as SocialAccountsRouteImport } from './routes/social-accounts'
+import { Route as TeamActionsRouteImport } from './routes/team-actions'
+import { Route as TemplatesRouteImport } from './routes/templates'
+import { Route as VideoRouteImport } from './routes/video'
+import { Route as WebsiteRouteImport } from './routes/website'
 import { Route as AssetsIdRouteImport } from './routes/assets.$id'
-import { Route as ApiPublicYoutubeVerificationRouteImport } from './routes/api/public/youtube-verification'
-import { Route as ApiPublicYoutubeEnrichmentRouteImport } from './routes/api/public/youtube-enrichment'
-import { Route as ApiPublicYoutubeDeepEnrichmentRouteImport } from './routes/api/public/youtube-deep-enrichment'
-import { Route as ApiPublicYoutubeCandidatesRouteImport } from './routes/api/public/youtube-candidates'
+import { Route as CreatorsIdRouteImport } from './routes/creators.$id'
+import { Route as CreatorsOutreachRouteImport } from './routes/creators.outreach'
+import { Route as KnowledgeIdRouteImport } from './routes/knowledge.$id'
 import { Route as ApiPublicCreatorContactQueueRouteImport } from './routes/api/public/creator-contact-queue'
+import { Route as ApiPublicYoutubeCandidatesRouteImport } from './routes/api/public/youtube-candidates'
+import { Route as ApiPublicYoutubeDeepEnrichmentRouteImport } from './routes/api/public/youtube-deep-enrichment'
+import { Route as ApiPublicYoutubeEnrichmentRouteImport } from './routes/api/public/youtube-enrichment'
+import { Route as ApiPublicYoutubeVerificationRouteImport } from './routes/api/public/youtube-verification'
 
-const WebsiteRoute = WebsiteRouteImport.update({
-  id: '/website',
-  path: '/website',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const VideoRoute = VideoRouteImport.update({
-  id: '/video',
-  path: '/video',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const TemplatesRoute = TemplatesRouteImport.update({
-  id: '/templates',
-  path: '/templates',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const TeamActionsRoute = TeamActionsRouteImport.update({
-  id: '/team-actions',
-  path: '/team-actions',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const SocialAccountsRoute = SocialAccountsRouteImport.update({
-  id: '/social-accounts',
-  path: '/social-accounts',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const SettingsRoute = SettingsRouteImport.update({
-  id: '/settings',
-  path: '/settings',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const SeoRoute = SeoRouteImport.update({
-  id: '/seo',
-  path: '/seo',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ReviewedSurvivalTabsMreRoute = ReviewedSurvivalTabsMreRouteImport.update({
-  id: '/reviewed-survival-tabs-mre',
-  path: '/reviewed-survival-tabs-mre',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ReviewRoute = ReviewRouteImport.update({
-  id: '/review',
-  path: '/review',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const PreparednessBookRoute = PreparednessBookRouteImport.update({
-  id: '/preparedness-book',
-  path: '/preparedness-book',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const OutreachRunnerRoute = OutreachRunnerRouteImport.update({
-  id: '/outreach-runner',
-  path: '/outreach-runner',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const LeadsRoute = LeadsRouteImport.update({
-  id: '/leads',
-  path: '/leads',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const KnowledgeRoute = KnowledgeRouteImport.update({
-  id: '/knowledge',
-  path: '/knowledge',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const EmailRoute = EmailRouteImport.update({
-  id: '/email',
-  path: '/email',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const DecisionsRoute = DecisionsRouteImport.update({
-  id: '/decisions',
-  path: '/decisions',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const CreatorsRoute = CreatorsRouteImport.update({
-  id: '/creators',
-  path: '/creators',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ContentRoute = ContentRouteImport.update({
-  id: '/content',
-  path: '/content',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const CommunicationsRoute = CommunicationsRouteImport.update({
-  id: '/communications',
-  path: '/communications',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const CommentsRoute = CommentsRouteImport.update({
-  id: '/comments',
-  path: '/comments',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ClassificationImportRoute = ClassificationImportRouteImport.update({
-  id: '/classification-import',
-  path: '/classification-import',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const CampaignsRoute = CampaignsRouteImport.update({
-  id: '/campaigns',
-  path: '/campaigns',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const BoboSearchRoute = BoboSearchRouteImport.update({
-  id: '/bobo-search',
-  path: '/bobo-search',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const BoboRoute = BoboRouteImport.update({
-  id: '/bobo',
-  path: '/bobo',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AuthRoute = AuthRouteImport.update({
-  id: '/auth',
-  path: '/auth',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AssetsRoute = AssetsRouteImport.update({
-  id: '/assets',
-  path: '/assets',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ArchiveRoute = ArchiveRouteImport.update({
-  id: '/archive',
-  path: '/archive',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AnalyticsRoute = AnalyticsRouteImport.update({
-  id: '/analytics',
-  path: '/analytics',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AmazonDiscoveryRoute = AmazonDiscoveryRouteImport.update({
-  id: '/amazon-discovery',
-  path: '/amazon-discovery',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AmazonCreatorsRoute = AmazonCreatorsRouteImport.update({
-  id: '/amazon-creators',
-  path: '/amazon-creators',
+const IndexRoute = IndexRouteImport.update({
+  id: '/',
+  path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminRoute = AdminRouteImport.update({
@@ -200,47 +60,175 @@ const AdminRoute = AdminRouteImport.update({
   path: '/admin',
   getParentRoute: () => rootRouteImport,
 } as any)
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
+const AmazonCreatorsRoute = AmazonCreatorsRouteImport.update({
+  id: '/amazon-creators',
+  path: '/amazon-creators',
   getParentRoute: () => rootRouteImport,
 } as any)
-const KnowledgeIdRoute = KnowledgeIdRouteImport.update({
-  id: '/$id',
-  path: '/$id',
-  getParentRoute: () => KnowledgeRoute,
+const AmazonDiscoveryRoute = AmazonDiscoveryRouteImport.update({
+  id: '/amazon-discovery',
+  path: '/amazon-discovery',
+  getParentRoute: () => rootRouteImport,
 } as any)
-const CreatorsOutreachRoute = CreatorsOutreachRouteImport.update({
-  id: '/outreach',
-  path: '/outreach',
-  getParentRoute: () => CreatorsRoute,
+const AnalyticsRoute = AnalyticsRouteImport.update({
+  id: '/analytics',
+  path: '/analytics',
+  getParentRoute: () => rootRouteImport,
 } as any)
-const CreatorsIdRoute = CreatorsIdRouteImport.update({
-  id: '/$id',
-  path: '/$id',
-  getParentRoute: () => CreatorsRoute,
+const ArchiveRoute = ArchiveRouteImport.update({
+  id: '/archive',
+  path: '/archive',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AssetsRoute = AssetsRouteImport.update({
+  id: '/assets',
+  path: '/assets',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthRoute = AuthRouteImport.update({
+  id: '/auth',
+  path: '/auth',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const BoboRoute = BoboRouteImport.update({
+  id: '/bobo',
+  path: '/bobo',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const BoboSearchRoute = BoboSearchRouteImport.update({
+  id: '/bobo-search',
+  path: '/bobo-search',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CampaignsRoute = CampaignsRouteImport.update({
+  id: '/campaigns',
+  path: '/campaigns',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ClassificationImportRoute = ClassificationImportRouteImport.update({
+  id: '/classification-import',
+  path: '/classification-import',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CommentsRoute = CommentsRouteImport.update({
+  id: '/comments',
+  path: '/comments',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CommunicationsRoute = CommunicationsRouteImport.update({
+  id: '/communications',
+  path: '/communications',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ContentRoute = ContentRouteImport.update({
+  id: '/content',
+  path: '/content',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CreatorsRoute = CreatorsRouteImport.update({
+  id: '/creators',
+  path: '/creators',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DecisionsRoute = DecisionsRouteImport.update({
+  id: '/decisions',
+  path: '/decisions',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const EmailRoute = EmailRouteImport.update({
+  id: '/email',
+  path: '/email',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const KnowledgeRoute = KnowledgeRouteImport.update({
+  id: '/knowledge',
+  path: '/knowledge',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LeadsRoute = LeadsRouteImport.update({
+  id: '/leads',
+  path: '/leads',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OutreachRunnerRoute = OutreachRunnerRouteImport.update({
+  id: '/outreach-runner',
+  path: '/outreach-runner',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PreparednessBookRoute = PreparednessBookRouteImport.update({
+  id: '/preparedness-book',
+  path: '/preparedness-book',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ReviewRoute = ReviewRouteImport.update({
+  id: '/review',
+  path: '/review',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ReviewedSurvivalTabsMreRoute = ReviewedSurvivalTabsMreRouteImport.update({
+  id: '/reviewed-survival-tabs-mre',
+  path: '/reviewed-survival-tabs-mre',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SeoRoute = SeoRouteImport.update({
+  id: '/seo',
+  path: '/seo',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SettingsRoute = SettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SocialAccountsRoute = SocialAccountsRouteImport.update({
+  id: '/social-accounts',
+  path: '/social-accounts',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TeamActionsRoute = TeamActionsRouteImport.update({
+  id: '/team-actions',
+  path: '/team-actions',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TemplatesRoute = TemplatesRouteImport.update({
+  id: '/templates',
+  path: '/templates',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const VideoRoute = VideoRouteImport.update({
+  id: '/video',
+  path: '/video',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const WebsiteRoute = WebsiteRouteImport.update({
+  id: '/website',
+  path: '/website',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const AssetsIdRoute = AssetsIdRouteImport.update({
   id: '/$id',
   path: '/$id',
   getParentRoute: () => AssetsRoute,
 } as any)
-const ApiPublicYoutubeVerificationRoute =
-  ApiPublicYoutubeVerificationRouteImport.update({
-    id: '/api/public/youtube-verification',
-    path: '/api/public/youtube-verification',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const ApiPublicYoutubeEnrichmentRoute =
-  ApiPublicYoutubeEnrichmentRouteImport.update({
-    id: '/api/public/youtube-enrichment',
-    path: '/api/public/youtube-enrichment',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const ApiPublicYoutubeDeepEnrichmentRoute =
-  ApiPublicYoutubeDeepEnrichmentRouteImport.update({
-    id: '/api/public/youtube-deep-enrichment',
-    path: '/api/public/youtube-deep-enrichment',
+const CreatorsIdRoute = CreatorsIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => CreatorsRoute,
+} as any)
+const CreatorsOutreachRoute = CreatorsOutreachRouteImport.update({
+  id: '/outreach',
+  path: '/outreach',
+  getParentRoute: () => CreatorsRoute,
+} as any)
+const KnowledgeIdRoute = KnowledgeIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => KnowledgeRoute,
+} as any)
+const ApiPublicCreatorContactQueueRoute =
+  ApiPublicCreatorContactQueueRouteImport.update({
+    id: '/api/public/creator-contact-queue',
+    path: '/api/public/creator-contact-queue',
     getParentRoute: () => rootRouteImport,
   } as any)
 const ApiPublicYoutubeCandidatesRoute =
@@ -249,10 +237,22 @@ const ApiPublicYoutubeCandidatesRoute =
     path: '/api/public/youtube-candidates',
     getParentRoute: () => rootRouteImport,
   } as any)
-const ApiPublicCreatorContactQueueRoute =
-  ApiPublicCreatorContactQueueRouteImport.update({
-    id: '/api/public/creator-contact-queue',
-    path: '/api/public/creator-contact-queue',
+const ApiPublicYoutubeDeepEnrichmentRoute =
+  ApiPublicYoutubeDeepEnrichmentRouteImport.update({
+    id: '/api/public/youtube-deep-enrichment',
+    path: '/api/public/youtube-deep-enrichment',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicYoutubeEnrichmentRoute =
+  ApiPublicYoutubeEnrichmentRouteImport.update({
+    id: '/api/public/youtube-enrichment',
+    path: '/api/public/youtube-enrichment',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicYoutubeVerificationRoute =
+  ApiPublicYoutubeVerificationRouteImport.update({
+    id: '/api/public/youtube-verification',
+    path: '/api/public/youtube-verification',
     getParentRoute: () => rootRouteImport,
   } as any)
 
@@ -553,207 +553,11 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/website': {
-      id: '/website'
-      path: '/website'
-      fullPath: '/website'
-      preLoaderRoute: typeof WebsiteRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/video': {
-      id: '/video'
-      path: '/video'
-      fullPath: '/video'
-      preLoaderRoute: typeof VideoRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/templates': {
-      id: '/templates'
-      path: '/templates'
-      fullPath: '/templates'
-      preLoaderRoute: typeof TemplatesRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/team-actions': {
-      id: '/team-actions'
-      path: '/team-actions'
-      fullPath: '/team-actions'
-      preLoaderRoute: typeof TeamActionsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/social-accounts': {
-      id: '/social-accounts'
-      path: '/social-accounts'
-      fullPath: '/social-accounts'
-      preLoaderRoute: typeof SocialAccountsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/settings': {
-      id: '/settings'
-      path: '/settings'
-      fullPath: '/settings'
-      preLoaderRoute: typeof SettingsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/seo': {
-      id: '/seo'
-      path: '/seo'
-      fullPath: '/seo'
-      preLoaderRoute: typeof SeoRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/reviewed-survival-tabs-mre': {
-      id: '/reviewed-survival-tabs-mre'
-      path: '/reviewed-survival-tabs-mre'
-      fullPath: '/reviewed-survival-tabs-mre'
-      preLoaderRoute: typeof ReviewedSurvivalTabsMreRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/review': {
-      id: '/review'
-      path: '/review'
-      fullPath: '/review'
-      preLoaderRoute: typeof ReviewRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/preparedness-book': {
-      id: '/preparedness-book'
-      path: '/preparedness-book'
-      fullPath: '/preparedness-book'
-      preLoaderRoute: typeof PreparednessBookRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/outreach-runner': {
-      id: '/outreach-runner'
-      path: '/outreach-runner'
-      fullPath: '/outreach-runner'
-      preLoaderRoute: typeof OutreachRunnerRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/leads': {
-      id: '/leads'
-      path: '/leads'
-      fullPath: '/leads'
-      preLoaderRoute: typeof LeadsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/knowledge': {
-      id: '/knowledge'
-      path: '/knowledge'
-      fullPath: '/knowledge'
-      preLoaderRoute: typeof KnowledgeRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/email': {
-      id: '/email'
-      path: '/email'
-      fullPath: '/email'
-      preLoaderRoute: typeof EmailRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/decisions': {
-      id: '/decisions'
-      path: '/decisions'
-      fullPath: '/decisions'
-      preLoaderRoute: typeof DecisionsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/creators': {
-      id: '/creators'
-      path: '/creators'
-      fullPath: '/creators'
-      preLoaderRoute: typeof CreatorsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/content': {
-      id: '/content'
-      path: '/content'
-      fullPath: '/content'
-      preLoaderRoute: typeof ContentRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/communications': {
-      id: '/communications'
-      path: '/communications'
-      fullPath: '/communications'
-      preLoaderRoute: typeof CommunicationsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/comments': {
-      id: '/comments'
-      path: '/comments'
-      fullPath: '/comments'
-      preLoaderRoute: typeof CommentsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/classification-import': {
-      id: '/classification-import'
-      path: '/classification-import'
-      fullPath: '/classification-import'
-      preLoaderRoute: typeof ClassificationImportRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/campaigns': {
-      id: '/campaigns'
-      path: '/campaigns'
-      fullPath: '/campaigns'
-      preLoaderRoute: typeof CampaignsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/bobo-search': {
-      id: '/bobo-search'
-      path: '/bobo-search'
-      fullPath: '/bobo-search'
-      preLoaderRoute: typeof BoboSearchRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/bobo': {
-      id: '/bobo'
-      path: '/bobo'
-      fullPath: '/bobo'
-      preLoaderRoute: typeof BoboRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/auth': {
-      id: '/auth'
-      path: '/auth'
-      fullPath: '/auth'
-      preLoaderRoute: typeof AuthRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/assets': {
-      id: '/assets'
-      path: '/assets'
-      fullPath: '/assets'
-      preLoaderRoute: typeof AssetsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/archive': {
-      id: '/archive'
-      path: '/archive'
-      fullPath: '/archive'
-      preLoaderRoute: typeof ArchiveRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/analytics': {
-      id: '/analytics'
-      path: '/analytics'
-      fullPath: '/analytics'
-      preLoaderRoute: typeof AnalyticsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/amazon-discovery': {
-      id: '/amazon-discovery'
-      path: '/amazon-discovery'
-      fullPath: '/amazon-discovery'
-      preLoaderRoute: typeof AmazonDiscoveryRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/amazon-creators': {
-      id: '/amazon-creators'
-      path: '/amazon-creators'
-      fullPath: '/amazon-creators'
-      preLoaderRoute: typeof AmazonCreatorsRouteImport
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin': {
@@ -763,33 +567,208 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
+    '/amazon-creators': {
+      id: '/amazon-creators'
+      path: '/amazon-creators'
+      fullPath: '/amazon-creators'
+      preLoaderRoute: typeof AmazonCreatorsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/knowledge/$id': {
-      id: '/knowledge/$id'
-      path: '/$id'
-      fullPath: '/knowledge/$id'
-      preLoaderRoute: typeof KnowledgeIdRouteImport
-      parentRoute: typeof KnowledgeRoute
+    '/amazon-discovery': {
+      id: '/amazon-discovery'
+      path: '/amazon-discovery'
+      fullPath: '/amazon-discovery'
+      preLoaderRoute: typeof AmazonDiscoveryRouteImport
+      parentRoute: typeof rootRouteImport
     }
-    '/creators/outreach': {
-      id: '/creators/outreach'
-      path: '/outreach'
-      fullPath: '/creators/outreach'
-      preLoaderRoute: typeof CreatorsOutreachRouteImport
-      parentRoute: typeof CreatorsRoute
+    '/analytics': {
+      id: '/analytics'
+      path: '/analytics'
+      fullPath: '/analytics'
+      preLoaderRoute: typeof AnalyticsRouteImport
+      parentRoute: typeof rootRouteImport
     }
-    '/creators/$id': {
-      id: '/creators/$id'
-      path: '/$id'
-      fullPath: '/creators/$id'
-      preLoaderRoute: typeof CreatorsIdRouteImport
-      parentRoute: typeof CreatorsRoute
+    '/archive': {
+      id: '/archive'
+      path: '/archive'
+      fullPath: '/archive'
+      preLoaderRoute: typeof ArchiveRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/assets': {
+      id: '/assets'
+      path: '/assets'
+      fullPath: '/assets'
+      preLoaderRoute: typeof AssetsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/auth': {
+      id: '/auth'
+      path: '/auth'
+      fullPath: '/auth'
+      preLoaderRoute: typeof AuthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/bobo': {
+      id: '/bobo'
+      path: '/bobo'
+      fullPath: '/bobo'
+      preLoaderRoute: typeof BoboRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/bobo-search': {
+      id: '/bobo-search'
+      path: '/bobo-search'
+      fullPath: '/bobo-search'
+      preLoaderRoute: typeof BoboSearchRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/campaigns': {
+      id: '/campaigns'
+      path: '/campaigns'
+      fullPath: '/campaigns'
+      preLoaderRoute: typeof CampaignsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/classification-import': {
+      id: '/classification-import'
+      path: '/classification-import'
+      fullPath: '/classification-import'
+      preLoaderRoute: typeof ClassificationImportRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/comments': {
+      id: '/comments'
+      path: '/comments'
+      fullPath: '/comments'
+      preLoaderRoute: typeof CommentsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/communications': {
+      id: '/communications'
+      path: '/communications'
+      fullPath: '/communications'
+      preLoaderRoute: typeof CommunicationsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/content': {
+      id: '/content'
+      path: '/content'
+      fullPath: '/content'
+      preLoaderRoute: typeof ContentRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/creators': {
+      id: '/creators'
+      path: '/creators'
+      fullPath: '/creators'
+      preLoaderRoute: typeof CreatorsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/decisions': {
+      id: '/decisions'
+      path: '/decisions'
+      fullPath: '/decisions'
+      preLoaderRoute: typeof DecisionsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/email': {
+      id: '/email'
+      path: '/email'
+      fullPath: '/email'
+      preLoaderRoute: typeof EmailRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/knowledge': {
+      id: '/knowledge'
+      path: '/knowledge'
+      fullPath: '/knowledge'
+      preLoaderRoute: typeof KnowledgeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/leads': {
+      id: '/leads'
+      path: '/leads'
+      fullPath: '/leads'
+      preLoaderRoute: typeof LeadsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/outreach-runner': {
+      id: '/outreach-runner'
+      path: '/outreach-runner'
+      fullPath: '/outreach-runner'
+      preLoaderRoute: typeof OutreachRunnerRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/preparedness-book': {
+      id: '/preparedness-book'
+      path: '/preparedness-book'
+      fullPath: '/preparedness-book'
+      preLoaderRoute: typeof PreparednessBookRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/review': {
+      id: '/review'
+      path: '/review'
+      fullPath: '/review'
+      preLoaderRoute: typeof ReviewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reviewed-survival-tabs-mre': {
+      id: '/reviewed-survival-tabs-mre'
+      path: '/reviewed-survival-tabs-mre'
+      fullPath: '/reviewed-survival-tabs-mre'
+      preLoaderRoute: typeof ReviewedSurvivalTabsMreRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/seo': {
+      id: '/seo'
+      path: '/seo'
+      fullPath: '/seo'
+      preLoaderRoute: typeof SeoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/settings': {
+      id: '/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof SettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/social-accounts': {
+      id: '/social-accounts'
+      path: '/social-accounts'
+      fullPath: '/social-accounts'
+      preLoaderRoute: typeof SocialAccountsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/team-actions': {
+      id: '/team-actions'
+      path: '/team-actions'
+      fullPath: '/team-actions'
+      preLoaderRoute: typeof TeamActionsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/templates': {
+      id: '/templates'
+      path: '/templates'
+      fullPath: '/templates'
+      preLoaderRoute: typeof TemplatesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/video': {
+      id: '/video'
+      path: '/video'
+      fullPath: '/video'
+      preLoaderRoute: typeof VideoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/website': {
+      id: '/website'
+      path: '/website'
+      fullPath: '/website'
+      preLoaderRoute: typeof WebsiteRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/assets/$id': {
       id: '/assets/$id'
@@ -798,25 +777,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AssetsIdRouteImport
       parentRoute: typeof AssetsRoute
     }
-    '/api/public/youtube-verification': {
-      id: '/api/public/youtube-verification'
-      path: '/api/public/youtube-verification'
-      fullPath: '/api/public/youtube-verification'
-      preLoaderRoute: typeof ApiPublicYoutubeVerificationRouteImport
-      parentRoute: typeof rootRouteImport
+    '/creators/$id': {
+      id: '/creators/$id'
+      path: '/$id'
+      fullPath: '/creators/$id'
+      preLoaderRoute: typeof CreatorsIdRouteImport
+      parentRoute: typeof CreatorsRoute
     }
-    '/api/public/youtube-enrichment': {
-      id: '/api/public/youtube-enrichment'
-      path: '/api/public/youtube-enrichment'
-      fullPath: '/api/public/youtube-enrichment'
-      preLoaderRoute: typeof ApiPublicYoutubeEnrichmentRouteImport
-      parentRoute: typeof rootRouteImport
+    '/creators/outreach': {
+      id: '/creators/outreach'
+      path: '/outreach'
+      fullPath: '/creators/outreach'
+      preLoaderRoute: typeof CreatorsOutreachRouteImport
+      parentRoute: typeof CreatorsRoute
     }
-    '/api/public/youtube-deep-enrichment': {
-      id: '/api/public/youtube-deep-enrichment'
-      path: '/api/public/youtube-deep-enrichment'
-      fullPath: '/api/public/youtube-deep-enrichment'
-      preLoaderRoute: typeof ApiPublicYoutubeDeepEnrichmentRouteImport
+    '/knowledge/$id': {
+      id: '/knowledge/$id'
+      path: '/$id'
+      fullPath: '/knowledge/$id'
+      preLoaderRoute: typeof KnowledgeIdRouteImport
+      parentRoute: typeof KnowledgeRoute
+    }
+    '/api/public/creator-contact-queue': {
+      id: '/api/public/creator-contact-queue'
+      path: '/api/public/creator-contact-queue'
+      fullPath: '/api/public/creator-contact-queue'
+      preLoaderRoute: typeof ApiPublicCreatorContactQueueRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/youtube-candidates': {
@@ -826,11 +812,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicYoutubeCandidatesRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/public/creator-contact-queue': {
-      id: '/api/public/creator-contact-queue'
-      path: '/api/public/creator-contact-queue'
-      fullPath: '/api/public/creator-contact-queue'
-      preLoaderRoute: typeof ApiPublicCreatorContactQueueRouteImport
+    '/api/public/youtube-deep-enrichment': {
+      id: '/api/public/youtube-deep-enrichment'
+      path: '/api/public/youtube-deep-enrichment'
+      fullPath: '/api/public/youtube-deep-enrichment'
+      preLoaderRoute: typeof ApiPublicYoutubeDeepEnrichmentRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/youtube-enrichment': {
+      id: '/api/public/youtube-enrichment'
+      path: '/api/public/youtube-enrichment'
+      fullPath: '/api/public/youtube-enrichment'
+      preLoaderRoute: typeof ApiPublicYoutubeEnrichmentRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/youtube-verification': {
+      id: '/api/public/youtube-verification'
+      path: '/api/public/youtube-verification'
+      fullPath: '/api/public/youtube-verification'
+      preLoaderRoute: typeof ApiPublicYoutubeVerificationRouteImport
       parentRoute: typeof rootRouteImport
     }
   }
