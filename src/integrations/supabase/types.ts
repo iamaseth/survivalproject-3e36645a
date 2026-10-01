@@ -485,6 +485,7 @@ export type Database = {
           primary_platforms: string | null
           primary_source: string | null
           priority: string | null
+          qualification_status: string | null
           reach_signal: string | null
           recent_activity_check: string | null
           recommended_offer: string | null
@@ -550,6 +551,7 @@ export type Database = {
           primary_platforms?: string | null
           primary_source?: string | null
           priority?: string | null
+          qualification_status?: string | null
           reach_signal?: string | null
           recent_activity_check?: string | null
           recommended_offer?: string | null
@@ -615,6 +617,7 @@ export type Database = {
           primary_platforms?: string | null
           primary_source?: string | null
           priority?: string | null
+          qualification_status?: string | null
           reach_signal?: string | null
           recent_activity_check?: string | null
           recommended_offer?: string | null
