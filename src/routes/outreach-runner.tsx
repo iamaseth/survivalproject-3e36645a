@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { ExternalLink, Copy, ClipboardCheck, CheckCircle2, AlertTriangle, SkipForward, ArrowRight, Bot } from "lucide-react";
+import { ExternalLink, Copy, ClipboardCheck, CheckCircle2, AlertTriangle, SkipForward, ArrowRight, Bot, X } from "lucide-react";
 import { CREATORS, creatorReadyToContact, useCreatorsVersion, type CreatorRow } from "@/lib/creator-partnerships";
 import { updateCreatorWorkflow } from "@/lib/creators.functions";
 import { externalLinkProps } from "@/lib/external-link";
@@ -104,6 +104,25 @@ function OutreachRunner() {
     } finally { setBusy(false); }
   };
 
+  const markNotRelevant = async () => {
+    if (!current) return;
+    setBusy(true);
+    try {
+      const existing = (current.renaNotes || "").trim();
+      const note = `${today} — Outreach Runner: Not Relevant`;
+      const rena_notes = existing ? `${existing}\n${note}` : note;
+      await updateFn({ data: { id: current.id, response_followup: "Not Relevant", rena_notes } });
+      current.responseFollowup = "Not Relevant";
+      current.renaNotes = rena_notes;
+      setStatus(current.id, "skipped");
+      setJustActed(true);
+      toast.success("Marked Not Relevant");
+      goNext();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not update creator");
+    } finally { setBusy(false); }
+  };
+
   const markReview = async () => {
     if (!current) return;
     setBusy(true);
@@ -183,6 +202,7 @@ function OutreachRunner() {
                 <button onClick={() => { setStatus(current.id, "pasted"); toast.success("Marked pasted (this browser only)"); }} className={btn}><ClipboardCheck className="h-4 w-4" />Mark Pasted</button>
                 <button disabled={busy || status === "contacted"} onClick={markContacted} className="inline-flex items-center justify-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground disabled:opacity-50"><CheckCircle2 className="h-4 w-4" />Mark Contacted</button>
                 <button disabled={busy} onClick={markReview} className={btn}><AlertTriangle className="h-4 w-4" />Needs Review</button>
+                <button disabled={busy} onClick={markNotRelevant} className={btn}><X className="h-4 w-4" />Not Relevant</button>
                 <button onClick={() => { setStatus(current.id, "skipped"); setJustActed(true); }} className={btn}><SkipForward className="h-4 w-4" />Skip</button>
                 <button onClick={goNext} className={`${btn} ${justActed ? "border-primary bg-primary text-primary-foreground ring-2 ring-primary/30 hover:bg-primary/90" : ""}`}>Next Creator<ArrowRight className="h-4 w-4" /></button>
               </div>
