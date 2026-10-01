@@ -238,8 +238,19 @@ export function creatorPersonalizationReady(c: CreatorRow): boolean {
   return Boolean(c.personalizedDm?.trim() || c.personalizedEmailBody?.trim());
 }
 
+// Discovery/search evidence is not creator-level qualification. Legacy TikTok
+// staging notes explicitly say these profiles were never reviewed/approved.
+export function creatorQualificationReady(c: CreatorRow): boolean {
+  const notes = (c.researchNotes ?? "").toLowerCase();
+  if (notes.includes("profile not yet reviewed for fit")) return false;
+  if (notes.includes("unverified candidate; outreach not approved")) return false;
+  return true;
+}
+
 export function creatorReadyToContact(c: CreatorRow): boolean {
-  return creatorOutreachStage(c) === "not_contacted" && creatorPersonalizationReady(c);
+  return creatorOutreachStage(c) === "not_contacted"
+    && creatorPersonalizationReady(c)
+    && creatorQualificationReady(c);
 }
 
 // ------------ Templates (from Templates sheet) ------------
