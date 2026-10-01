@@ -2,7 +2,7 @@
 import http from "node:http";
 import { validateOpenAndPaste, MAX_BODY_BYTES } from "./validate.mjs";
 
-const VERSION = "0.1.0";
+const VERSION = "0.2.0";
 const HOST = process.env.HOST || "127.0.0.1";
 const PORT = Number(process.env.PORT || 4317);
 const ORIGINS = (process.env.ALLOWED_ORIGINS || "").split(",").map((s) => s.trim()).filter(Boolean);
@@ -74,15 +74,45 @@ async function detectStop(page) {
   return null;
 }
 
-async function openAndPaste({ creatorId, platform, profileUrl }) {
+async function openAndPaste({ creatorId, platform, profileUrl, message }) {
   const ctx = await getContext();
   const page = await ctx.newPage();
   await page.goto(profileUrl, { waitUntil: "domcontentloaded", timeout: 45_000 });
   await page.waitForTimeout(2500);
-  const stop = await detectStop(page);
+  let stop = await detectStop(page);
   if (stop) return { success: false, status: stop, error: "Stopped for human attention. Nothing was pasted or sent." };
-  // V1: reliable messaging selectors not established. Do NOT guess; do NOT paste; NEVER send.
-  return { success: true, status: "profile_opened_paste_not_implemented", error: "Profile opened. Open messages and paste manually." };
+
+  if (String(platform).toLowerCase() !== "tiktok") {
+    return { success: true, status: "profile_opened_platform_not_automated", error: "Profile opened. Follow/paste automation is currently TikTok-only." };
+  }
+
+  // Follow only when the visible control clearly says Follow. Never click Following,
+  // because that could unfollow an account that is already followed.
+  const follow = page.getByRole("button", { name: /^follow$/i }).first();
+  if (await follow.isVisible({ timeout: 5000 }).catch(() => false)) {
+    await follow.click();
+    await page.waitForTimeout(1200);
+    stop = await detectStop(page);
+    if (stop) return { success: false, status: stop, error: "Stopped for human attention after Follow. No message was pasted or sent." };
+  }
+
+  const messageButton = page.getByRole("button", { name: /^message$/i }).first();
+  if (!(await messageButton.isVisible({ timeout: 5000 }).catch(() => false))) {
+    return { success: true, status: "followed_message_button_not_found", error: "Profile is open, but the Message button was not found. Nothing was pasted or sent." };
+  }
+  await messageButton.click();
+  await page.waitForTimeout(1800);
+  stop = await detectStop(page);
+  if (stop) return { success: false, status: stop, error: "Stopped for human attention. No message was pasted or sent." };
+
+  // TikTok's composer is normally contenteditable. Restrict the search to visible
+  // textbox/contenteditable controls and fill only; NEVER press Enter or click Send.
+  const composer = page.locator('[contenteditable="true"][role="textbox"], div[contenteditable="true"], textarea').filter({ visible: true }).last();
+  if (!(await composer.isVisible({ timeout: 6000 }).catch(() => false))) {
+    return { success: true, status: "followed_message_opened_paste_not_found", error: "Follow/message opened, but the composer was not found. Nothing was pasted or sent." };
+  }
+  await composer.fill(message);
+  return { success: true, status: "followed_pasted_ready_for_review" };
 }
 
 const server = http.createServer(async (req, res) => {
