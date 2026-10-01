@@ -22,7 +22,7 @@ export const Route = createFileRoute("/outreach-runner")({
   component: OutreachRunner,
 });
 
-type RunnerStatus = "pasted" | "contacted" | "review" | "skipped";
+type RunnerStatus = "pasted" | "contacted" | "review" | "blocked" | "skipped";
 const LS_KEY = "outreach-runner-v1";
 
 function profileOf(c: CreatorRow): { platform: string; url: string } | null {
@@ -67,7 +67,8 @@ function OutreachRunner() {
     void version;
     return CREATORS.filter((c) =>
       (readyIds ? readyIds.has(c.id) : creatorReadyToContact(c)) &&
-      Boolean(c.tiktok && c.personalizedDm?.trim())
+      Boolean(c.tiktok && c.personalizedDm?.trim()) &&
+      c.responseFollowup !== "DM Blocked — Retry Later"
     ).sort((a, b) => a.name.localeCompare(b.name));
   }, [version, readyIds]);
 
@@ -77,6 +78,7 @@ function OutreachRunner() {
     pasted: Object.values(statuses).filter((s) => s === "pasted").length,
     contacted: Object.values(statuses).filter((s) => s === "contacted").length,
     review: Object.values(statuses).filter((s) => s === "review").length,
+    blocked: Object.values(statuses).filter((s) => s === "blocked").length,
   };
 
   const current = (currentId && CREATORS.find((c) => c.id === currentId)) || queue[0] || null;
@@ -123,6 +125,25 @@ function OutreachRunner() {
     } finally { setBusy(false); }
   };
 
+  const markBlocked = async () => {
+    if (!current) return;
+    setBusy(true);
+    try {
+      const existing = (current.renaNotes || "").trim();
+      const note = `${today} — Outreach Runner: TikTok DM blocked; retry later`;
+      const rena_notes = existing ? `${existing}\n${note}` : note;
+      await updateFn({ data: { id: current.id, response_followup: "DM Blocked — Retry Later", rena_notes } });
+      current.responseFollowup = "DM Blocked — Retry Later";
+      current.renaNotes = rena_notes;
+      setStatus(current.id, "blocked");
+      setJustActed(true);
+      toast.success("DM blocked — saved for later retry");
+      goNext();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not save blocked DM status");
+    } finally { setBusy(false); }
+  };
+
   const markReview = async () => {
     if (!current) return;
     setBusy(true);
@@ -163,8 +184,8 @@ function OutreachRunner() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        {([["Ready", counts.ready], ["Pasted", counts.pasted], ["Contacted", counts.contacted], ["Needs Review", counts.review]] as const).map(([l, n]) => (
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+        {([["Ready", counts.ready], ["Pasted", counts.pasted], ["Contacted", counts.contacted], ["Needs Review", counts.review], ["DM Blocked", counts.blocked]] as const).map(([l, n]) => (
           <div key={l} className="rounded-xl border border-border bg-card px-4 py-3">
             <div className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">{l}</div>
             <div className="font-display text-2xl text-foreground">{n}</div>
@@ -202,6 +223,7 @@ function OutreachRunner() {
                 <button onClick={() => { setStatus(current.id, "pasted"); toast.success("Marked pasted (this browser only)"); }} className={btn}><ClipboardCheck className="h-4 w-4" />Mark Pasted</button>
                 <button disabled={busy || status === "contacted"} onClick={markContacted} className="inline-flex items-center justify-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground disabled:opacity-50"><CheckCircle2 className="h-4 w-4" />Mark Contacted</button>
                 <button disabled={busy} onClick={markReview} className={btn}><AlertTriangle className="h-4 w-4" />Needs Review</button>
+                <button disabled={busy} onClick={markBlocked} className={btn}><AlertTriangle className="h-4 w-4" />DM Blocked / Retry Later</button>
                 <button disabled={busy} onClick={markNotRelevant} className={btn}><X className="h-4 w-4" />Not Relevant</button>
                 <button onClick={() => { setStatus(current.id, "skipped"); setJustActed(true); }} className={btn}><SkipForward className="h-4 w-4" />Skip</button>
                 <button onClick={goNext} className={`${btn} ${justActed ? "border-primary bg-primary text-primary-foreground ring-2 ring-primary/30 hover:bg-primary/90" : ""}`}>Next Creator<ArrowRight className="h-4 w-4" /></button>
