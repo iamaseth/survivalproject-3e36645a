@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { ChevronDown, ChevronRight, Copy, Download, ExternalLink, Facebook, Globe, Image as ImageIcon, Instagram, Loader2, Mail, MessageCircle, Printer, Search, Upload, Youtube, X } from "lucide-react";
-import { CREATORS, creatorOutreachStage, creatorPersonalizationReady, creatorReadyToContact, type CreatorRow, useCreatorsVersion } from "@/lib/creator-partnerships";
+import { CREATORS, creatorOutreachStage, creatorPersonalizationReady, creatorReadyToContact, creatorQualificationReady, type CreatorRow, useCreatorsVersion } from "@/lib/creator-partnerships";
 import { importCreatorPersonalization, updateCreatorWorkflow } from "@/lib/creators.functions";
 import { externalLinkProps, outlookComposeUrl } from "@/lib/external-link";
 import { listEmailTemplates } from "@/lib/templates.functions";
