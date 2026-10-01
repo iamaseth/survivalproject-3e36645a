@@ -243,7 +243,8 @@ export function creatorPersonalizationReady(c: CreatorRow): boolean {
 export function creatorQualificationReady(c: CreatorRow): boolean {
   const notes = (c.researchNotes ?? "").toLowerCase();
   const research = (c.researchStatus ?? "").toLowerCase();
-  const isTikTokStaging = c.id.startsWith("TT-STAGING-");
+  const id = (c.id ?? "").toUpperCase();
+  const isTikTokStaging = id.startsWith("TT-STAGING-") || id.includes("TT-STAGING-");
 
   // TikTok search/clipping rows are discovery candidates, not approved creators.
   // They must have an explicit creator-level qualification before outreach.
