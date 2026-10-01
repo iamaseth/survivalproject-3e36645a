@@ -240,7 +240,7 @@ export function creatorPersonalizationReady(c: CreatorRow): boolean {
 }
 
 export function creatorReadyToContact(c: CreatorRow): boolean {
-  return creatorOutreachStage(c) === "not_contacted" && creatorPersonalizationReady(c) && c.qualificationStatus === "Qualified";
+  return creatorOutreachStage(c) === "not_contacted" && creatorPersonalizationReady(c) && c.qualificationStatus !== "Not Relevant";
 }
 
 // ------------ Templates (from Templates sheet) ------------
