@@ -238,33 +238,8 @@ export function creatorPersonalizationReady(c: CreatorRow): boolean {
   return Boolean(c.personalizedDm?.trim() || c.personalizedEmailBody?.trim());
 }
 
-// Discovery/search evidence is not creator-level qualification. Legacy TikTok
-// staging notes explicitly say these profiles were never reviewed/approved.
-export function creatorQualificationReady(c: CreatorRow): boolean {
-  const notes = (c.researchNotes ?? "").toLowerCase();
-  const research = (c.researchStatus ?? "").toLowerCase();
-  const id = (c.id ?? "").toUpperCase();
-  const isTikTokStaging = id.startsWith("TT-STAGING-") || id.includes("TT-STAGING-");
-
-  // TikTok search/clipping rows are discovery candidates, not approved creators.
-  // They must have an explicit creator-level qualification before outreach.
-  if (isTikTokStaging) {
-    const explicitlyQualified =
-      research.includes("qualified") ||
-      notes.includes("creator-level qualified") ||
-      notes.includes("profile verified for fit");
-    if (!explicitlyQualified) return false;
-  }
-
-  if (notes.includes("profile not yet reviewed for fit")) return false;
-  if (notes.includes("unverified candidate; outreach not approved")) return false;
-  return true;
-}
-
 export function creatorReadyToContact(c: CreatorRow): boolean {
-  return creatorOutreachStage(c) === "not_contacted"
-    && creatorPersonalizationReady(c)
-    && creatorQualificationReady(c);
+  return creatorOutreachStage(c) === "not_contacted" && creatorPersonalizationReady(c);
 }
 
 // ------------ Templates (from Templates sheet) ------------
