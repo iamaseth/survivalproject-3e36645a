@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { ChevronDown, ChevronRight, Copy, Download, ExternalLink, Facebook, Globe, Image as ImageIcon, Instagram, Loader2, Mail, MessageCircle, Printer, Search, Upload, Youtube, X } from "lucide-react";
-import { CREATORS, creatorOutreachStage, creatorPersonalizationReady, creatorReadyToContact, creatorQualificationReady, type CreatorRow, useCreatorsVersion } from "@/lib/creator-partnerships";
+import { CREATORS, creatorOutreachStage, creatorPersonalizationReady, creatorReadyToContact, type CreatorRow, useCreatorsVersion } from "@/lib/creator-partnerships";
 import { importCreatorPersonalization, updateCreatorWorkflow } from "@/lib/creators.functions";
 import { externalLinkProps, outlookComposeUrl } from "@/lib/external-link";
 import { listEmailTemplates } from "@/lib/templates.functions";
@@ -122,9 +122,9 @@ function CreatorPipeline() {
   }, [query, platformFilter, contactFilter, nicheFilter, version]);
   const filtersActive = Boolean(query || platformFilter !== "all" || contactFilter !== "all" || nicheFilter !== "all");
   const grouped = useMemo(() => { const out: Record<StageKey, CreatorRow[]> = { not_contacted: [], confirm_contact: [], contacted: [], follow_up: [], responded: [], sample: [] }; creators.forEach((c) => out[stageFor(c)].push(c)); return out; }, [creators]);
-  const needsReview = useMemo(() => creators.filter((c) => stageFor(c) === "not_contacted" && (c.personalizationStatus?.toLowerCase() === "needs review" || !creatorQualificationReady(c))), [creators]);
-  const needsPersonalization = useMemo(() => creators.filter((c) => stageFor(c) === "not_contacted" && creatorQualificationReady(c) && !personalizationReady(c) && c.personalizationStatus?.toLowerCase() !== "needs review"), [creators]);
-  const readyToContact = useMemo(() => creators.filter((c) => stageFor(c) === "not_contacted" && creatorQualificationReady(c) && personalizationReady(c)), [creators]);
+  const needsReview = useMemo(() => creators.filter((c) => stageFor(c) === "not_contacted" && c.personalizationStatus?.toLowerCase() === "needs review"), [creators]);
+  const needsPersonalization = useMemo(() => creators.filter((c) => stageFor(c) === "not_contacted" && !personalizationReady(c) && c.personalizationStatus?.toLowerCase() !== "needs review"), [creators]);
+  const readyToContact = useMemo(() => creators.filter((c) => stageFor(c) === "not_contacted" && personalizationReady(c)), [creators]);
   const outreachGrouped = useMemo(() => ({ ...grouped, not_contacted: grouped.not_contacted.filter((c) => !personalizationReady(c)) }), [grouped]);
   const lastImport = typeof window !== "undefined" ? (() => { try { return JSON.parse(window.localStorage.getItem("survival-tabs-last-personalization-import") ?? "null") as {updated:number;skipped:number;total:number;file:string;at:string}|null; } catch { return null; } })() : null;
   const exportPersonalization = (limit: number) => {
