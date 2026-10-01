@@ -136,6 +136,8 @@ export function testCreatorToRow(t: TestCreatorEntry): CreatorRow {
     personalizedEmailSubject: null,
     personalizedEmailBody: null,
     personalizationSource: null,
+    personalizationStatus: null,
+    qualificationStatus: null,
     researchStatus: null,
     priority: null,
     amazon: null,

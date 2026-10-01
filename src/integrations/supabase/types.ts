@@ -477,9 +477,15 @@ export type Database = {
           outreach_owner: string | null
           partnership_tier: string | null
           perry_comments: string | null
+          personalization_source: string | null
+          personalization_status: string | null
+          personalized_dm: string | null
+          personalized_email_body: string | null
+          personalized_email_subject: string | null
           primary_platforms: string | null
           primary_source: string | null
           priority: string | null
+          qualification_status: string | null
           reach_signal: string | null
           recent_activity_check: string | null
           recommended_offer: string | null
@@ -537,9 +543,15 @@ export type Database = {
           outreach_owner?: string | null
           partnership_tier?: string | null
           perry_comments?: string | null
+          personalization_source?: string | null
+          personalization_status?: string | null
+          personalized_dm?: string | null
+          personalized_email_body?: string | null
+          personalized_email_subject?: string | null
           primary_platforms?: string | null
           primary_source?: string | null
           priority?: string | null
+          qualification_status?: string | null
           reach_signal?: string | null
           recent_activity_check?: string | null
           recommended_offer?: string | null
@@ -597,9 +609,15 @@ export type Database = {
           outreach_owner?: string | null
           partnership_tier?: string | null
           perry_comments?: string | null
+          personalization_source?: string | null
+          personalization_status?: string | null
+          personalized_dm?: string | null
+          personalized_email_body?: string | null
+          personalized_email_subject?: string | null
           primary_platforms?: string | null
           primary_source?: string | null
           priority?: string | null
+          qualification_status?: string | null
           reach_signal?: string | null
           recent_activity_check?: string | null
           recommended_offer?: string | null
