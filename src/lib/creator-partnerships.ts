@@ -86,6 +86,7 @@ export interface CreatorRow {
   personalizedEmailBody: string | null;
   personalizationSource: string | null;
   personalizationStatus: string | null;
+  qualificationStatus: "Qualified" | "Needs Review" | "Not Relevant" | null;
 
   // Derived / workflow additions
   supervisor: "RENA";
@@ -239,7 +240,7 @@ export function creatorPersonalizationReady(c: CreatorRow): boolean {
 }
 
 export function creatorReadyToContact(c: CreatorRow): boolean {
-  return creatorOutreachStage(c) === "not_contacted" && creatorPersonalizationReady(c);
+  return creatorOutreachStage(c) === "not_contacted" && creatorPersonalizationReady(c) && c.qualificationStatus === "Qualified";
 }
 
 // ------------ Templates (from Templates sheet) ------------
@@ -435,6 +436,7 @@ function rowToCreator(r: Record<string, unknown>): CreatorRow {
     personalizedEmailBody: (r.personalized_email_body as string | null) ?? null,
     personalizationSource: (r.personalization_source as string | null) ?? null,
     personalizationStatus: (r.personalization_status as string | null) ?? null,
+    qualificationStatus: (r.qualification_status as CreatorRow["qualificationStatus"]) ?? null,
     supervisor: "RENA" as const,
     perryApproval: normPerry((r.perry_comments as string | null) ?? null),
     responseState,
