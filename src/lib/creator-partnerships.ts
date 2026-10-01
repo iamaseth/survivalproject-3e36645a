@@ -242,6 +242,19 @@ export function creatorPersonalizationReady(c: CreatorRow): boolean {
 // staging notes explicitly say these profiles were never reviewed/approved.
 export function creatorQualificationReady(c: CreatorRow): boolean {
   const notes = (c.researchNotes ?? "").toLowerCase();
+  const research = (c.researchStatus ?? "").toLowerCase();
+  const isTikTokStaging = c.id.startsWith("TT-STAGING-");
+
+  // TikTok search/clipping rows are discovery candidates, not approved creators.
+  // They must have an explicit creator-level qualification before outreach.
+  if (isTikTokStaging) {
+    const explicitlyQualified =
+      research.includes("qualified") ||
+      notes.includes("creator-level qualified") ||
+      notes.includes("profile verified for fit");
+    if (!explicitlyQualified) return false;
+  }
+
   if (notes.includes("profile not yet reviewed for fit")) return false;
   if (notes.includes("unverified candidate; outreach not approved")) return false;
   return true;
