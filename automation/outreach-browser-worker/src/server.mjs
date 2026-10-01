@@ -107,7 +107,7 @@ async function openAndPaste({ creatorId, platform, profileUrl, message }) {
 
   // TikTok's composer is normally contenteditable. Restrict the search to visible
   // textbox/contenteditable controls and fill only; NEVER press Enter or click Send.
-  const composer = page.locator('[contenteditable="true"][role="textbox"], div[contenteditable="true"], textarea').filter({ visible: true }).last();
+  const composer = page.locator('[contenteditable="true"][role="textbox"]:visible, div[contenteditable="true"]:visible, textarea:visible').last();
   if (!(await composer.isVisible({ timeout: 6000 }).catch(() => false))) {
     return { success: true, status: "followed_message_opened_paste_not_found", error: "Follow/message opened, but the composer was not found. Nothing was pasted or sent." };
   }
