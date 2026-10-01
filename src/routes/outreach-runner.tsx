@@ -6,7 +6,6 @@ import { ExternalLink, Copy, ClipboardCheck, CheckCircle2, AlertTriangle, SkipFo
 import { CREATORS, creatorReadyToContact, useCreatorsVersion, type CreatorRow } from "@/lib/creator-partnerships";
 import { updateCreatorWorkflow } from "@/lib/creators.functions";
 import { externalLinkProps } from "@/lib/external-link";
-import { BrowserWorkerPanel } from "@/components/BrowserWorkerPanel";
 
 export const Route = createFileRoute("/outreach-runner")({
   head: () => ({
@@ -141,7 +140,7 @@ function OutreachRunner() {
           <p className="mt-1 text-base font-medium text-foreground">One creator at a time. Review before sending.</p>
         </div>
         <div className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1.5 text-xs text-muted-foreground">
-          <Bot className="h-3.5 w-3.5" /> Browser Worker: TikTok test mode
+          <Bot className="h-3.5 w-3.5" /> TikTok manual-send test mode
         </div>
       </div>
 
@@ -179,7 +178,7 @@ function OutreachRunner() {
               </div>
 
               <div className="flex flex-wrap gap-2">
-                {profile ? <a {...externalLinkProps(profile.url)} className={btn}><ExternalLink className="h-4 w-4" />Open Profile</a> : null}
+                {profile ? <button type="button" onClick={async () => { await copyMessage(); window.open(profile.url, "_blank", "noopener,noreferrer"); }} className={btn}><ExternalLink className="h-4 w-4" />Copy DM & Open TikTok</button> : null}
                 <button onClick={copyMessage} className={btn}><Copy className="h-4 w-4" />Copy Message</button>
                 <button onClick={() => { setStatus(current.id, "pasted"); toast.success("Marked pasted (this browser only)"); }} className={btn}><ClipboardCheck className="h-4 w-4" />Mark Pasted</button>
                 <button disabled={busy || status === "contacted"} onClick={markContacted} className="inline-flex items-center justify-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground disabled:opacity-50"><CheckCircle2 className="h-4 w-4" />Mark Contacted</button>
@@ -187,13 +186,12 @@ function OutreachRunner() {
                 <button onClick={() => { setStatus(current.id, "skipped"); setJustActed(true); }} className={btn}><SkipForward className="h-4 w-4" />Skip</button>
                 <button onClick={goNext} className={`${btn} ${justActed ? "border-primary bg-primary text-primary-foreground ring-2 ring-primary/30 hover:bg-primary/90" : ""}`}>Next Creator<ArrowRight className="h-4 w-4" /></button>
               </div>
-              <p className="text-xs text-muted-foreground">Nothing is sent automatically. Paste and send the message yourself on the profile, then click Mark Contacted.</p>
+              <p className="text-xs text-muted-foreground">Test flow: Copy DM & Open TikTok → Follow the creator → Message → paste the copied DM → STOP before Send. Nothing is sent automatically.</p>
             </div>
           )}
         </section>
 
         <div className="space-y-5">
-        <BrowserWorkerPanel target={current && profile && current.personalizedDm ? { creatorId: current.id, platform: profile.platform, profileUrl: profile.url, message: current.personalizedDm } : null} />
         <aside className="rounded-xl border border-border bg-card">
           <div className="border-b border-border px-4 py-3 text-sm font-semibold">TikTok — Ready to Contact ({queue.length})</div>
           <ul className="max-h-[560px] divide-y divide-border overflow-y-auto">
