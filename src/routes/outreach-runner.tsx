@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { ExternalLink, CheckCircle2, AlertTriangle, ArrowRight, Bot, X } from "lucide-react";
-import { CREATORS, creatorReadyToContact, useCreatorsVersion, type CreatorRow } from "@/lib/creator-partnerships";
+import { CREATORS, creatorOutreachStage, useCreatorsVersion, type CreatorRow } from "@/lib/creator-partnerships";
 import { updateCreatorWorkflow } from "@/lib/creators.functions";
 import { externalLinkProps } from "@/lib/external-link";
 
@@ -63,7 +63,7 @@ function OutreachRunner() {
   const eligible = useMemo(() => {
     void version;
     return CREATORS.filter((c) =>
-      (readyIds ? readyIds.has(c.id) : creatorReadyToContact(c)) &&
+      (readyIds ? readyIds.has(c.id) : (creatorOutreachStage(c) === "not_contacted" && c.qualificationStatus !== "Not Relevant" && c.qualificationStatus !== "Needs Review")) &&
       Boolean(c.tiktok)
     ).sort((a, b) => a.name.localeCompare(b.name));
   }, [version, readyIds]);
@@ -166,7 +166,7 @@ function OutreachRunner() {
         <section className="rounded-xl border border-border bg-card p-5">
           {!current ? (
             <div className="py-16 text-center text-sm text-muted-foreground">
-              No TikTok creators are currently Ready to Contact.
+              No TikTok creators are currently ready for outreach.
             </div>
           ) : (
             <div className="space-y-5">
@@ -232,7 +232,7 @@ function OutreachRunner() {
         </section>
 
         <aside className="rounded-xl border border-border bg-card">
-          <div className="border-b border-border px-4 py-3 text-sm font-semibold">TikTok — Ready to Contact ({queue.length})</div>
+          <div className="border-b border-border px-4 py-3 text-sm font-semibold">TikTok — Ready for Outreach ({queue.length})</div>
           <ul className="max-h-[560px] divide-y divide-border overflow-y-auto">
             {queue.slice(0, 50).map((c, i) => (
               <li key={c.id}>
