@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { ExternalLink, Copy, ClipboardCheck, CheckCircle2, AlertTriangle, SkipForward, ArrowRight, Bot, X } from "lucide-react";
+import { ExternalLink, CheckCircle2, AlertTriangle, ArrowRight, Bot, X } from "lucide-react";
 import { CREATORS, creatorReadyToContact, useCreatorsVersion, type CreatorRow } from "@/lib/creator-partnerships";
 import { updateCreatorWorkflow } from "@/lib/creators.functions";
 import { externalLinkProps } from "@/lib/external-link";
@@ -11,9 +11,9 @@ export const Route = createFileRoute("/outreach-runner")({
   head: () => ({
     meta: [
       { title: "Outreach Runner — Survival Tabs" },
-      { name: "description", content: "One creator at a time: open profile, copy the saved message, review before sending." },
+      { name: "description", content: "One creator at a time: review the TikTok profile, write the DM, send manually, and move on." },
       { property: "og:title", content: "Outreach Runner — Survival Tabs" },
-      { property: "og:description", content: "One-at-a-time browser-assisted creator outreach." },
+      { property: "og:description", content: "Simple one-at-a-time creator outreach workflow." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
       { name: "robots", content: "noindex" },
@@ -22,12 +22,10 @@ export const Route = createFileRoute("/outreach-runner")({
   component: OutreachRunner,
 });
 
-type RunnerStatus = "pasted" | "contacted" | "review" | "blocked" | "skipped";
+type RunnerStatus = "contacted" | "review" | "skipped";
 const LS_KEY = "outreach-runner-v1";
 
 function profileOf(c: CreatorRow): { platform: string; url: string } | null {
-  // Phase 1 automation is intentionally TikTok-only. Other platforms will get
-  // their own routines because their message buttons and composers differ.
   if (c.tiktok) return { platform: "TikTok", url: c.tiktok };
   return null;
 }
@@ -53,6 +51,7 @@ function OutreachRunner() {
   useEffect(() => {
     try { setStatuses(JSON.parse(localStorage.getItem(LS_KEY) || "{}")); } catch { /* ignore */ }
   }, []);
+
   const setStatus = (id: string, s: RunnerStatus) => {
     setStatuses((prev) => {
       const next = { ...prev, [id]: s };
@@ -61,24 +60,20 @@ function OutreachRunner() {
     });
   };
 
-  // Start with the exact shared CRM Ready-to-Contact selector, then narrow
-  // to TikTok records with a DM body for this platform-specific worker.
   const eligible = useMemo(() => {
     void version;
     return CREATORS.filter((c) =>
       (readyIds ? readyIds.has(c.id) : creatorReadyToContact(c)) &&
-      Boolean(c.tiktok && c.personalizedDm?.trim()) &&
-      c.responseFollowup !== "DM Blocked — Retry Later"
+      Boolean(c.tiktok)
     ).sort((a, b) => a.name.localeCompare(b.name));
   }, [version, readyIds]);
 
-  const queue = eligible.filter((c) => !statuses[c.id] || statuses[c.id] === "pasted");
+  const queue = eligible.filter((c) => !statuses[c.id]);
   const counts = {
     ready: eligible.filter((c) => !statuses[c.id]).length,
-    pasted: Object.values(statuses).filter((s) => s === "pasted").length,
     contacted: Object.values(statuses).filter((s) => s === "contacted").length,
     review: Object.values(statuses).filter((s) => s === "review").length,
-    blocked: Object.values(statuses).filter((s) => s === "blocked").length,
+    notRelevant: Object.values(statuses).filter((s) => s === "skipped").length,
   };
 
   const current = (currentId && CREATORS.find((c) => c.id === currentId)) || queue[0] || null;
@@ -119,28 +114,8 @@ function OutreachRunner() {
       setStatus(current.id, "skipped");
       setJustActed(true);
       toast.success("Marked Not Relevant");
-      goNext();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Could not update creator");
-    } finally { setBusy(false); }
-  };
-
-  const markBlocked = async () => {
-    if (!current) return;
-    setBusy(true);
-    try {
-      const existing = (current.renaNotes || "").trim();
-      const note = `${today} — Outreach Runner: TikTok DM blocked; retry later`;
-      const rena_notes = existing ? `${existing}\n${note}` : note;
-      await updateFn({ data: { id: current.id, response_followup: "DM Blocked — Retry Later", rena_notes } });
-      current.responseFollowup = "DM Blocked — Retry Later";
-      current.renaNotes = rena_notes;
-      setStatus(current.id, "blocked");
-      setJustActed(true);
-      toast.success("DM blocked — saved for later retry");
-      goNext();
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Could not save blocked DM status");
     } finally { setBusy(false); }
   };
 
@@ -161,15 +136,9 @@ function OutreachRunner() {
     } finally { setBusy(false); }
   };
 
-  const copyMessage = async () => {
-    if (!current?.personalizedDm) return;
-    try { await navigator.clipboard.writeText(current.personalizedDm); toast.success("Message copied"); }
-    catch { toast.error("Copy failed — select the text and copy manually"); }
-  };
-
   const profile = current ? profileOf(current) : null;
   const status = current ? statuses[current.id] : undefined;
-  const btn = "inline-flex items-center justify-center gap-2 rounded-md border border-input bg-background px-4 py-2.5 text-sm font-medium hover:bg-secondary disabled:opacity-50";
+  const baseButton = "inline-flex min-w-[170px] items-center justify-center gap-2 rounded-lg px-4 py-3 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50";
 
   return (
     <div className="mx-auto max-w-[1400px] space-y-5">
@@ -177,15 +146,15 @@ function OutreachRunner() {
         <div>
           <div className="text-[11px] uppercase tracking-[0.18em] text-[color:var(--gold)]">Creator outreach</div>
           <h1 className="font-display text-3xl text-foreground">Influencer Outreach Runner</h1>
-          <p className="mt-1 text-base font-medium text-foreground">One creator at a time. Review before sending.</p>
+          <p className="mt-1 text-base font-medium text-foreground">Simple BoBo workflow: check fit, write DM, send, mark, next.</p>
         </div>
         <div className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1.5 text-xs text-muted-foreground">
-          <Bot className="h-3.5 w-3.5" /> TikTok manual-send test mode
+          <Bot className="h-3.5 w-3.5" /> Manual-send mode
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
-        {([["Ready", counts.ready], ["Pasted", counts.pasted], ["Contacted", counts.contacted], ["Needs Review", counts.review], ["DM Blocked", counts.blocked]] as const).map(([l, n]) => (
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {([["Ready", counts.ready], ["Contacted", counts.contacted], ["Needs Review", counts.review], ["Not Relevant", counts.notRelevant]] as const).map(([l, n]) => (
           <div key={l} className="rounded-xl border border-border bg-card px-4 py-3">
             <div className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">{l}</div>
             <div className="font-display text-2xl text-foreground">{n}</div>
@@ -197,10 +166,10 @@ function OutreachRunner() {
         <section className="rounded-xl border border-border bg-card p-5">
           {!current ? (
             <div className="py-16 text-center text-sm text-muted-foreground">
-              No TikTok creators are currently Ready to Contact with a saved personalized DM.
+              No TikTok creators are currently Ready to Contact.
             </div>
           ) : (
-            <div className="space-y-4">
+            <div className="space-y-5">
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div>
                   <h2 className="font-display text-2xl text-foreground">{current.name}</h2>
@@ -209,46 +178,76 @@ function OutreachRunner() {
                   </div>
                   {profile ? <a {...externalLinkProps(profile.url)} className="break-all text-xs text-primary underline">{profile.url}</a> : null}
                 </div>
-                {status ? <span className="rounded-full bg-secondary px-3 py-1 text-xs font-medium">{status === "review" ? "Needs review" : status}</span> : null}
+                {status ? <span className="rounded-full bg-secondary px-3 py-1 text-xs font-medium">{status === "review" ? "Needs review" : status === "skipped" ? "Not relevant" : status}</span> : null}
               </div>
 
-              <div>
-                <div className="mb-1 text-xs font-medium text-muted-foreground">Saved personalized message</div>
-                <div className="whitespace-pre-wrap rounded-lg border border-border bg-background p-4 text-[15px] leading-relaxed text-foreground">{current.personalizedDm}</div>
+              <div className="rounded-xl border border-dashed border-border bg-secondary/20 p-4 text-sm text-muted-foreground">
+                Open TikTok and decide whether this creator fits. If yes, send the profile screenshot to ChatGPT, copy the new DM into TikTok, send it manually, then return here and click Contacted.
               </div>
 
-              <div className="flex flex-wrap gap-2">
-                {profile ? <button type="button" onClick={async () => { await copyMessage(); window.open(profile.url, "_blank", "noopener,noreferrer"); }} className={btn}><ExternalLink className="h-4 w-4" />Copy DM & Open TikTok</button> : null}
-                <button onClick={copyMessage} className={btn}><Copy className="h-4 w-4" />Copy Message</button>
-                <button onClick={() => { setStatus(current.id, "pasted"); toast.success("Marked pasted (this browser only)"); }} className={btn}><ClipboardCheck className="h-4 w-4" />Mark Pasted</button>
-                <button disabled={busy || status === "contacted"} onClick={markContacted} className="inline-flex items-center justify-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground disabled:opacity-50"><CheckCircle2 className="h-4 w-4" />Mark Contacted</button>
-                <button disabled={busy} onClick={markReview} className={btn}><AlertTriangle className="h-4 w-4" />Needs Review</button>
-                <button disabled={busy} onClick={markBlocked} className={btn}><AlertTriangle className="h-4 w-4" />DM Blocked / Retry Later</button>
-                <button disabled={busy} onClick={markNotRelevant} className={btn}><X className="h-4 w-4" />Not Relevant</button>
-                <button onClick={() => { setStatus(current.id, "skipped"); setJustActed(true); }} className={btn}><SkipForward className="h-4 w-4" />Skip</button>
-                <button onClick={goNext} className={`${btn} ${justActed ? "border-primary bg-primary text-primary-foreground ring-2 ring-primary/30 hover:bg-primary/90" : ""}`}>Next Creator<ArrowRight className="h-4 w-4" /></button>
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+                {profile ? (
+                  <button
+                    type="button"
+                    onClick={() => window.open(profile.url, "_blank", "noopener,noreferrer")}
+                    className={`${baseButton} border border-blue-300 bg-blue-50 text-blue-900 hover:bg-blue-100`}
+                  >
+                    <ExternalLink className="h-4 w-4" />1. Open TikTok
+                  </button>
+                ) : null}
+
+                <button
+                  disabled={busy || status === "contacted"}
+                  onClick={markContacted}
+                  className={`${baseButton} bg-emerald-600 text-white hover:bg-emerald-700`}
+                >
+                  <CheckCircle2 className="h-4 w-4" />2. Contacted
+                </button>
+
+                <button
+                  disabled={busy}
+                  onClick={markReview}
+                  className={`${baseButton} border border-amber-300 bg-amber-50 text-amber-900 hover:bg-amber-100`}
+                >
+                  <AlertTriangle className="h-4 w-4" />3. Needs Review
+                </button>
+
+                <button
+                  disabled={busy}
+                  onClick={markNotRelevant}
+                  className={`${baseButton} border border-rose-300 bg-rose-50 text-rose-900 hover:bg-rose-100`}
+                >
+                  <X className="h-4 w-4" />4. Not Relevant
+                </button>
+
+                <button
+                  onClick={goNext}
+                  className={`${baseButton} ${justActed ? "bg-slate-900 text-white ring-2 ring-slate-400" : "border border-slate-300 bg-slate-100 text-slate-900 hover:bg-slate-200"}`}
+                >
+                  5. Next Creator<ArrowRight className="h-4 w-4" />
+                </button>
               </div>
-              <p className="text-xs text-muted-foreground">Test flow: Copy DM & Open TikTok → Follow the creator → Message → paste the copied DM → STOP before Send. Nothing is sent automatically.</p>
             </div>
           )}
         </section>
 
-        <div className="space-y-5">
         <aside className="rounded-xl border border-border bg-card">
           <div className="border-b border-border px-4 py-3 text-sm font-semibold">TikTok — Ready to Contact ({queue.length})</div>
           <ul className="max-h-[560px] divide-y divide-border overflow-y-auto">
             {queue.slice(0, 50).map((c, i) => (
               <li key={c.id}>
-                <button onClick={() => { setCurrentId(c.id); setJustActed(false); }} className={`flex w-full items-center gap-2 px-4 py-2 text-left text-sm hover:bg-secondary/50 ${c.id === current?.id ? "bg-secondary" : ""}`}>
+                <button
+                  onClick={() => { setCurrentId(c.id); setJustActed(false); }}
+                  className={`flex w-full items-center gap-2 px-4 py-2 text-left text-sm hover:bg-secondary/50 ${c.id === current?.id ? "bg-secondary" : ""}`}
+                >
                   <span className="w-6 text-xs text-muted-foreground">{i + 1}</span>
                   <span className="min-w-0 flex-1 truncate">{c.name}</span>
-                  <span className="text-[11px] text-muted-foreground">{statuses[c.id] === "pasted" ? "pasted" : profileOf(c)?.platform}</span>
+                  <span className="text-[11px] text-muted-foreground">{profileOf(c)?.platform}</span>
                 </button>
               </li>
             ))}
           </ul>
         </aside>
-        </div>
       </div>
     </div>
   );
