@@ -115,8 +115,11 @@ function normResponse(v: string | null): ResponseState {
   const s = v.toLowerCase();
   if (s.includes("bounce")) return "Bounced";
   if (s.includes("declin") || s.includes("not interested") || s.includes("pass")) return "Replied — Declined";
-  if (s.includes("interest") || s.includes("reply") || s.includes("replied") || s.includes("yes")) return "Replied — Interested";
+  // Waiting/follow-up phrases often contain the word "reply" (for example
+  // "Waiting reply"). Classify those before positive reply phrases so a
+  // sent outreach does not get mistaken for an interested response.
   if (s.includes("wait") || s.includes("await") || s.includes("pending") || s.includes("follow")) return "Waiting Reply";
+  if (s.includes("interest") || s.includes("replied") || s.includes("yes")) return "Replied — Interested";
   return "Waiting Reply";
 }
 
