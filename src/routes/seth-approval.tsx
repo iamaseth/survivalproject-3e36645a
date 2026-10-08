@@ -3,7 +3,8 @@ import { useEffect, useMemo, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { CREATORS, useCreatorsVersion, type CreatorRow } from "@/lib/creator-partnerships";
-import { amICreatorApprover, sethReviewCreator } from "@/lib/creators.functions";
+import { amICreatorApprover, outreachPoolAction, sethReviewCreator } from "@/lib/creators.functions";
+import { hydrateCreatorsFromDB } from "@/lib/creator-partnerships";
 import { TIKTOK_PROFILE_RE } from "@/lib/tiktok-dm-verification";
 import { externalLinkProps } from "@/lib/external-link";
 
@@ -90,6 +91,13 @@ function Card({ c, onDone, onSkip }: { c: CreatorRow; onDone: () => void; onSkip
   const [busy, setBusy] = useState(false);
   const screening = (c.researchNotes || "").match(SCREEN_RE) || [];
 
+  const pool = useServerFn(outreachPoolAction);
+  const assign = async (target: string) => {
+    setBusy(true);
+    try { await pool({ data: { id: c.id, action: "assign", target } }); await hydrateCreatorsFromDB(); toast.success(`${c.name} assigned to ${target}`); onDone(); }
+    catch (e) { toast.error(e instanceof Error ? e.message : "Could not assign"); }
+    finally { setBusy(false); }
+  };
   const act = async (decision: "approved" | "rejected" | "cleared") => {
     if (busy) return;
     setBusy(true);
@@ -120,6 +128,12 @@ function Card({ c, onDone, onSkip }: { c: CreatorRow; onDone: () => void; onSkip
       {c.sethApprovalStatus ? (
         <div className="flex items-center justify-between rounded-md bg-secondary/40 p-2 text-sm">
           <span>{c.sethApprovalStatus === "approved" ? "Approved" : "Rejected"}{c.sethApprovedAt ? ` · ${c.sethApprovedAt.slice(0, 10)}` : ""}{c.sethApprovalNote ? ` · ${c.sethApprovalNote}` : ""}</span>
+          {c.sethApprovalStatus === "approved" && !c.outreachSentAt && !c.contactedDate ? (
+            <select disabled={busy} value={c.outreachAssignee ?? ""} onChange={(e) => void assign(e.target.value)} className="rounded-md border border-input bg-background px-2 py-1 text-xs">
+              <option value="" disabled>Assign sender…</option>
+              {["Seth", "BoBo", "Rena"].map((n) => <option key={n} value={n}>{n}</option>)}
+            </select>
+          ) : c.outreachSentBy ? <span className="text-xs">Sent by {c.outreachSentBy}</span> : null}
           <button disabled={busy} onClick={() => void act("cleared")} className="rounded-md border border-input px-3 py-1 text-xs">Undo → back to review</button>
         </div>
       ) : (

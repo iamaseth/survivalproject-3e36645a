@@ -91,6 +91,9 @@ export interface CreatorRow {
   sethApprovedBy?: string | null;
   sethApprovedAt?: string | null;
   sethApprovalNote?: string | null;
+  outreachAssignee?: string | null;
+  outreachSentBy?: string | null;
+  outreachSentAt?: string | null;
 
   // Derived / workflow additions
   supervisor: "RENA";
@@ -428,6 +431,9 @@ function rowToCreator(r: Record<string, unknown>): CreatorRow {
     sethApprovedBy: (r.seth_approved_by as string | null) ?? null,
     sethApprovedAt: (r.seth_approved_at as string | null) ?? null,
     sethApprovalNote: (r.seth_approval_note as string | null) ?? null,
+    outreachAssignee: (r.outreach_assignee as string | null) ?? null,
+    outreachSentBy: (r.outreach_sent_by as string | null) ?? null,
+    outreachSentAt: (r.outreach_sent_at as string | null) ?? null,
     verificationDate: (r.verification_date as string | null) ?? null,
     followersSignal: (r.followers_signal as string | null) ?? null,
     targetAudience: (r.target_audience as string | null) ?? null,

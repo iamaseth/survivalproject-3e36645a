@@ -63,7 +63,7 @@ const navItems: NavItem[] = [
       { to: "/tiktok-master-import", label: "TikTok Master Import" },
       { to: "/tiktok-dm-review", label: "TikTok DM Review" },
       { to: "/seth-approval", label: "Seth Approval" },
-      { to: "/rena-queue", label: "Rena TikTok DMs" },
+      { to: "/rena-queue", label: "My TikTok DMs" },
     ],
   },
   { to: "/templates", label: "Templates", icon: FileText },

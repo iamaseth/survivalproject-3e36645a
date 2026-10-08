@@ -489,7 +489,12 @@ export type Database = {
           offer_confidence: string | null
           offer_reasoning: string | null
           other_platform: string | null
+          outreach_assignee: string | null
+          outreach_claimed_at: string | null
           outreach_owner: string | null
+          outreach_prev: Json | null
+          outreach_sent_at: string | null
+          outreach_sent_by: string | null
           partnership_tier: string | null
           perry_comments: string | null
           personalization_source: string | null
@@ -560,7 +565,12 @@ export type Database = {
           offer_confidence?: string | null
           offer_reasoning?: string | null
           other_platform?: string | null
+          outreach_assignee?: string | null
+          outreach_claimed_at?: string | null
           outreach_owner?: string | null
+          outreach_prev?: Json | null
+          outreach_sent_at?: string | null
+          outreach_sent_by?: string | null
           partnership_tier?: string | null
           perry_comments?: string | null
           personalization_source?: string | null
@@ -631,7 +641,12 @@ export type Database = {
           offer_confidence?: string | null
           offer_reasoning?: string | null
           other_platform?: string | null
+          outreach_assignee?: string | null
+          outreach_claimed_at?: string | null
           outreach_owner?: string | null
+          outreach_prev?: Json | null
+          outreach_sent_at?: string | null
+          outreach_sent_by?: string | null
           partnership_tier?: string | null
           perry_comments?: string | null
           personalization_source?: string | null
@@ -1189,6 +1204,24 @@ export type Database = {
           },
         ]
       }
+      outreach_senders: {
+        Row: {
+          created_at: string
+          email: string
+          sender_key: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          sender_key: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          sender_key?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -1647,6 +1680,11 @@ export type Database = {
       }
       get_rena_chat_user_id: { Args: never; Returns: string }
       is_creator_approver: { Args: never; Returns: boolean }
+      outreach_action: {
+        Args: { p_action: string; p_id: string; p_target?: string }
+        Returns: Json
+      }
+      outreach_my_sender: { Args: never; Returns: string }
       seth_review_creator: {
         Args: {
           p_checked_profile: boolean
