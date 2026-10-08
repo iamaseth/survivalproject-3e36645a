@@ -38,17 +38,36 @@ function QualifiedRow({c,onDone}:{c:CreatorRow;onDone:()=>void}) {
   const [busy,setBusy] = useState(false);
   const [showPaste,setShowPaste] = useState(false);
   const [dm,setDm] = useState("");
+  const [evidence,setEvidence] = useState("");
   const [error,setError] = useState("");
   const handle = c.tiktok?.match(/@([^/?#]+)/)?.[1] ?? c.name;
   const copy = async () => {
     const prompt = `Review this TikTok creator for Survival Tabs. Use the actual profile clip I paste below. Decide APPROVE or REJECT based only on evidence. If APPROVE, write a creator-specific, non-generic DM with no unsupported claims. Return a short evidence summary and the DM. Creator: @${handle}\nProfile: ${c.tiktok}\nPrior research (may be unverified): ${c.researchNotes || "None"}\nPrevious DM (may be generic): ${c.personalizedDm || "None"}\n\n[PASTE OBSIDIAN WEB CLIP HERE]`;
     try { await navigator.clipboard.writeText(prompt); toast.success("Copied creator research prompt"); } catch { setError("Clipboard unavailable; use a secure browser context."); }
   };
+  const paste = async () => {
+    setShowPaste(true); setError("");
+    try {
+      const raw = await navigator.clipboard.readText();
+      if (!raw.trim()) { setError("Clipboard is empty. Copy the complete ChatGPT result first."); return; }
+      const match = raw.match(/(?:^|\\n)Creator:\\s*([^\\n]+)/i);
+      if (match && !match[1].toLowerCase().includes(handle.toLowerCase())) { setError("Clipboard belongs to a different creator. Nothing saved."); return; }
+      const decision = raw.match(/(?:^|\\n)Decision:\\s*([^\\n]+)/i)?.[1] || "";
+      if (/REJECT/i.test(decision) || /(?:^|\\n)Qualification:\\s*Not Relevant/i.test(raw)) { setError("ChatGPT recommends rejection. Use Reject to confirm; no message was saved."); return; }
+      const dmMatch = raw.match(/(?:^|\\n)Personalized DM:\\s*\\n?([\\s\\S]*?)(?=\\n(?:Outreach|Status|Creator|Profile|Qualification|Decision|Evidence|Fit):|$)/i);
+      const extracted = (dmMatch?.[1] || "").trim();
+      if (!extracted) { setError("Could not find 'Personalized DM:' in the copied result. Paste the DM manually below."); return; }
+      const evidenceMatch = raw.match(/(?:^|\\n)Evidence:\\s*([^\\n]+)/i);
+      setDm(extracted);
+      setEvidence(evidenceMatch?.[1]?.trim() || "");
+      toast.success("Personalized DM extracted. Review before saving.");
+    } catch { setError("Browser blocked clipboard access. Paste the complete result into the field below."); }
+  };
   const act = async (decision:"approved"|"rejected") => {
     if (busyRef.current) return;
     if (decision === "approved" && (!isDmVerified(c) || !hasGroundedDm(c.verificationEvidence || "",dm))) {
       setError("Saved draft only. Direct profile evidence must be verified before outreach approval.");
-      if (dm.trim()) { try { await saveDraft({data:{id:c.id,dm:dm.trim(),note:"User pasted revised DM; direct verification still required"}}); toast.success("DM draft saved for verification"); } catch(e) { setError(e instanceof Error ? e.message : "Could not save draft"); } }
+      if (dm.trim()) { try { await saveDraft({data:{id:c.id,dm:dm.trim(),note:"User pasted revised DM. Evidence from clip (unverified in database): "+evidence.slice(0,500)}}); toast.success("DM draft saved for verification"); } catch(e) { setError(e instanceof Error ? e.message : "Could not save draft"); } }
       return;
     }
     busyRef.current=true;setBusy(true);setError("");
@@ -67,10 +86,10 @@ function QualifiedRow({c,onDone}:{c:CreatorRow;onDone:()=>void}) {
       <span className="mr-auto min-w-32 break-all text-sm font-medium">@{handle}</span>
       <a {...externalLinkProps(c.tiktok)} className="rounded-md border px-3 py-1.5 text-xs hover:bg-secondary">Open Profile ↗</a>
       <button type="button" onClick={() => void copy()} className="rounded-md border px-3 py-1.5 text-xs hover:bg-secondary">Copy</button>
-      <button type="button" onClick={() => setShowPaste(v=>!v)} className="rounded-md border px-3 py-1.5 text-xs hover:bg-secondary">Paste</button>
+      <button type="button" onClick={() => void paste()} className="rounded-md border px-3 py-1.5 text-xs hover:bg-secondary">Paste</button>
       <button type="button" disabled={busy} onClick={() => void act("rejected")} className="rounded-md border px-3 py-1.5 text-xs hover:bg-secondary">Reject</button>
     </div>
-    {showPaste && <div className="mt-3 space-y-2"><label className="block text-xs font-medium">Paste personalized DM from ChatGPT<textarea value={dm} onChange={e=>setDm(e.target.value)} rows={5} maxLength={2000} className="mt-1 w-full rounded-md border bg-background p-2 text-sm" /></label><button type="button" disabled={busy || !dm.trim()} onClick={()=>void act("approved")} className="rounded-md bg-primary px-3 py-2 text-xs text-primary-foreground">Save DM and approve if verified</button><p className="text-xs text-muted-foreground">Unverified creators remain in review; saving a DM never bypasses evidence checks.</p></div>}
+    {showPaste && <div className="mt-3 space-y-2"><label className="block text-xs font-medium">Personalized DM extracted from ChatGPT (editable)<textarea value={dm} onChange={e=>setDm(e.target.value)} rows={5} maxLength={2000} className="mt-1 w-full rounded-md border bg-background p-2 text-sm" /></label><button type="button" disabled={busy || !dm.trim()} onClick={()=>void act("approved")} className="rounded-md bg-primary px-3 py-2 text-xs text-primary-foreground">Save DM and approve if verified</button><p className="text-xs text-muted-foreground">The DM can be saved now. Outreach approval still requires recorded direct-profile verification.</p></div>}
     {error && <p role="alert" className="mt-2 text-xs text-destructive">{error}</p>}
   </div>;
 }
