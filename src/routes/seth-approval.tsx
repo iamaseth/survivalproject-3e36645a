@@ -283,7 +283,7 @@ function Row({ c, active, onActivate, onDone, onSkip }: { c: CreatorRow; active:
     <div className={active ? "bg-secondary/30 p-3" : ""}>
       <div className={`flex items-center gap-3 ${active ? "" : "cursor-pointer px-3 py-2 hover:bg-secondary/20"}`} onClick={active ? undefined : onActivate}>
         <a {...externalLinkProps(c.tiktok)} onClick={(e) => { e.stopPropagation(); onLinkClick(); }} className="font-medium text-primary underline">@{handle} ↗</a>
-        <span className="truncate text-xs text-muted-foreground">{c.name !== handle ? c.name : ""}</span>
+        <span className="truncate text-xs text-muted-foreground">{c.name.replace(/^@/, "") !== handle ? c.name : ""}</span>
         <span className="ml-auto flex shrink-0 items-center gap-1 text-[11px]">
           {isGood ? <span className="rounded bg-secondary px-1.5 py-0.5">Good (indirect)</span> : null}
           <span className={`rounded px-1.5 py-0.5 ${status === "Generic DM" || status === "No DM" ? "bg-destructive/15 text-destructive" : "bg-secondary"}`}>{status}</span>
