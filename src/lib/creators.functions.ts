@@ -356,3 +356,36 @@ export const addTikTokOutreachCreator = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return { id, name, created: Boolean(inserted?.length) };
   });
+
+// Records one researcher's individual TikTok DM review. Writes ONLY the three
+// verification fields for one creator; never touches DMs, status or contact history.
+export const recordTikTokDmReview = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { id: string; decision: "verified" | "rejected"; evidence: string; reviewer: string; checks?: { profileOpened: boolean; relevant: boolean; urlCorrect: boolean; dmGrounded: boolean } }) => {
+    if (!d?.id) throw new Error("Creator id required");
+    const evidence = (d.evidence || "").trim();
+    const reviewer = (d.reviewer || "").trim();
+    if (!reviewer) throw new Error("Reviewer name required");
+    if (d.decision === "verified") {
+      const c = d.checks;
+      if (!c?.profileOpened || !c.relevant || !c.urlCorrect || !c.dmGrounded) throw new Error("All four checks are required to verify");
+      if (evidence.length < 40) throw new Error("Write at least 40 characters of what you saw on the profile");
+    } else if (evidence.length < 5) throw new Error("Give a short reason");
+    if (evidence.length > 2000) throw new Error("Evidence too long");
+    return { id: d.id, decision: d.decision, evidence, reviewer: reviewer.slice(0, 80) };
+  })
+  .handler(async ({ data, context }) => {
+    const today = new Date().toISOString().slice(0, 10);
+    const label = data.decision === "verified" ? "Verified for TikTok DM" : "Rejected for TikTok DM";
+    const { data: cur, error: e1 } = await context.supabase.from("creators").select("contacted_date").eq("id", data.id).maybeSingle();
+    if (e1) throw new Error(e1.message);
+    if (!cur) throw new Error("Creator not found");
+    const { data: changed, error } = await context.supabase
+      .from("creators")
+      .update({ full_verification: `${label} — ${data.reviewer} — ${today}`, verification_evidence: data.evidence, verification_date: today } as never)
+      .eq("id", data.id)
+      .select("id");
+    if (error) throw new Error(error.message);
+    if (!changed?.length) throw new Error("Review not saved (update not permitted)");
+    return { ok: true };
+  });
