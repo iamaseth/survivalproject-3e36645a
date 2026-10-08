@@ -1,10 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { ExternalLink, CheckCircle2, AlertTriangle, ArrowRight, Bot, X } from "lucide-react";
 import { CREATORS, creatorOutreachStage, useCreatorsVersion, type CreatorRow } from "@/lib/creator-partnerships";
-import { updateCreatorWorkflow } from "@/lib/creators.functions";
+import { updateCreatorWorkflow, importCreatorQualifications } from "@/lib/creators.functions";
 import { externalLinkProps } from "@/lib/external-link";
 
 export const Route = createFileRoute("/outreach-runner")({
@@ -43,6 +43,7 @@ function OutreachRunner() {
     return raw ? new Set(raw.split(",").filter(Boolean)) : null;
   }, []);
   const updateFn = useServerFn(updateCreatorWorkflow);
+  const qualifyFn = useServerFn(importCreatorQualifications);
   const [statuses, setStatuses] = useState<Record<string, RunnerStatus>>({});
   const [currentId, setCurrentId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -77,64 +78,81 @@ function OutreachRunner() {
   };
 
   const current = (currentId && CREATORS.find((c) => c.id === currentId)) || queue[0] || null;
+  const lockRef = useRef(false);
+
+  // Next eligible creator after `fromId` in the existing queue order, skipping
+  // anything already actioned (including ids passed in `alsoDone`). Wraps around.
+  const nextAfter = (fromId: string | undefined, alsoDone: string[] = []) => {
+    const done = new Set(alsoDone);
+    const open = eligible.filter((c) => !statuses[c.id] && !done.has(c.id));
+    const others = open.filter((c) => c.id !== fromId);
+    if (!others.length) return null;
+    const idx = eligible.findIndex((c) => c.id === fromId);
+    if (idx < 0) return others[0].id;
+    const after = others.find((c) => eligible.indexOf(c) > idx);
+    return (after ?? others[0]).id;
+  };
 
   const goNext = () => {
+    if (lockRef.current) return;
     setJustActed(false);
-    const rest = queue.filter((c) => c.id !== current?.id);
-    setCurrentId(rest[0]?.id ?? null);
+    setCurrentId(nextAfter(current?.id));
+  };
+
+  // Runs one persisted action with a double-click guard; advances only on success.
+  const runAction = async (fn: (c: CreatorRow) => Promise<void>, status: RunnerStatus, okMsg: string, errMsg: string) => {
+    const target = current;
+    if (!target || lockRef.current) return;
+    lockRef.current = true;
+    setBusy(true);
+    try {
+      await fn(target);
+      const nextId = nextAfter(target.id, [target.id]);
+      setStatus(target.id, status);
+      setJustActed(false);
+      setCurrentId(nextId);
+      toast.success(okMsg);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : errMsg);
+    } finally {
+      lockRef.current = false;
+      setBusy(false);
+    }
+  };
+
+  const persistQualification = async (id: string, qualification_status: "Needs Review" | "Not Relevant") => {
+    const r = await qualifyFn({ data: { rows: [{ id, qualification_status }] } });
+    if (r.updated !== 1) throw new Error("Creator status was not saved (no matching record).");
   };
 
   const today = new Date().toISOString().slice(0, 10);
 
-  const markContacted = async () => {
-    if (!current) return;
-    const p = profileOf(current);
-    setBusy(true);
-    try {
-      await updateFn({ data: { id: current.id, contacted_date: today, contact_method: current.contactMethod || `${p?.platform ?? "Other"} DM`, response_followup: "Waiting reply" } });
-      current.contactedDate = today;
-      setStatus(current.id, "contacted");
-      setJustActed(true);
-      toast.success("Marked contacted");
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Could not update creator");
-    } finally { setBusy(false); }
-  };
+  const markContacted = () => runAction(async (c) => {
+    const p = profileOf(c);
+    await updateFn({ data: { id: c.id, contacted_date: today, contact_method: c.contactMethod || `${p?.platform ?? "Other"} DM`, response_followup: "Waiting reply" } });
+    c.contactedDate = today;
+  }, "contacted", "Marked contacted", "Could not update creator");
 
-  const markNotRelevant = async () => {
-    if (!current) return;
-    setBusy(true);
-    try {
-      const existing = (current.renaNotes || "").trim();
-      const note = `${today} — Outreach Runner: Not Relevant`;
-      const rena_notes = existing ? `${existing}\n${note}` : note;
-      await updateFn({ data: { id: current.id, response_followup: "Not Relevant", rena_notes } });
-      current.responseFollowup = "Not Relevant";
-      current.renaNotes = rena_notes;
-      setStatus(current.id, "skipped");
-      setJustActed(true);
-      toast.success("Marked Not Relevant");
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Could not update creator");
-    } finally { setBusy(false); }
-  };
+  const markNotRelevant = () => runAction(async (c) => {
+    const existing = (c.renaNotes || "").trim();
+    const note = `${today} — Outreach Runner: Not Relevant`;
+    const rena_notes = existing ? `${existing}\n${note}` : note;
+    await updateFn({ data: { id: c.id, response_followup: "Not Relevant", rena_notes } });
+    c.responseFollowup = "Not Relevant";
+    c.renaNotes = rena_notes;
+    await persistQualification(c.id, "Not Relevant");
+    c.qualificationStatus = "Not Relevant";
+  }, "skipped", "Marked Not Relevant", "Could not update creator");
 
-  const markReview = async () => {
-    if (!current) return;
-    setBusy(true);
-    try {
-      const existing = (current.renaNotes || "").trim();
-      const note = `${today} — Outreach Runner: needs review before contact`;
-      const rena_notes = existing ? `${existing}\n${note}` : note;
-      await updateFn({ data: { id: current.id, rena_notes } });
-      current.renaNotes = rena_notes;
-      setStatus(current.id, "review");
-      setJustActed(true);
-      toast.success("Flagged for review");
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Could not save note");
-    } finally { setBusy(false); }
-  };
+  const markReview = () => runAction(async (c) => {
+    const existing = (c.renaNotes || "").trim();
+    const note = `${today} — Outreach Runner: needs review before contact`;
+    const rena_notes = existing ? `${existing}\n${note}` : note;
+    await updateFn({ data: { id: c.id, rena_notes } });
+    c.renaNotes = rena_notes;
+    await persistQualification(c.id, "Needs Review");
+    c.qualificationStatus = "Needs Review";
+  }, "review", "Flagged for review", "Could not save review status");
 
   const profile = current ? profileOf(current) : null;
   const status = current ? statuses[current.id] : undefined;
