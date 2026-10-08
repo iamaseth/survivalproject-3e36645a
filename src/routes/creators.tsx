@@ -289,7 +289,9 @@ function CreatorLine({ creator }: { creator: CreatorRow }) {
   };
   const beginContact = async (href: string) => {
     // Open synchronously from the click so popup blockers do not prevent outreach.
-    window.open(href, "_blank", "noopener,noreferrer");
+    const normalizedHref = /^https?:\/\//i.test(href.trim()) ? href.trim() : `https://${href.trim().replace(/^\/+/, "")}`;
+    const opened = window.open(normalizedHref, "_blank");
+    if (!opened) { toast.error("Browser blocked the profile tab. Allow pop-ups or use the link in creator details."); return; }
     if (stage === "not_contacted") await update({ response_followup: "Contact confirmation pending" });
   };
   const markManualContacted=()=>{
