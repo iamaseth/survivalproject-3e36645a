@@ -45,7 +45,7 @@ function DmQueue() {
   const [savingId, setSavingId] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
 
-  const [previewSender] = useState<string | null>("Rena");
+  const [previewSender, setPreviewSender] = useState<string | null>("Rena");
   const viewingSender = previewSender ?? me?.sender ?? null;
   const readOnlyPreview = Boolean(viewingSender && viewingSender !== me?.sender);
   const lock = useRef(false);
