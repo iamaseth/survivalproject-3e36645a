@@ -62,6 +62,7 @@ const navItems: NavItem[] = [
       { to: "/outreach-runner", label: "Outreach Runner" },
       { to: "/tiktok-master-import", label: "TikTok Master Import" },
       { to: "/tiktok-dm-review", label: "TikTok DM Review" },
+      { to: "/seth-approval", label: "Seth Approval" },
       { to: "/rena-queue", label: "Rena TikTok DMs" },
     ],
   },

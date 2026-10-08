@@ -28,3 +28,7 @@ export function isDmVerified(c: CreatorRow) {
 }
 
 export const isDmRejected = (c: CreatorRow) => (c.fullVerification || "").startsWith(REJECTED_PREFIX);
+
+// Seth's personal approval (server-enforced approver only) also unlocks Rena's queue.
+export const isSethApproved = (c: CreatorRow) => c.sethApprovalStatus === "approved";
+export const isRenaReady = (c: CreatorRow) => isSethApproved(c) || isDmVerified(c);

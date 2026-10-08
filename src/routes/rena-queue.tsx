@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { CREATORS, useCreatorsVersion, type CreatorRow } from "@/lib/creator-partnerships";
 import { updateCreatorWorkflow } from "@/lib/creators.functions";
-import { baseCandidate, isDmVerified, TIKTOK_PROFILE_RE } from "@/lib/tiktok-dm-verification";
+import { baseCandidate, isRenaReady as isDmVerified, TIKTOK_PROFILE_RE } from "@/lib/tiktok-dm-verification";
 
 export const Route = createFileRoute("/rena-queue")({
   head: () => ({
@@ -122,8 +122,8 @@ function RenaQueue() {
           {notice.dm ? <textarea readOnly value={notice.dm} rows={4} onFocus={(e) => e.currentTarget.select()} className="mt-2 w-full rounded border border-input bg-background p-2 text-sm text-foreground" /> : null}
         </div>
       ) : null}
-      {rows.length === 0 ? <div className="py-12 text-center text-sm text-muted-foreground"><div className="text-base font-semibold text-foreground">Awaiting verification</div>No creators have passed individual profile review yet.</div> : null}
-      <p className="text-center text-[11px] text-muted-foreground">{unverified} qualified creators hidden until a researcher verifies them.</p>
+      {rows.length === 0 ? <div className="py-12 text-center text-sm text-muted-foreground"><div className="text-base font-semibold text-foreground">Awaiting verification</div>No creators have been approved by Seth or verified yet.</div> : null}
+      <p className="text-center text-[11px] text-muted-foreground">{unverified} qualified creators hidden until Seth approves them.</p>
       <ul className="space-y-2">
         {rows.map((c) => {
           const sent = isAssumed(c);

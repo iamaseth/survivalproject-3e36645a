@@ -87,6 +87,10 @@ export interface CreatorRow {
   personalizationSource: string | null;
   personalizationStatus: string | null;
   qualificationStatus: "Qualified" | "Needs Review" | "Not Relevant" | null;
+  sethApprovalStatus?: "approved" | "rejected" | null;
+  sethApprovedBy?: string | null;
+  sethApprovedAt?: string | null;
+  sethApprovalNote?: string | null;
 
   // Derived / workflow additions
   supervisor: "RENA";
@@ -420,6 +424,10 @@ function rowToCreator(r: Record<string, unknown>): CreatorRow {
     technicalNotes: (r.technical_notes as string | null) ?? null,
     recentActivityCheck: (r.recent_activity_check as string | null) ?? null,
     fullVerification: (r.full_verification as string | null) ?? null,
+    sethApprovalStatus: (r.seth_approval_status as "approved" | "rejected" | null) ?? null,
+    sethApprovedBy: (r.seth_approved_by as string | null) ?? null,
+    sethApprovedAt: (r.seth_approved_at as string | null) ?? null,
+    sethApprovalNote: (r.seth_approval_note as string | null) ?? null,
     verificationDate: (r.verification_date as string | null) ?? null,
     followersSignal: (r.followers_signal as string | null) ?? null,
     targetAudience: (r.target_audience as string | null) ?? null,

@@ -389,3 +389,27 @@ export const recordTikTokDmReview = createServerFn({ method: "POST" })
     if (!changed?.length) throw new Error("Review not saved (update not permitted)");
     return { ok: true };
   });
+
+// Seth approval: enforced in the database (is_creator_approver + seth_review_creator).
+export const amICreatorApprover = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { data, error } = await context.supabase.rpc("is_creator_approver" as never);
+    if (error) throw new Error(error.message);
+    return { approver: data === true };
+  });
+
+export const sethReviewCreator = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { id: string; decision: "approved" | "rejected" | "cleared"; dm?: string; note?: string; checkedProfile?: boolean; messageFits?: boolean }) => {
+    if (!d?.id || !["approved", "rejected", "cleared"].includes(d.decision)) throw new Error("Invalid request");
+    return d;
+  })
+  .handler(async ({ data, context }) => {
+    const { error } = await context.supabase.rpc("seth_review_creator" as never, {
+      p_id: data.id, p_decision: data.decision, p_dm: data.dm ?? null, p_note: data.note ?? null,
+      p_checked_profile: !!data.checkedProfile, p_message_fits: !!data.messageFits,
+    } as never);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
