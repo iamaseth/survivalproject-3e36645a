@@ -3,7 +3,7 @@ import { ChevronDown, ChevronRight } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { CREATORS, refreshCreatorsFromDB, useCreatorsVersion, type CreatorRow } from "@/lib/creator-partnerships";
-import { amICreatorApprover, sethReviewCreator, sethSaveDmDraft } from "@/lib/creators.functions";
+import { amICreatorApprover, sethReviewCreator, sethSaveDmDraft, outreachPoolAction } from "@/lib/creators.functions";
 import { hasGroundedDm } from "@/lib/final-approval";
 import { isDmVerified } from "@/lib/tiktok-dm-verification";
 import { externalLinkProps } from "@/lib/external-link";
@@ -37,6 +37,7 @@ export function SethReviewPanel() {
 function QualifiedRow({c,onDone}:{c:CreatorRow;onDone:()=>void}) {
   const review = useServerFn(sethReviewCreator);
   const saveDraft = useServerFn(sethSaveDmDraft);
+  const assign = useServerFn(outreachPoolAction);
   const busyRef = useRef(false);
   const [busy,setBusy] = useState(false);
   const [showPaste,setShowPaste] = useState(false);
@@ -78,10 +79,12 @@ function QualifiedRow({c,onDone}:{c:CreatorRow;onDone:()=>void}) {
       c.personalizedDm = dm.trim();
       await review({data:{id:c.id,decision:"approved",dm:dm.trim(),note:"Second manual review completed; assigned for "+assignee+" outreach",checkedProfile:true,messageFits:true}});
       c.sethApprovalStatus = "approved";
+      await assign({data:{id:c.id,action:"assign",target:assignee}});
+      c.outreachAssignee = assignee;
       setSaved(true);
       toast.success("Approved for Outreach");
       onDone();
-    } catch(e) { setError((e instanceof Error ? e.message : "Could not approve creator") + ". DM may have been saved; creator remains in Passed First Review until approval succeeds."); }
+    } catch(e) { setError((e instanceof Error ? e.message : "Could not approve creator") + ". The DM may be saved; refresh to confirm approval and assignment status."); }
     finally {busyRef.current = false; setBusy(false); }
   };
   const act = async (decision:"approved"|"rejected") => {
