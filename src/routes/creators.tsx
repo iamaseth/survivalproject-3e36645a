@@ -105,6 +105,7 @@ function CreatorPipeline() {
   const [personalizedOpen,setPersonalizedOpen]=useState(false);
   const [reviewOpen,setReviewOpen]=useState(false);
   const [readyOpen,setReadyOpen]=useState(false);
+  const [tiktokAuditOpen,setTiktokAuditOpen]=useState(false);
   const [personalizationImporting,setPersonalizationImporting]=useState(false);
   const [qualificationImporting,setQualificationImporting]=useState(false);
   const importPersonalization=useServerFn(importCreatorPersonalization);
@@ -128,6 +129,13 @@ function CreatorPipeline() {
   const needsPersonalization = useMemo(() => creators.filter((c) => stageFor(c) === "not_contacted" && !personalizationReady(c) && c.personalizationStatus?.toLowerCase() !== "needs review"), [creators]);
   const readyToContact = useMemo(() => creators.filter((c) => stageFor(c) === "not_contacted" && personalizationReady(c) && c.qualificationStatus !== "Not Relevant"), [creators]);
   const outreachGrouped = useMemo(() => ({ ...grouped, not_contacted: grouped.not_contacted.filter((c) => !personalizationReady(c)) }), [grouped]);
+  const tiktokAudit = useMemo(() => {
+    const all = CREATORS.filter(c => Boolean(c.tiktok));
+    const rejected = all.filter(c => c.qualificationStatus === "Not Relevant" || c.responseFollowup === "Not Relevant");
+    const patterns = new Map<string,number>();
+    rejected.forEach(c => { const niche=nicheLabel(c); patterns.set(niche,(patterns.get(niche)??0)+1); });
+    return {total:all.length,rejected:rejected.length,contacted:all.filter(c=>Boolean(c.contactedDate)).length,review:all.filter(c=>c.qualificationStatus==="Needs Review").length,active:all.filter(c=>!c.contactedDate&&c.qualificationStatus!=="Not Relevant"&&c.qualificationStatus!=="Needs Review"&&c.responseFollowup!=="Not Relevant").length,patterns:[...patterns.entries()].sort((a,b)=>b[1]-a[1]).slice(0,10)};
+  },[version]);
   const lastImport = typeof window !== "undefined" ? (() => { try { return JSON.parse(window.localStorage.getItem("survival-tabs-last-personalization-import") ?? "null") as {updated:number;skipped:number;total:number;file:string;at:string}|null; } catch { return null; } })() : null;
   const exportPersonalization = (limit: number) => {
     const eligible = platformFilter === "all" ? needsPersonalization : needsPersonalization.filter((creator) => creatorPlatforms(creator).includes(platformFilter));
@@ -232,6 +240,15 @@ function CreatorPipeline() {
   const { rows: ytRows, totals, refresh: refreshYT } = useYouTubePipeline();
   return <div className="mx-auto max-w-[1500px]">
     <div className="mb-4 flex flex-wrap items-end justify-between gap-3"><div><div className="text-[11px] uppercase tracking-[0.18em] text-[color:var(--gold)]">Creator outreach</div><div className="mt-1 flex flex-wrap items-center gap-3"><h1 className="font-display text-3xl text-foreground">Creators</h1><label><span className="sr-only">Choose creator platform</span><select value={platformFilter} onChange={(e)=>setPlatformFilter(e.target.value as PlatformFilter)} className="min-w-[170px] rounded-md border-2 border-input bg-background px-3 py-2 text-base font-semibold">{PLATFORM_OPTIONS.map((option)=><option key={option.value} value={option.value}>{option.label}</option>)}</select></label></div></div><div /></div>
+    <div className="mb-4 rounded-xl border border-border bg-card p-3">
+      <button type="button" onClick={()=>setTiktokAuditOpen(v=>!v)} aria-expanded={tiktokAuditOpen} className="flex w-full items-center justify-between text-left text-sm font-semibold">TikTok relevance audit — existing CRM decisions <span>{tiktokAuditOpen?"Hide":"View audit"}</span></button>
+      {tiktokAuditOpen?<div className="mt-3 space-y-3 text-sm">
+        <div className="grid gap-2 sm:grid-cols-5">{[["TikTok records",tiktokAudit.total],["Not Relevant",tiktokAudit.rejected],["Needs Review",tiktokAudit.review],["Already contacted",tiktokAudit.contacted],["Potential outreach",tiktokAudit.active]].map(([label,count])=><div key={String(label)} className="rounded-md border border-border p-3"><div className="text-xs text-muted-foreground">{label}</div><div className="text-xl font-semibold">{count}</div></div>)}</div>
+        <div className="font-medium">Most common existing niches among Not Relevant decisions</div>
+        {tiktokAudit.patterns.length?tiktokAudit.patterns.map(([niche,count])=><div key={niche} className="flex justify-between border-b border-border py-1"><span>{niche}</span><strong>{count}</strong></div>):<p className="text-muted-foreground">No TikTok rejection patterns recorded yet.</p>}
+        <p className="text-xs text-muted-foreground">Counts use saved CRM fields, not live TikTok verification. Niches are inferred from existing research notes; a rejected niche is not automatically irrelevant for every creator. No records are changed by this audit.</p>
+      </div>:null}
+    </div>
     <div className="mb-4 rounded-xl border border-border bg-card p-3">
       <div className="grid gap-2 lg:grid-cols-[minmax(240px,1fr)_210px_220px_auto]">
         <label className="relative"><span className="sr-only">Search creators</span><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"/><input value={query} onChange={(e)=>setQuery(e.target.value)} placeholder="Search creator, platform or niche…" className="w-full rounded-md border border-input bg-background py-2.5 pl-9 pr-3 text-sm"/></label>
