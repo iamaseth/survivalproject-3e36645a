@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { CREATORS, useCreatorsVersion, type CreatorRow } from "@/lib/creator-partnerships";
 import { amICreatorApprover, outreachPoolAction, sethReviewCreator, sethSaveDmDraft } from "@/lib/creators.functions";
 import { buildDmPrompt, copyText } from "@/lib/seth-dm-prompt";
-import { SethReviewRow as Row, SETH_SCREEN_RE } from "@/components/SethReviewPanel";
+import { SethReviewRow as Row } from "@/components/SethReviewPanel";
 import { hydrateCreatorsFromDB, refreshCreatorsFromDB } from "@/lib/creator-partnerships";
 import { TIKTOK_PROFILE_RE } from "@/lib/tiktok-dm-verification";
 import { externalLinkProps } from "@/lib/external-link";
