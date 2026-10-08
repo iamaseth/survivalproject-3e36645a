@@ -4,7 +4,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { ExternalLink, CheckCircle2, AlertTriangle, ArrowRight, Bot, X } from "lucide-react";
 import { CREATORS, creatorOutreachStage, useCreatorsVersion, type CreatorRow } from "@/lib/creator-partnerships";
-import { updateCreatorWorkflow, importCreatorQualifications } from "@/lib/creators.functions";
+import { updateCreatorWorkflow, importCreatorQualifications, addTikTokOutreachCreator } from "@/lib/creators.functions";
 import { externalLinkProps } from "@/lib/external-link";
 
 export const Route = createFileRoute("/outreach-runner")({
@@ -44,6 +44,12 @@ function OutreachRunner() {
   }, []);
   const updateFn = useServerFn(updateCreatorWorkflow);
   const qualifyFn = useServerFn(importCreatorQualifications);
+  const addCreatorFn = useServerFn(addTikTokOutreachCreator);
+  const [newProfile, setNewProfile] = useState("");
+  const [newName, setNewName] = useState("");
+  const [newFollowers, setNewFollowers] = useState("");
+  const [addingCreator, setAddingCreator] = useState(false);
+  const [addOpen, setAddOpen] = useState(false);
   const [statuses, setStatuses] = useState<Record<string, RunnerStatus>>({});
   const [restored, setRestored] = useState(false);
   const [currentId, setCurrentId] = useState<string | null>(null);
@@ -161,6 +167,28 @@ function OutreachRunner() {
     c.qualificationStatus = "Needs Review";
   }, "review", "Flagged for review", "Could not save review status");
 
+  const addCreator = async () => {
+    if (addingCreator || !newProfile.trim()) return;
+    setAddingCreator(true);
+    try {
+      const result = await addCreatorFn({ data: {
+        profile: newProfile.trim(), name: newName.trim(), followers: newFollowers.trim()
+      } });
+      toast.success(result.created ? "Influencer added to CRM" : "Influencer already in CRM", {
+        description: result.name,
+      });
+      // Refresh the server-backed roster before showing the new creator.
+      // The optional ids query is preserved, with the new id appended.
+      const params = new URLSearchParams(window.location.search);
+      const ids = params.get("ids");
+      if (ids) params.set("ids", [...new Set([...ids.split(",").filter(Boolean), result.id])].join(","));
+      window.location.assign(`/outreach-runner?${params.toString()}`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not add influencer");
+      setAddingCreator(false);
+    }
+  };
+
   const profile = current ? profileOf(current) : null;
   const status = current ? statuses[current.id] : undefined;
   const baseButton = "inline-flex min-w-[170px] items-center justify-center gap-2 rounded-lg px-4 py-3 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50";
@@ -178,6 +206,37 @@ function OutreachRunner() {
         </div>
       </div>
 
+      <section className="rounded-xl border border-border bg-card p-4">
+        <button type="button" onClick={() => setAddOpen((v) => !v)}
+          className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">
+          {addOpen ? "Close" : "+ Add & Contact Influencer"}
+        </button>
+        {addOpen ? <div className="mt-3 grid gap-3 sm:grid-cols-3">
+          <label className="text-xs font-medium">TikTok profile URL *
+            <input value={newProfile} onChange={(e) => setNewProfile(e.target.value)}
+              placeholder="https://www.tiktok.com/@americanprepper1"
+              className="mt-1 w-full rounded-md border border-input bg-background p-2 text-sm" />
+          </label>
+          <label className="text-xs font-medium">Display name (optional)
+            <input value={newName} onChange={(e) => setNewName(e.target.value)}
+              placeholder="Americanprepper"
+              className="mt-1 w-full rounded-md border border-input bg-background p-2 text-sm" />
+          </label>
+          <label className="text-xs font-medium">Followers (optional)
+            <input value={newFollowers} onChange={(e) => setNewFollowers(e.target.value)}
+              placeholder="29.9K"
+              className="mt-1 w-full rounded-md border border-input bg-background p-2 text-sm" />
+          </label>
+          <div className="sm:col-span-3 flex items-center gap-3">
+            <button type="button" disabled={addingCreator || !newProfile.trim()}
+              onClick={() => void addCreator()}
+              className="rounded-md bg-emerald-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
+              {addingCreator ? "Checking CRM…" : "Add to CRM & Open Queue"}
+            </button>
+            <span className="text-xs text-muted-foreground">Checks for duplicate TikTok handles. Messaging remains manual.</span>
+          </div>
+        </div> : null}
+      </section>
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {([["Ready", counts.ready], ["Contacted", counts.contacted], ["Needs Review", counts.review], ["Not Relevant", counts.notRelevant]] as const).map(([l, n]) => (
           <div key={l} className="rounded-xl border border-border bg-card px-4 py-3">
