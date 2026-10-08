@@ -7,8 +7,12 @@ import { TIKTOK_PROFILE_RE } from "@/lib/tiktok-dm-verification";
 
 export const Route = createFileRoute("/rena-queue")({
   head: () => ({
+    links: [{ rel: "manifest", href: "/rena.webmanifest" }, { rel: "icon", type: "image/svg+xml", href: "/rena-icon.svg" }, { rel: "apple-touch-icon", href: "/rena-icon.svg" }],
     meta: [
-      { title: "My TikTok DMs — Survival Tabs" },
+      { title: "Rena Outreach — Survival Tabs" },
+      { name: "theme-color", content: "#173c2c" },
+      { name: "apple-mobile-web-app-capable", content: "yes" },
+      { name: "apple-mobile-web-app-title", content: "Rena Outreach" },
       { name: "description", content: "Shared approved outreach pool: tap a creator to copy their DM and open TikTok." },
       { property: "og:title", content: "My TikTok DMs — Survival Tabs" },
       { property: "og:description", content: "Phone-first DM queue for Rena, Seth and BoBo." },
@@ -45,6 +49,7 @@ function DmQueue() {
   const readOnlyPreview = Boolean(viewingSender && viewingSender !== me?.sender);
   const lock = useRef(false);
 
+  useEffect(() => { if ("serviceWorker" in navigator) navigator.serviceWorker.register("/rena-sw.js").catch(() => {}); }, []);
   useEffect(() => { who().then(setMe).catch(() => setMe({ sender: null, approver: false })); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const pool = useMemo(() => { void version; return CREATORS.filter(inPool).sort((a, b) => a.name.localeCompare(b.name)); }, [version]);
