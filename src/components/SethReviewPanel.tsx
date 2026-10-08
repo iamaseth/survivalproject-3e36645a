@@ -41,7 +41,7 @@ export function SethReviewPanel() {
       <Button variant="ghost" onClick={() => setOpen((v) => !v)} aria-expanded={open} className="h-auto w-full justify-start gap-3 rounded-none px-4 py-3 text-left hover:bg-secondary/40">
         {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
         <div className="min-w-0 flex-1">
-          <div className="font-semibold">Seth Review <span className="ml-1 text-sm font-normal text-muted-foreground">({loadError ? "—" : rows.length})</span></div>
+          <div className="whitespace-normal break-words font-semibold">Seth Review <span className="ml-1 text-sm font-normal text-muted-foreground">({loadError ? "—" : rows.length})</span></div>
         </div>
       </Button>
       {open ? (
@@ -111,8 +111,8 @@ function CompactSethReviewRow({ c, active, onActivate, onDone }: { c: CreatorRow
     }
   };
   return (
-    <div className={active ? "bg-secondary/30 px-4 py-2" : "px-4 py-2"}>
-      <div className="flex min-w-0 items-center gap-3">
+    <div className={active ? "bg-secondary/30 px-2 py-2 sm:px-4" : "px-2 py-2 sm:px-4"}>
+      <div className="flex min-w-0 flex-wrap items-center gap-1 sm:gap-3">
         <a {...externalLinkProps(c.tiktok)} className="min-w-0 break-all text-sm font-medium text-primary underline" onClick={() => {
           onActivate();
           setProfileOpened(true);
@@ -125,7 +125,7 @@ function CompactSethReviewRow({ c, active, onActivate, onDone }: { c: CreatorRow
       {active ? <div className="mt-2 space-y-2">
         {copyFailed ? <div className="space-y-1"><p className="text-xs text-destructive">Clipboard blocked — Copy or select below.</p><textarea aria-label="ChatGPT prompt" readOnly value={prompt} rows={3} onFocus={(e) => e.currentTarget.select()} className="w-full rounded-md border border-input bg-background p-2 text-xs" /></div> : null}
         <textarea aria-label={`Paste DM for @${handle}`} placeholder="Paste DM" disabled={busy || locked} value={dm} maxLength={2000} onChange={(e) => setDm(e.target.value)} rows={3} className="w-full rounded-md border border-input bg-background p-2 text-sm" />
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button size="sm" disabled={busy || locked || !profileOpened || invalidDm} title="Approve confirms you personally checked the profile and the new DM fits" onClick={() => void decide("approved")}>Approve</Button>
           <Button size="sm" variant="outline" disabled={busy || locked} onClick={() => void decide("rejected")}>Reject</Button>
         </div>
