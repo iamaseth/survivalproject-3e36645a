@@ -44,8 +44,8 @@ function DmQueue() {
   const [notice, setNotice] = useState<{ kind: "ok" | "warn" | "err"; text: string; dm?: string } | null>(null);
   const [savingId, setSavingId] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [showPool, setShowPool] = useState(false);
-  const [previewSender, setPreviewSender] = useState<string | null>("Rena");
+
+  const [previewSender] = useState<string | null>("Rena");
   const viewingSender = previewSender ?? me?.sender ?? null;
   const readOnlyPreview = Boolean(viewingSender && viewingSender !== me?.sender);
   const lock = useRef(false);
@@ -112,10 +112,10 @@ function DmQueue() {
       <div className="flex items-start justify-between gap-2">
         <div>
           <h1 className="font-display text-2xl text-foreground">{viewingSender === "Rena" ? "Rena’s Outreach Queue" : `${viewingSender ?? "Team"}’s TikTok DMs`}</h1>
-          <p className="text-sm text-muted-foreground">{readOnlyPreview ? "Viewing another sender’s queue. Read-only preview; no messages or assignments will be changed." : "Tap a creator: DM copies + TikTok opens. Paste, send, come back, tap the next one."}</p>
-          {me.approver ? <label className="mt-2 flex items-center gap-2 text-sm">View queue <select aria-label="View sender queue" className="rounded-md border border-input bg-background px-2 py-1" value={viewingSender ?? ""} onChange={e => setPreviewSender(e.target.value === me.sender ? null : e.target.value)}><option value={me.sender ?? ""}>My queue ({me.sender ?? "Team"})</option>{["Seth","Rena","BoBo"].filter(name => name !== me.sender).map(name => <option key={name} value={name}>{name}’s view (read-only)</option>)}</select></label> : null}
+          <p className="text-sm text-muted-foreground">Tap a creator to copy the DM, open TikTok and mark it done.</p>
+          {readOnlyPreview ? <p className="text-xs text-muted-foreground">Preview mode — Rena must sign in to send.</p> : null}
         </div>
-        <button onClick={() => void refresh()} className="rounded-md border border-input px-2 py-1 text-xs">Refresh</button>
+        <button onClick={() => void refresh()} className="rounded-md border border-input px-3 py-2 text-sm">Refresh</button>
       </div>
       <div className="sticky top-0 z-10 rounded-xl border border-border bg-card p-3">
         <div className="flex justify-between text-sm font-semibold"><span>{done} done today</span><span>{mine.length - done} left</span></div>
@@ -140,7 +140,7 @@ function DmQueue() {
             <li key={c.id} className="flex items-stretch gap-2">
               <a href={sent ? undefined : c.tiktok!} target="_blank" rel="noopener noreferrer" aria-disabled={sent || savingId === c.id}
                 onClick={(e) => { if (readOnlyPreview || sent || lock.current) { if (readOnlyPreview || sent) e.preventDefault(); return; } onTap(c); }}
-                className={`flex min-h-[64px] flex-1 flex-col justify-center rounded-xl border-2 px-4 py-3 ${sent ? "border-emerald-600 bg-emerald-100 text-emerald-950" : "border-border bg-card text-foreground active:bg-secondary"}`}>
+                className={`flex min-h-[76px] flex-1 flex-col justify-center rounded-xl border-2 px-4 py-3 ${sent ? "border-emerald-600 bg-emerald-100 text-emerald-950" : "border-border bg-card text-foreground active:bg-secondary"}`}>
                 <span className="text-base font-semibold">{sent ? "✓ " : ""}{c.name}</span>
                 <span className="text-xs opacity-75">{h ? `@${h}` : "TikTok"}{savingId === c.id ? " · saving…" : sent ? " · assumed sent" : ""}</span>
               </a>
@@ -151,7 +151,7 @@ function DmQueue() {
           );
         })}
       </ul>
-      <section className="rounded-xl border border-border bg-card">
+      {false && <section className="rounded-xl border border-border bg-card">
         <button onClick={() => setShowPool((v) => !v)} className="flex w-full justify-between px-4 py-3 text-sm font-semibold">
           <span>Shared pool: {available.length} available</span><span>{showPool ? "Hide" : "Show"}</span>
         </button>
@@ -169,7 +169,7 @@ function DmQueue() {
             })}
           </ul>
         ) : null}
-      </section>
+      </section>}
     </div>
   );
 }
