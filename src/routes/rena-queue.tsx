@@ -30,13 +30,10 @@ const isAssumed = (c: CreatorRow) => c.contactMethod === ASSUMED_METHOD;
 const handleOf = (url: string) => url.match(/@([A-Za-z0-9._-]+)/)?.[1] ?? null;
 
 function eligible(c: CreatorRow) {
-  if (!c.tiktok || !/^https:\/\/(www\.)?tiktok\.com\/@/i.test(c.tiktok)) return false;
-  if (!c.personalizedDm?.trim()) return false;
-  if (c.qualificationStatus !== "Qualified") return false;
+  if (!c.tiktok || !TIKTOK_PROFILE_RE.test(c.tiktok) || !c.personalizedDm?.trim()) return false;
+  if (!isDmVerified(c)) return false; // individual human review required
   if (isAssumed(c)) return true; // keep showing green rows so they can be undone
-  if (c.contactedDate) return false;
-  if (/not relevant|dm blocked|do not contact/i.test(c.responseFollowup || "")) return false;
-  return true;
+  return baseCandidate(c);
 }
 
 function RenaQueue() {
