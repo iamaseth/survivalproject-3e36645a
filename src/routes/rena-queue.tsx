@@ -69,7 +69,7 @@ function DmQueue() {
   };
 
   const onTap = (c: CreatorRow) => {
-    if (readOnlyPreview || lock.current || c.outreachSentAt) return;
+    if (lock.current || c.outreachSentAt) return;
     lock.current = true; setSavingId(c.id);
     const dm = c.personalizedDm!.trim();
     const copy = navigator.clipboard?.writeText(dm) ?? Promise.reject(new Error("no clipboard"));
@@ -77,6 +77,7 @@ function DmQueue() {
       let copied = true;
       try { await copy; } catch { copied = false; }
       try {
+        if (readOnlyPreview) { setNotice({ kind: copied ? "ok" : "warn", text: copied ? "DM copied for preview. Open TikTok; nothing was marked sent." : "Copy this DM manually. Preview did not change CRM status.", dm: copied ? undefined : dm }); return; }
         await run(c, "sent");
         setNotice(copied
           ? { kind: "ok", text: `DM for ${c.name} copied. Paste it in TikTok, send, then come back and tap the next row.` }
@@ -113,7 +114,7 @@ function DmQueue() {
         <div>
           <h1 className="font-display text-2xl text-foreground">{viewingSender === "Rena" ? "Rena’s Outreach Queue" : `${viewingSender ?? "Team"}’s TikTok DMs`}</h1>
           <p className="text-sm text-muted-foreground">Tap a creator to copy the DM, open TikTok and mark it done.</p>
-          {readOnlyPreview ? <p className="text-xs text-muted-foreground">Preview mode — Rena must sign in to send.</p> : null}
+          {readOnlyPreview ? <p className="text-xs text-muted-foreground">Preview: tap to copy and open TikTok. Only Rena can mark messages done.</p> : null}
         </div>
         <button onClick={() => void refresh()} className="rounded-md border border-input px-3 py-2 text-sm">Refresh</button>
       </div>
@@ -139,7 +140,7 @@ function DmQueue() {
           return (
             <li key={c.id} className="flex items-stretch gap-2">
               <a href={sent ? undefined : c.tiktok!} target="_blank" rel="noopener noreferrer" aria-disabled={sent || savingId === c.id}
-                onClick={(e) => { if (readOnlyPreview || sent || lock.current) { if (readOnlyPreview || sent) e.preventDefault(); return; } onTap(c); }}
+                onClick={(e) => { if (sent || lock.current) { e.preventDefault(); return; } onTap(c); }}
                 className={`flex min-h-[76px] flex-1 flex-col justify-center rounded-xl border-2 px-4 py-3 ${sent ? "border-emerald-600 bg-emerald-100 text-emerald-950" : "border-border bg-card text-foreground active:bg-secondary"}`}>
                 <span className="text-base font-semibold">{sent ? "✓ " : ""}{c.name}</span>
                 <span className="text-xs opacity-75">{h ? `@${h}` : "TikTok"}{savingId === c.id ? " · saving…" : sent ? " · assumed sent" : ""}</span>
@@ -151,25 +152,7 @@ function DmQueue() {
           );
         })}
       </ul>
-      {false && <section className="rounded-xl border border-border bg-card">
-        <button onClick={() => setShowPool((v) => !v)} className="flex w-full justify-between px-4 py-3 text-sm font-semibold">
-          <span>Shared pool: {available.length} available</span><span>{showPool ? "Hide" : "Show"}</span>
-        </button>
-        {showPool ? (
-          <ul className="divide-y divide-border border-t border-border text-sm">
-            {pool.filter((c) => statusOf(c) !== "contacted" || (c.outreachSentAt || "").slice(0, 10) === today).slice(0, 100).map((c) => {
-              const st = statusOf(c);
-              return (
-                <li key={c.id} className="flex items-center gap-2 px-4 py-2">
-                  <span className="min-w-0 flex-1 truncate">{c.name}</span>
-                  <span className="text-[11px] text-muted-foreground">{st === "assigned" ? `assigned · ${c.outreachAssignee}` : st === "contacted" ? `contacted · ${c.outreachSentBy ?? "CRM"}` : st}</span>
-                  {st === "available" && !readOnlyPreview ? <button disabled={savingId === c.id} onClick={() => void simple(c, "claim")} className="rounded-md bg-primary px-3 py-1 text-xs font-semibold text-primary-foreground">Claim</button> : null}
-                </li>
-              );
-            })}
-          </ul>
-        ) : null}
-      </section>}
+
     </div>
   );
 }
