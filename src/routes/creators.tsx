@@ -1,4 +1,3 @@
-import { isFinalApprovalReady, isPendingResearchCandidate } from "@/lib/final-approval";
 import { SethReviewPanel } from "@/components/SethReviewPanel";
 import { createFileRoute, Link, Outlet, useRouterState } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
@@ -107,7 +106,6 @@ function CreatorPipeline() {
   const [personalizedOpen,setPersonalizedOpen]=useState(false);
   const [reviewOpen,setReviewOpen]=useState(false);
   const [rejectedOpen,setRejectedOpen]=useState(false);
-  const [readyOpen,setReadyOpen]=useState(false);
   const [personalizationImporting,setPersonalizationImporting]=useState(false);
   const [qualificationImporting,setQualificationImporting]=useState(false);
   const importPersonalization=useServerFn(importCreatorPersonalization);
@@ -128,7 +126,7 @@ function CreatorPipeline() {
   const filtersActive = Boolean(query || platformFilter !== "all" || contactFilter !== "all" || nicheFilter !== "all");
   const grouped = useMemo(() => { const out: Record<StageKey, CreatorRow[]> = { not_contacted: [], contacted: [], follow_up: [], responded: [], sample: [] }; creators.forEach((c) => { if (c.qualificationStatus !== "Not Relevant") out[stageFor(c)].push(c); }); return out; }, [creators]);
   const rejectedCreators = useMemo(() => creators.filter(c => c.qualificationStatus === "Not Relevant" || c.sethApprovalStatus === "rejected"), [creators]);
-  const needsReview = useMemo(() => creators.filter((c) => stageFor(c) === "not_contacted" && (c.personalizationStatus?.toLowerCase() === "needs review" || (isPendingResearchCandidate(c) && !isFinalApprovalReady(c)))), [creators]);
+  const needsReview = useMemo(() => creators.filter((c) => stageFor(c) === "not_contacted" && c.qualificationStatus !== "Qualified" && c.qualificationStatus !== "Not Relevant"), [creators]);
   const needsPersonalization = useMemo(() => creators.filter((c) => stageFor(c) === "not_contacted" && !personalizationReady(c) && c.personalizationStatus?.toLowerCase() !== "needs review"), [creators]);
   const readyToContact = useMemo(() => creators.filter((c) => stageFor(c) === "not_contacted" && personalizationReady(c) && c.qualificationStatus !== "Not Relevant"), [creators]);
   const outreachGrouped = useMemo(() => ({ ...grouped, not_contacted: grouped.not_contacted.filter((c) => !personalizationReady(c)) }), [grouped]);
