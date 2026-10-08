@@ -62,7 +62,8 @@ const navItems: NavItem[] = [
       { to: "/outreach-runner", label: "Outreach Runner" },
       { to: "/tiktok-master-import", label: "TikTok Master Import" },
       { to: "/tiktok-dm-review", label: "TikTok DM Review" },
-      { to: "/rena-queue", label: "My TikTok DMs" },
+      { to: "/rena-queue", label: "Rena TikTok DMs" },
+      { to: "/seth-queue", label: "Seth TikTok DMs" },
     ],
   },
   { to: "/templates", label: "Templates", icon: FileText },
@@ -115,7 +116,7 @@ export function AppShell() {
     return <NoAccess email={auth.profile.email} onSignOut={auth.signOut} />;
   }
 
-  if (pathname === "/rena-queue") return <main className="min-h-screen bg-background px-3 py-4"><Outlet /></main>;
+  if (pathname === "/rena-queue" || pathname === "/seth-queue") return <main className="min-h-screen bg-background px-3 py-4"><Outlet /></main>;
 
   return (
     <div className="grid min-h-screen w-full grid-cols-[240px_minmax(0,1fr)] bg-background">
