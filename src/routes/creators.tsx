@@ -12,7 +12,7 @@ import { listEmailTemplates } from "@/lib/templates.functions";
 import { applyMergeFields, mergeContextForCreator, orderTemplatesForCreator, type EmailTemplate } from "@/lib/templates";
 import { PipelineCounters, YouTubeCandidatesSection, useYouTubePipeline } from "@/components/creators/YouTubeCandidates";
 
-export const Route = createFileRoute("/creators")({ component: CreatorsLayout, head: () => ({ meta: [{ title: "Creators — Survival Tabs" }, { name: "description", content: "Simple creator outreach workflow." }] }) });
+export const Route = createFileRoute("/creators")({ component: CreatorsLayout, head: () => ({ meta: [{ title: "Creators — Survival Tabs" }, { name: "description", content: "Simple creator outreach workflow." }, { property: "og:title", content: "Creators — Survival Tabs" }, { property: "og:description", content: "Review creators and manage the Survival Tabs outreach workflow." }, { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary" }] }) });
 function CreatorsLayout() { const pathname = useRouterState({ select: (s) => s.location.pathname }); if (pathname !== "/creators") return <Outlet />; return <CreatorPipeline />; }
 type StageKey = "not_contacted" | "contacted" | "follow_up" | "responded" | "sample";
 type PlatformFilter = "all" | "youtube" | "tiktok" | "instagram" | "facebook" | "amazon" | "website";
