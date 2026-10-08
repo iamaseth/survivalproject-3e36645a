@@ -1,0 +1,3 @@
+- [x] Replace duplicate Seth review with Needs Final Approval accordion and preserve decision undo.
+- [x] Enforce direct evidence and specific DM approval eligibility without changing creator rows.
+- [ ] Audit current final-ready/research counts and test signed-in page without writes.
