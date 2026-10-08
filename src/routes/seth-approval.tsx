@@ -198,7 +198,7 @@ function Card({ c, onDone, onSkip }: { c: CreatorRow; onDone: () => void; onSkip
           <label className="flex items-start gap-2 text-sm"><input type="checkbox" checked={fits} onChange={(e) => setFits(e.target.checked)} className="mt-1" />This message fits this creator</label>
           <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Note (optional; reason if rejecting)" className="w-full rounded-md border border-input bg-background p-2 text-sm" />
           <div className="flex flex-wrap gap-2">
-            <button disabled={busy || !checked || !fits || !dm.trim()} onClick={() => void act("approved")} className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-40">Approve → Rena</button>
+            <button disabled={busy || locked || badOutput || !checked || !fits || !dm.trim()} onClick={() => void act("approved")} className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-40">Approve → Rena</button>
             <button disabled={busy} onClick={() => void act("rejected")} className="rounded-md border border-input px-4 py-2 text-sm">Reject</button>
             <button disabled={busy} onClick={onSkip} className="rounded-md px-4 py-2 text-sm text-muted-foreground">Skip</button>
           </div>
