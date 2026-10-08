@@ -414,6 +414,20 @@ export const sethReviewCreator = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+// Save an improved DM draft without approving. Approver-only, blocked once contacted/decided; old DM kept in history.
+export const sethSaveDmDraft = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { id: string; dm: string; note?: string }) => {
+    if (!d?.id || typeof d.dm !== "string" || !d.dm.trim()) throw new Error("Draft DM is empty");
+    if (d.dm.length > 2000) throw new Error("DM too long (max 2000 characters)");
+    return d;
+  })
+  .handler(async ({ data, context }) => {
+    const { data: r, error } = await context.supabase.rpc("seth_save_dm_draft" as never, { p_id: data.id, p_dm: data.dm, p_note: data.note ?? null } as never);
+    if (error) throw new Error(error.message);
+    return r as { ok: boolean; unchanged?: boolean };
+  });
+
 // Shared outreach pool. All checks and locking happen in public.outreach_action.
 export const getMyOutreachSender = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
