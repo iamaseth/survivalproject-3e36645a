@@ -35,6 +35,20 @@ function handleOf(url: string): string | null {
   return m ? `@${m[1]}` : null;
 }
 
+function assessTikTokFit(c: CreatorRow): { label: "Likely relevant" | "Review needed" | "Likely unrelated"; evidence: string; reason: string } {
+  const source = [c.segment,c.targetAudience,c.researchNotes,c.verificationEvidence,c.recentActivityCheck].filter(Boolean).join(" ");
+  const relevant = /emergency (food|kit|preparedness)|food storage|survival (skills|gear|food)|preparedness|prepper|backpack|hiking|camping|bushcraft|homestead|off.grid|overland|wilderness|outdoor gear|disaster kit/i;
+  const unrelated = /beauty|makeup|cosmetic|fashion|gaming|prank|dance trend|celebrity gossip|nail art/i;
+  if (!source.trim()) return {label:"Review needed",evidence:"",reason:"No research evidence saved. Open TikTok before deciding."};
+  if (relevant.test(source)) return {label:"Likely relevant",evidence:source.slice(0,280),reason:"Existing research contains relevant topics; verify against recent TikTok posts."};
+  if (unrelated.test(source)) return {label:"Likely unrelated",evidence:source.slice(0,280),reason:"Existing research suggests an unrelated topic; confirm before rejecting."};
+  return {label:"Review needed",evidence:source.slice(0,280),reason:"Existing notes do not establish a strong fit."};
+}
+function draftFirstTikTokDm(c: CreatorRow, verifiedDetail: string): string {
+  const detail = verifiedDetail.trim().replace(/[\\r\\n]+/g," ").slice(0,170);
+  return `Hi! I'm Rena from Survival Tabs. I saw your content about ${detail} and thought our compact emergency nutrition tablets might be a fit for your audience. Would you be interested in trying a complimentary sample? No obligation to post.`;
+}
+
 function OutreachRunner() {
   const version = useCreatorsVersion();
   const readyIds = useMemo(() => {
@@ -57,6 +71,8 @@ function OutreachRunner() {
   const [currentId, setCurrentId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [justActed, setJustActed] = useState(false);
+  const [verifiedDetail,setVerifiedDetail] = useState("");
+  const [firstDm,setFirstDm] = useState("");
 
   useEffect(() => {
     try { setStatuses(JSON.parse(localStorage.getItem(LS_KEY) || "{}")); } catch { setStatuses({}); }
@@ -108,6 +124,7 @@ function OutreachRunner() {
     if (lockRef.current) return;
     setJustActed(false);
     setCurrentId(nextAfter(current?.id));
+    setVerifiedDetail("");setFirstDm("");
   };
 
   // Runs one persisted action with a double-click guard; advances only on success.
@@ -128,6 +145,7 @@ function OutreachRunner() {
       setStatus(target.id, status);
       setJustActed(false);
       setCurrentId(nextId);
+      setVerifiedDetail("");setFirstDm("");
       if (tikTokTab && nextProfile) {
         tikTokTab.location.replace(nextProfile.url);
       }
@@ -210,6 +228,7 @@ function OutreachRunner() {
     window.location.assign(`/outreach-runner?${params.toString()}`);
   };
 
+  const fit = current ? assessTikTokFit(current) : null;
   const profile = current ? profileOf(current) : null;
   const status = current ? statuses[current.id] : undefined;
   const baseButton = "inline-flex min-w-[170px] items-center justify-center gap-2 rounded-lg px-4 py-3 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50";
@@ -294,6 +313,21 @@ function OutreachRunner() {
                 {status ? <span className="rounded-full bg-secondary px-3 py-1 text-xs font-medium">{status === "review" ? "Needs review" : status === "skipped" ? "Not relevant" : status}</span> : null}
               </div>
 
+              <div className="rounded-xl border border-border bg-secondary/20 p-4 space-y-3">
+                <h3 className="font-semibold">Step 1: TikTok relevance screening</h3>
+                <p className="text-sm"><strong>{fit?.label}</strong> — {fit?.reason}</p>
+                {fit?.evidence?<p className="text-xs text-muted-foreground">Existing CRM evidence: {fit.evidence}</p>:null}
+                <p className="text-xs text-muted-foreground">Preliminary keyword triage from saved CRM notes only; not a live TikTok profile check. Confirm the profile and recent posts before contacting or rejecting.</p>
+                <h3 className="font-semibold">Step 2: Verified first DM</h3>
+                <label className="block text-sm">One specific detail you verified on their TikTok
+                  <input value={verifiedDetail} onChange={e=>{setVerifiedDetail(e.target.value);setFirstDm("");}} placeholder="e.g. their recent backpacking gear review" className="mt-1 w-full rounded-md border border-input bg-background p-2"/>
+                </label>
+                <button type="button" disabled={!verifiedDetail.trim()} onClick={()=>current&&setFirstDm(draftFirstTikTokDm(current,verifiedDetail))} className="rounded-md bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50">Create first DM</button>
+                {firstDm?<div className="space-y-2">
+                  <textarea aria-label="Edit first TikTok DM" rows={4} value={firstDm} onChange={e=>setFirstDm(e.target.value)} className="w-full rounded-md border border-input bg-background p-2 text-sm"/>
+                  <button type="button" onClick={()=>void navigator.clipboard.writeText(firstDm).then(()=>toast.success("DM copied — send manually in TikTok")).catch(()=>toast.error("Copy failed"))} className="rounded-md border border-input px-3 py-2 text-sm font-semibold">Copy DM</button>
+                </div>:null}
+              </div>
               <div className="rounded-xl border border-dashed border-border bg-secondary/20 p-4 text-sm text-muted-foreground">
                 Open TikTok and decide whether this creator fits. If yes, send the profile screenshot to ChatGPT, copy the new DM into TikTok, send it manually, then return here and click Contacted.
               </div>
@@ -351,7 +385,7 @@ function OutreachRunner() {
             {queue.slice(0, 50).map((c, i) => (
               <li key={c.id}>
                 <button
-                  onClick={() => { setCurrentId(c.id); setJustActed(false); }}
+                  onClick={() => { setCurrentId(c.id); setJustActed(false);setVerifiedDetail("");setFirstDm(""); }}
                   className={`flex w-full items-center gap-2 px-4 py-2 text-left text-sm hover:bg-secondary/50 ${c.id === current?.id ? "bg-secondary" : ""}`}
                 >
                   <span className="w-6 text-xs text-muted-foreground">{i + 1}</span>
