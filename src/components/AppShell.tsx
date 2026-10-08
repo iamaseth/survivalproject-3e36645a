@@ -115,6 +115,8 @@ export function AppShell() {
     return <NoAccess email={auth.profile.email} onSignOut={auth.signOut} />;
   }
 
+  if (pathname === "/rena-queue") return <main className="min-h-screen bg-background px-3 py-4"><Outlet /></main>;
+
   return (
     <div className="grid min-h-screen w-full grid-cols-[240px_minmax(0,1fr)] bg-background">
       <aside className="sticky top-0 flex h-screen flex-col bg-sidebar text-sidebar-foreground">
