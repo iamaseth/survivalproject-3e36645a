@@ -40,9 +40,9 @@ function DmQueue() {
   const [notice, setNotice] = useState<{ kind: "ok" | "warn" | "err"; text: string; dm?: string } | null>(null);
   const [savingId, setSavingId] = useState<string | null>(null);
   const [showPool, setShowPool] = useState(false);
-  const [previewSender, setPreviewSender] = useState<string | null>(null);
+  const [previewSender, setPreviewSender] = useState<string | null>("Rena");
   const viewingSender = previewSender ?? me?.sender ?? null;
-  const readOnlyPreview = Boolean(previewSender && previewSender !== me?.sender);
+  const readOnlyPreview = Boolean(viewingSender && viewingSender !== me?.sender);
   const lock = useRef(false);
 
   useEffect(() => { who().then(setMe).catch(() => setMe({ sender: null, approver: false })); }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -105,9 +105,9 @@ function DmQueue() {
     <div className="mx-auto max-w-xl space-y-3 pb-16">
       <div className="flex items-start justify-between gap-2">
         <div>
-          <h1 className="font-display text-2xl text-foreground">{viewingSender ?? "Team"}'s TikTok DMs</h1>
+          <h1 className="font-display text-2xl text-foreground">{viewingSender === "Rena" ? "Rena’s Outreach Queue" : `${viewingSender ?? "Team"}’s TikTok DMs`}</h1>
           <p className="text-sm text-muted-foreground">{readOnlyPreview ? "Viewing another sender’s queue. Read-only preview; no messages or assignments will be changed." : "Tap a creator: DM copies + TikTok opens. Paste, send, come back, tap the next one."}</p>
-          {me.approver ? <label className="mt-2 flex items-center gap-2 text-sm">View queue <select aria-label="View sender queue" className="rounded-md border border-input bg-background px-2 py-1" value={previewSender ?? me.sender ?? ""} onChange={e => setPreviewSender(e.target.value === me.sender ? null : e.target.value)}><option value={me.sender ?? ""}>My queue ({me.sender ?? "Team"})</option>{["Seth","Rena","BoBo"].filter(name => name !== me.sender).map(name => <option key={name} value={name}>{name}’s view (read-only)</option>)}</select></label> : null}
+          {me.approver ? <label className="mt-2 flex items-center gap-2 text-sm">View queue <select aria-label="View sender queue" className="rounded-md border border-input bg-background px-2 py-1" value={viewingSender ?? ""} onChange={e => setPreviewSender(e.target.value === me.sender ? null : e.target.value)}><option value={me.sender ?? ""}>My queue ({me.sender ?? "Team"})</option>{["Seth","Rena","BoBo"].filter(name => name !== me.sender).map(name => <option key={name} value={name}>{name}’s view (read-only)</option>)}</select></label> : null}
         </div>
         <button onClick={() => void refresh()} className="rounded-md border border-input px-2 py-1 text-xs">Refresh</button>
       </div>
