@@ -51,6 +51,8 @@ function DmQueue() {
   const lock = useRef(false);
   const touchStart = useRef<{id:string;x:number;y:number}|null>(null);
   const [swipingId,setSwipingId] = useState<string|null>(null);
+  const [actionsId,setActionsId] = useState<string|null>(null);
+  const [laterIds,setLaterIds] = useState<string[]>([]);
 
   useEffect(() => { if ("serviceWorker" in navigator) navigator.serviceWorker.register("/rena-sw.js").catch(() => {}); }, []);
   useEffect(() => { who().then(setMe).catch(() => setMe({ sender: null, approver: false })); void hydrateCreatorsFromDB().catch(e => setLoadError(e instanceof Error ? e.message : "Could not load outreach queue")); }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -59,7 +61,7 @@ function DmQueue() {
   const today = new Date().toISOString().slice(0, 10);
   const mine = pool.filter((c) => viewingSender && (
     (c.outreachAssignee === viewingSender && statusOf(c) === "assigned") ||
-    (c.outreachSentBy === viewingSender && (c.outreachSentAt || "").slice(0, 10) === today)));
+    (c.outreachSentBy === viewingSender && (c.outreachSentAt || "").slice(0, 10) === today))).sort((a,b)=>Number(laterIds.includes(a.id))-Number(laterIds.includes(b.id)));
   const available = pool.filter((c) => statusOf(c) === "available");
   const done = mine.filter((c) => c.outreachSentAt).length;
 
@@ -99,7 +101,7 @@ function DmQueue() {
     finally { lock.current = false; setSavingId(null); }
   };
 
-  const swipeUndo = (c:CreatorRow, x:number, y:number) => { const start=touchStart.current; touchStart.current=null; if (!start || start.id!==c.id) return; if (start.x-x>70 && Math.abs(start.y-y)<55 && c.outreachSentAt && !readOnlyPreview) { setSwipingId(c.id); void simple(c,"undo_sent"); } };
+  const swipeUndo = (c:CreatorRow, x:number, y:number) => { const start=touchStart.current; touchStart.current=null; if (!start || start.id!==c.id) return; if (start.x-x>70 && Math.abs(start.y-y)<55) { setSwipingId(c.id); setActionsId(c.id); } };
 
   const tone = { ok: "border-emerald-600 bg-emerald-50 text-emerald-950", warn: "border-amber-500 bg-amber-50 text-amber-950", err: "border-red-600 bg-red-50 text-red-950" };
 
@@ -127,7 +129,7 @@ function DmQueue() {
         <div className="mt-2 h-2 overflow-hidden rounded-full bg-secondary">
           <div className="h-full bg-emerald-600 transition-all" style={{ width: `${mine.length ? (done / mine.length) * 100 : 0}%` }} />
         </div>
-        <p className="mt-2 text-[11px] text-muted-foreground">Green = marked done (not confirmed by TikTok). Swipe left on a green tile to undo.</p>
+        <p className="mt-2 text-[11px] text-muted-foreground">Green = marked done (not confirmed by TikTok). Swipe left on a tile for Undo, Delete or Do later.</p>
       </div>
       {loadError ? <p role="alert" className="rounded border border-red-600 p-3 text-sm">{loadError}</p> : null}
       {notice ? (
@@ -148,9 +150,8 @@ function DmQueue() {
                 <span className="text-base font-semibold">{sent ? "✓ " : ""}{c.name}</span>
                 <span className="text-xs opacity-75">{c.followersSignal?.trim() ? `${c.followersSignal.trim()} followers` : "Followers not recorded"}{savingId === c.id ? " · saving…" : sent ? " · done" : ""}</span>
               </a>
-              {readOnlyPreview ? null : sent
-                ? <button type="button" onClick={() => void simple(c, "undo_sent", `Undo ${c.name}? It goes back to not contacted.`)} className="rounded-xl border border-border px-3 text-xs text-muted-foreground">Undo</button>
-                : <button type="button" onClick={() => void simple(c, "release", `Give ${c.name} back to the shared pool?`)} className="rounded-xl border border-border px-2 text-[11px] text-muted-foreground">Return</button>}
+              <button type="button" onClick={()=>setActionsId(v=>v===c.id?null:c.id)} className="rounded-xl border border-border px-3 text-sm" aria-label={`Actions for ${c.name}`}>•••</button>
+              {actionsId===c.id && <div className="flex flex-wrap items-center gap-2 rounded-xl border bg-card p-2 text-xs">{sent && <button disabled={readOnlyPreview} onClick={()=>{setActionsId(null);void simple(c,"undo_sent");}} className="rounded border px-2 py-2">Undo</button>}<button disabled={readOnlyPreview || sent} onClick={()=>{setActionsId(null);void simple(c,"release",`Remove ${c.name} from Rena’s queue? The creator stays in the CRM.`);}} className="rounded border px-2 py-2">Delete from queue</button><button onClick={()=>{setLaterIds(ids=>ids.includes(c.id)?ids:[...ids,c.id]);setActionsId(null);setNotice({kind:"ok",text:`${c.name} moved to the end of this queue for now.`});}} className="rounded border px-2 py-2">Do later</button></div>}
             </li>
           );
         })}
