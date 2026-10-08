@@ -31,6 +31,7 @@ import { Route as KnowledgeRouteImport } from './routes/knowledge'
 import { Route as LeadsRouteImport } from './routes/leads'
 import { Route as OutreachRunnerRouteImport } from './routes/outreach-runner'
 import { Route as PreparednessBookRouteImport } from './routes/preparedness-book'
+import { Route as RenaQueueRouteImport } from './routes/rena-queue'
 import { Route as ReviewRouteImport } from './routes/review'
 import { Route as ReviewedSurvivalTabsMreRouteImport } from './routes/reviewed-survival-tabs-mre'
 import { Route as SeoRouteImport } from './routes/seo'
@@ -160,6 +161,11 @@ const PreparednessBookRoute = PreparednessBookRouteImport.update({
   path: '/preparedness-book',
   getParentRoute: () => rootRouteImport,
 } as any)
+const RenaQueueRoute = RenaQueueRouteImport.update({
+  id: '/rena-queue',
+  path: '/rena-queue',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ReviewRoute = ReviewRouteImport.update({
   id: '/review',
   path: '/review',
@@ -279,6 +285,7 @@ export interface FileRoutesByFullPath {
   '/leads': typeof LeadsRoute
   '/outreach-runner': typeof OutreachRunnerRoute
   '/preparedness-book': typeof PreparednessBookRoute
+  '/rena-queue': typeof RenaQueueRoute
   '/review': typeof ReviewRoute
   '/reviewed-survival-tabs-mre': typeof ReviewedSurvivalTabsMreRoute
   '/seo': typeof SeoRoute
@@ -321,6 +328,7 @@ export interface FileRoutesByTo {
   '/leads': typeof LeadsRoute
   '/outreach-runner': typeof OutreachRunnerRoute
   '/preparedness-book': typeof PreparednessBookRoute
+  '/rena-queue': typeof RenaQueueRoute
   '/review': typeof ReviewRoute
   '/reviewed-survival-tabs-mre': typeof ReviewedSurvivalTabsMreRoute
   '/seo': typeof SeoRoute
@@ -364,6 +372,7 @@ export interface FileRoutesById {
   '/leads': typeof LeadsRoute
   '/outreach-runner': typeof OutreachRunnerRoute
   '/preparedness-book': typeof PreparednessBookRoute
+  '/rena-queue': typeof RenaQueueRoute
   '/review': typeof ReviewRoute
   '/reviewed-survival-tabs-mre': typeof ReviewedSurvivalTabsMreRoute
   '/seo': typeof SeoRoute
@@ -408,6 +417,7 @@ export interface FileRouteTypes {
     | '/leads'
     | '/outreach-runner'
     | '/preparedness-book'
+    | '/rena-queue'
     | '/review'
     | '/reviewed-survival-tabs-mre'
     | '/seo'
@@ -450,6 +460,7 @@ export interface FileRouteTypes {
     | '/leads'
     | '/outreach-runner'
     | '/preparedness-book'
+    | '/rena-queue'
     | '/review'
     | '/reviewed-survival-tabs-mre'
     | '/seo'
@@ -492,6 +503,7 @@ export interface FileRouteTypes {
     | '/leads'
     | '/outreach-runner'
     | '/preparedness-book'
+    | '/rena-queue'
     | '/review'
     | '/reviewed-survival-tabs-mre'
     | '/seo'
@@ -535,6 +547,7 @@ export interface RootRouteChildren {
   LeadsRoute: typeof LeadsRoute
   OutreachRunnerRoute: typeof OutreachRunnerRoute
   PreparednessBookRoute: typeof PreparednessBookRoute
+  RenaQueueRoute: typeof RenaQueueRoute
   ReviewRoute: typeof ReviewRoute
   ReviewedSurvivalTabsMreRoute: typeof ReviewedSurvivalTabsMreRoute
   SeoRoute: typeof SeoRoute
@@ -705,6 +718,13 @@ declare module '@tanstack/react-router' {
       path: '/preparedness-book'
       fullPath: '/preparedness-book'
       preLoaderRoute: typeof PreparednessBookRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/rena-queue': {
+      id: '/rena-queue'
+      path: '/rena-queue'
+      fullPath: '/rena-queue'
+      preLoaderRoute: typeof RenaQueueRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/review': {
@@ -896,6 +916,7 @@ const rootRouteChildren: RootRouteChildren = {
   LeadsRoute: LeadsRoute,
   OutreachRunnerRoute: OutreachRunnerRoute,
   PreparednessBookRoute: PreparednessBookRoute,
+  RenaQueueRoute: RenaQueueRoute,
   ReviewRoute: ReviewRoute,
   ReviewedSurvivalTabsMreRoute: ReviewedSurvivalTabsMreRoute,
   SeoRoute: SeoRoute,
