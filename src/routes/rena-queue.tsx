@@ -136,14 +136,13 @@ function DmQueue() {
       <ul className="space-y-2">
         {mine.map((c) => {
           const sent = Boolean(c.outreachSentAt);
-          const h = handleOf(c.tiktok!);
           return (
             <li key={c.id} className="flex items-stretch gap-2">
               <a href={sent ? undefined : c.tiktok!} target="_blank" rel="noopener noreferrer" aria-disabled={sent || savingId === c.id}
                 onClick={(e) => { if (sent || lock.current) { e.preventDefault(); return; } onTap(c); }}
                 className={`flex min-h-[76px] flex-1 flex-col justify-center rounded-xl border-2 px-4 py-3 ${sent ? "border-emerald-600 bg-emerald-100 text-emerald-950" : "border-border bg-card text-foreground active:bg-secondary"}`}>
                 <span className="text-base font-semibold">{sent ? "✓ " : ""}{c.name}</span>
-                <span className="text-xs opacity-75">{h ? `@${h}` : "TikTok"}{savingId === c.id ? " · saving…" : sent ? " · assumed sent" : ""}</span>
+                <span className="text-xs opacity-75">{c.followersSignal?.trim() ? `${c.followersSignal.trim()} followers` : "Followers not recorded"}{savingId === c.id ? " · saving…" : sent ? " · done" : ""}</span>
               </a>
               {readOnlyPreview ? null : sent
                 ? <button type="button" onClick={() => void simple(c, "undo_sent", `Undo ${c.name}? It goes back to not contacted.`)} className="rounded-xl border border-border px-3 text-xs text-muted-foreground">Undo</button>
