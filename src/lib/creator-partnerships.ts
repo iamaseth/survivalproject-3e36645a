@@ -473,6 +473,16 @@ function rowToCreator(r: Record<string, unknown>): CreatorRow {
 }
 
 let creatorsHydrated = false;
+export async function refreshCreatorsFromDB(): Promise<number> {
+  const { listCreators } = await import("./creators.functions");
+  const { rows } = await listCreators();
+  const fresh = rows.map((r) => rowToCreator(r as Record<string, unknown>));
+  CREATORS.splice(0, CREATORS.length, ...fresh);
+  creatorsHydrated = true;
+  bumpRoster();
+  return fresh.length;
+}
+
 export async function hydrateCreatorsFromDB(): Promise<void> {
   if (creatorsHydrated || typeof window === "undefined") return;
   creatorsHydrated = true;
@@ -493,6 +503,7 @@ export async function hydrateCreatorsFromDB(): Promise<void> {
 
   } catch (e) {
     console.error("[creators] hydrateCreatorsFromDB failed", e);
+    creatorsHydrated = false; // allow a retry instead of staying empty forever
   }
 }
 
