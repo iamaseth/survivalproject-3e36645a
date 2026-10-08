@@ -158,7 +158,12 @@ function DmQueue() {
               </a>
               {!sent && !readOnlyPreview && <button type="button" disabled={savingId===c.id} onClick={()=>void simple(c,"sent")} className="rounded-xl bg-emerald-700 px-3 text-sm font-semibold text-white">Sent</button>}
               <button type="button" onClick={()=>setActionsId(v=>v===c.id?null:c.id)} className="rounded-xl border border-border px-3 text-sm" aria-label={`Actions for ${c.name}`}>•••</button>
-              {actionsId===c.id && <div className="flex flex-wrap items-center gap-2 rounded-xl border bg-card p-2 text-xs">{sent && <button disabled={readOnlyPreview} onClick={()=>{setActionsId(null);void simple(c,"undo_sent");}} className="rounded border px-2 py-2">Undo</button>}<button disabled={readOnlyPreview || sent} onClick={()=>{setActionsId(null);void simple(c,"release",`Remove ${c.name} from Rena’s queue? The creator stays in the CRM.`);}} className="rounded border px-2 py-2">Remove assignment</button><button disabled={readOnlyPreview} onClick={()=>void reject(c)} className="rounded border px-2 py-2">Not Relevant</button><button onClick={()=>{setLaterIds(ids=>ids.includes(c.id)?ids:[...ids,c.id]);setActionsId(null);setNotice({kind:"ok",text:`${c.name} moved to the end of this queue for now.`});}} className="rounded border px-2 py-2">Do later</button></div>}
+              {actionsId===c.id && <div className="basis-full grid w-full grid-cols-4 gap-1 rounded-xl border p-2 text-xs font-medium">
+                <button type="button" disabled={readOnlyPreview || !sent} onClick={()=>{setActionsId(null);void simple(c,"undo_sent");}} className="flex min-h-14 flex-col items-center justify-center rounded-lg bg-blue-100 text-blue-900 disabled:opacity-40"><span className="text-xl">↶</span>Undo</button>
+                <button type="button" disabled={readOnlyPreview || sent} onClick={()=>void reject(c)} className="flex min-h-14 flex-col items-center justify-center rounded-lg bg-red-100 text-red-900 disabled:opacity-40"><span className="text-xl">✕</span>Reject</button>
+                <button type="button" onClick={()=>{setLaterIds(ids=>ids.includes(c.id)?ids:[...ids,c.id]);setActionsId(null);}} className="flex min-h-14 flex-col items-center justify-center rounded-lg bg-amber-100 text-amber-900"><span className="text-xl">◷</span>Later</button>
+                <button type="button" disabled={readOnlyPreview || sent} onClick={()=>{setActionsId(null);void simple(c,"sent");}} className="flex min-h-14 flex-col items-center justify-center rounded-lg bg-green-100 text-green-900 disabled:opacity-40"><span className="text-xl">✓</span>Sent</button>
+              </div>
             </li>
           );
         })}
