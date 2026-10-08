@@ -55,6 +55,7 @@ function RenaQueue() {
     return CREATORS.filter(eligible).sort((a, b) => a.name.localeCompare(b.name));
   }, [version]);
   const done = rows.filter(isAssumed).length;
+  const unverified = useMemo(() => { void version; return CREATORS.filter((c) => baseCandidate(c) && !isDmVerified(c)).length; }, [version]);
 
   const savePrev = (next: Record<string, Prev>) => { setPrev(next); localStorage.setItem(LS_PREV, JSON.stringify(next)); };
 
@@ -121,7 +122,8 @@ function RenaQueue() {
           {notice.dm ? <textarea readOnly value={notice.dm} rows={4} onFocus={(e) => e.currentTarget.select()} className="mt-2 w-full rounded border border-input bg-background p-2 text-sm text-foreground" /> : null}
         </div>
       ) : null}
-      {rows.length === 0 ? <div className="py-12 text-center text-sm text-muted-foreground">No qualified TikTok creators with a saved DM are waiting.</div> : null}
+      {rows.length === 0 ? <div className="py-12 text-center text-sm text-muted-foreground"><div className="text-base font-semibold text-foreground">Awaiting verification</div>No creators have passed individual profile review yet.</div> : null}
+      <p className="text-center text-[11px] text-muted-foreground">{unverified} qualified creators hidden until a researcher verifies them.</p>
       <ul className="space-y-2">
         {rows.map((c) => {
           const sent = isAssumed(c);
