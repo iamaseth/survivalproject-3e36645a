@@ -251,11 +251,13 @@ export const updateCreatorWorkflow = createServerFn({ method: "POST" })
     const cleanPatch = Object.fromEntries(
       Object.entries(patch).filter(([, value]) => value !== undefined),
     );
-    const { error } = await context.supabase
+    const { data: changed, error } = await context.supabase
       .from("creators")
       .update(cleanPatch as never)
-      .eq("id", id);
+      .eq("id", id)
+      .select("id");
     if (error) throw new Error(error.message);
+    if (!changed?.length) throw new Error("Creator status was not saved (record missing or update not permitted).");
     return { updated: true };
   });
 
