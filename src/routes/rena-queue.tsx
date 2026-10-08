@@ -43,6 +43,7 @@ function DmQueue() {
   const [me, setMe] = useState<{ sender: string | null; approver: boolean } | null>(null);
   const [notice, setNotice] = useState<{ kind: "ok" | "warn" | "err"; text: string; dm?: string } | null>(null);
   const [savingId, setSavingId] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [showPool, setShowPool] = useState(false);
   const [previewSender, setPreviewSender] = useState<string | null>("Rena");
   const viewingSender = previewSender ?? me?.sender ?? null;
@@ -50,7 +51,7 @@ function DmQueue() {
   const lock = useRef(false);
 
   useEffect(() => { if ("serviceWorker" in navigator) navigator.serviceWorker.register("/rena-sw.js").catch(() => {}); }, []);
-  useEffect(() => { who().then(setMe).catch(() => setMe({ sender: null, approver: false })); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { who().then(setMe).catch(() => setMe({ sender: null, approver: false })); void hydrateCreatorsFromDB().catch(e => setLoadError(e instanceof Error ? e.message : "Could not load outreach queue")); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const pool = useMemo(() => { void version; return CREATORS.filter(inPool).sort((a, b) => a.name.localeCompare(b.name)); }, [version]);
   const today = new Date().toISOString().slice(0, 10);
@@ -60,7 +61,7 @@ function DmQueue() {
   const available = pool.filter((c) => statusOf(c) === "available");
   const done = mine.filter((c) => c.outreachSentAt).length;
 
-  const refresh = async () => { await hydrateCreatorsFromDB(); };
+  const refresh = async () => { try { setLoadError(null); await hydrateCreatorsFromDB(); } catch(e) { setLoadError(e instanceof Error ? e.message : "Could not refresh outreach queue"); } };
 
   const run = async (c: CreatorRow, action: "claim" | "release" | "sent" | "undo_sent") => {
     await act({ data: { id: c.id, action } });
@@ -123,6 +124,7 @@ function DmQueue() {
         </div>
         <p className="mt-2 text-[11px] text-muted-foreground">Green = assumed sent (not confirmed). If TikTok blocks a message, stop and undo that row.</p>
       </div>
+      {loadError ? <p role="alert" className="rounded border border-red-600 p-3 text-sm">{loadError}</p> : null}
       {notice ? (
         <div role="status" className={`rounded-lg border-2 p-3 text-sm ${tone[notice.kind]}`}>
           <div className="font-medium">{notice.text}</div>
