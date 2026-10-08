@@ -1,118 +1,116 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { CREATORS, useCreatorsVersion, type CreatorRow } from "@/lib/creator-partnerships";
-import { updateCreatorWorkflow } from "@/lib/creators.functions";
-import { baseCandidate, isRenaReady as isDmVerified, TIKTOK_PROFILE_RE } from "@/lib/tiktok-dm-verification";
+import { CREATORS, hydrateCreatorsFromDB, useCreatorsVersion, type CreatorRow } from "@/lib/creator-partnerships";
+import { getMyOutreachSender, outreachPoolAction } from "@/lib/creators.functions";
+import { TIKTOK_PROFILE_RE } from "@/lib/tiktok-dm-verification";
 
 export const Route = createFileRoute("/rena-queue")({
   head: () => ({
     meta: [
-      { title: "Rena TikTok DM Queue — Survival Tabs" },
-      { name: "description", content: "Phone-first list: tap a creator to copy their DM and open TikTok." },
-      { property: "og:title", content: "Rena TikTok DM Queue — Survival Tabs" },
-      { property: "og:description", content: "Tap a creator to copy their personalized DM and open their TikTok profile." },
+      { title: "My TikTok DMs — Survival Tabs" },
+      { name: "description", content: "Shared approved outreach pool: tap a creator to copy their DM and open TikTok." },
+      { property: "og:title", content: "My TikTok DMs — Survival Tabs" },
+      { property: "og:description", content: "Phone-first DM queue for Rena, Seth and BoBo." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
       { name: "robots", content: "noindex" },
     ],
   }),
-  component: RenaQueue,
+  component: DmQueue,
 });
 
-// Marker that distinguishes "assumed sent" (tapped in this queue) from confirmed contact.
-const ASSUMED_METHOD = "TikTok DM (assumed — Rena queue)";
-const ASSUMED_FOLLOWUP = "Assumed sent — unconfirmed";
-const LS_PREV = "rena-queue-prev-v1";
-
-type Prev = { contacted_date: string | null; contact_method: string | null; response_followup: string | null };
-
-const isAssumed = (c: CreatorRow) => c.contactMethod === ASSUMED_METHOD;
 const handleOf = (url: string) => url.match(/@([A-Za-z0-9._-]+)/)?.[1] ?? null;
+const blocked = (c: CreatorRow) => /not relevant|dm blocked|do not contact/i.test(c.responseFollowup || "");
 
-function eligible(c: CreatorRow) {
-  if (!c.tiktok || !TIKTOK_PROFILE_RE.test(c.tiktok) || !c.personalizedDm?.trim()) return false;
-  if (!isDmVerified(c)) return false; // individual human review required
-  if (isAssumed(c)) return true; // keep showing green rows so they can be undone
-  return baseCandidate(c);
+function inPool(c: CreatorRow) {
+  return c.sethApprovalStatus === "approved" && Boolean(c.tiktok && TIKTOK_PROFILE_RE.test(c.tiktok)) && Boolean(c.personalizedDm?.trim());
+}
+function statusOf(c: CreatorRow): "available" | "assigned" | "contacted" | "blocked" {
+  if (c.outreachSentAt || c.contactedDate) return "contacted";
+  if (blocked(c)) return "blocked";
+  return c.outreachAssignee ? "assigned" : "available";
 }
 
-function RenaQueue() {
+function DmQueue() {
   const version = useCreatorsVersion();
-  const updateFn = useServerFn(updateCreatorWorkflow);
-  const [, force] = useState(0);
+  const who = useServerFn(getMyOutreachSender);
+  const act = useServerFn(outreachPoolAction);
+  const [me, setMe] = useState<{ sender: string | null; approver: boolean } | null>(null);
   const [notice, setNotice] = useState<{ kind: "ok" | "warn" | "err"; text: string; dm?: string } | null>(null);
   const [savingId, setSavingId] = useState<string | null>(null);
+  const [showPool, setShowPool] = useState(false);
   const lock = useRef(false);
-  const [prev, setPrev] = useState<Record<string, Prev>>({});
 
-  useEffect(() => {
-    try { setPrev(JSON.parse(localStorage.getItem(LS_PREV) || "{}")); } catch { /* ignore */ }
-  }, []);
+  useEffect(() => { who().then(setMe).catch(() => setMe({ sender: null, approver: false })); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const rows = useMemo(() => {
-    void version;
-    return CREATORS.filter(eligible).sort((a, b) => a.name.localeCompare(b.name));
-  }, [version]);
-  const done = rows.filter(isAssumed).length;
-  const unverified = useMemo(() => { void version; return CREATORS.filter((c) => baseCandidate(c) && !isDmVerified(c)).length; }, [version]);
+  const pool = useMemo(() => { void version; return CREATORS.filter(inPool).sort((a, b) => a.name.localeCompare(b.name)); }, [version]);
+  const today = new Date().toISOString().slice(0, 10);
+  const mine = pool.filter((c) => me?.sender && (
+    (c.outreachAssignee === me.sender && statusOf(c) === "assigned") ||
+    (c.outreachSentBy === me.sender && (c.outreachSentAt || "").slice(0, 10) === today)));
+  const available = pool.filter((c) => statusOf(c) === "available");
+  const done = mine.filter((c) => c.outreachSentAt).length;
 
-  const savePrev = (next: Record<string, Prev>) => { setPrev(next); localStorage.setItem(LS_PREV, JSON.stringify(next)); };
+  const refresh = async () => { await hydrateCreatorsFromDB(); };
+
+  const run = async (c: CreatorRow, action: "claim" | "release" | "sent" | "undo_sent") => {
+    await act({ data: { id: c.id, action } });
+    await refresh();
+  };
 
   const onTap = (c: CreatorRow) => {
-    if (lock.current || isAssumed(c)) return;
-    lock.current = true;
-    setSavingId(c.id);
+    if (lock.current || c.outreachSentAt) return;
+    lock.current = true; setSavingId(c.id);
     const dm = c.personalizedDm!.trim();
-    // Clipboard call starts inside the tap gesture; the native link opens TikTok in the same gesture.
     const copy = navigator.clipboard?.writeText(dm) ?? Promise.reject(new Error("no clipboard"));
-    const before: Prev = { contacted_date: c.contactedDate, contact_method: c.contactMethod, response_followup: c.responseFollowup };
-    const today = new Date().toISOString().slice(0, 10);
     void (async () => {
       let copied = true;
       try { await copy; } catch { copied = false; }
       try {
-        await updateFn({ data: { id: c.id, contacted_date: today, contact_method: ASSUMED_METHOD, response_followup: ASSUMED_FOLLOWUP } });
-        c.contactedDate = today; c.contactMethod = ASSUMED_METHOD; c.responseFollowup = ASSUMED_FOLLOWUP;
-        savePrev({ ...prev, [c.id]: before });
+        await run(c, "sent");
         setNotice(copied
           ? { kind: "ok", text: `DM for ${c.name} copied. Paste it in TikTok, send, then come back and tap the next row.` }
           : { kind: "warn", text: `Your phone blocked automatic copy for ${c.name}. Press and hold the message below, copy it, then paste in TikTok.`, dm });
       } catch (e) {
-        setNotice({ kind: "err", text: `Could not save ${c.name}: ${e instanceof Error ? e.message : "error"}. Row not marked.`, dm: copied ? undefined : dm });
-      } finally {
-        lock.current = false; setSavingId(null); force((n) => n + 1);
-      }
+        setNotice({ kind: "err", text: `Not marked: ${e instanceof Error ? e.message : "error"}. Don't send this one — someone else may have it.`, dm: undefined });
+        void refresh();
+      } finally { lock.current = false; setSavingId(null); }
     })();
   };
 
-  const undo = async (c: CreatorRow) => {
-    if (lock.current || !isAssumed(c)) return;
-    if (!confirm(`Undo ${c.name}? It goes back to not contacted.`)) return;
+  const simple = async (c: CreatorRow, action: "claim" | "release" | "undo_sent", ask?: string) => {
+    if (lock.current || (ask && !confirm(ask))) return;
     lock.current = true; setSavingId(c.id);
-    const p = prev[c.id] ?? { contacted_date: null, contact_method: null, response_followup: null };
-    try {
-      await updateFn({ data: { id: c.id, ...p } });
-      c.contactedDate = p.contacted_date; c.contactMethod = p.contact_method; c.responseFollowup = p.response_followup;
-      const next = { ...prev }; delete next[c.id]; savePrev(next);
-      setNotice({ kind: "ok", text: `${c.name} undone.` });
-    } catch (e) {
-      setNotice({ kind: "err", text: `Undo failed: ${e instanceof Error ? e.message : "error"}` });
-    } finally { lock.current = false; setSavingId(null); force((n) => n + 1); }
+    try { await run(c, action); setNotice({ kind: "ok", text: action === "claim" ? `${c.name} is yours.` : action === "release" ? `${c.name} returned to the pool.` : `${c.name} undone.` }); }
+    catch (e) { setNotice({ kind: "err", text: e instanceof Error ? e.message : "Could not save" }); void refresh(); }
+    finally { lock.current = false; setSavingId(null); }
   };
 
   const tone = { ok: "border-emerald-600 bg-emerald-50 text-emerald-950", warn: "border-amber-500 bg-amber-50 text-amber-950", err: "border-red-600 bg-red-50 text-red-950" };
 
+  if (me === null) return <div className="p-8 text-sm text-muted-foreground">Loading…</div>;
+  if (!me.sender) return (
+    <div className="mx-auto max-w-lg rounded-xl border border-border bg-card p-6 text-sm">
+      <h1 className="font-display text-2xl">TikTok DMs</h1>
+      <p className="mt-2">Your account isn't set up as a DM sender (Seth, BoBo or Rena). Ask Seth to add you.</p>
+      <p className="mt-2 text-muted-foreground">Shared pool: {available.length} available · {pool.filter((c) => statusOf(c) === "assigned").length} assigned · {pool.filter((c) => statusOf(c) === "contacted").length} contacted</p>
+    </div>
+  );
+
   return (
     <div className="mx-auto max-w-xl space-y-3 pb-16">
-      <div>
-        <h1 className="font-display text-2xl text-foreground">Rena TikTok DMs</h1>
-        <p className="text-sm text-muted-foreground">Tap a creator: DM copies + TikTok opens. Paste, send, come back, tap the next one.</p>
+      <div className="flex items-start justify-between gap-2">
+        <div>
+          <h1 className="font-display text-2xl text-foreground">{me.sender}'s TikTok DMs</h1>
+          <p className="text-sm text-muted-foreground">Tap a creator: DM copies + TikTok opens. Paste, send, come back, tap the next one.</p>
+        </div>
+        <button onClick={() => void refresh()} className="rounded-md border border-input px-2 py-1 text-xs">Refresh</button>
       </div>
       <div className="sticky top-0 z-10 rounded-xl border border-border bg-card p-3">
-        <div className="flex justify-between text-sm font-semibold"><span>{done} done</span><span>{rows.length - done} left</span></div>
+        <div className="flex justify-between text-sm font-semibold"><span>{done} done today</span><span>{mine.length - done} left</span></div>
         <div className="mt-2 h-2 overflow-hidden rounded-full bg-secondary">
-          <div className="h-full bg-emerald-600 transition-all" style={{ width: `${rows.length ? (done / rows.length) * 100 : 0}%` }} />
+          <div className="h-full bg-emerald-600 transition-all" style={{ width: `${mine.length ? (done / mine.length) * 100 : 0}%` }} />
         </div>
         <p className="mt-2 text-[11px] text-muted-foreground">Green = assumed sent (not confirmed). If TikTok blocks a message, stop and undo that row.</p>
       </div>
@@ -122,32 +120,45 @@ function RenaQueue() {
           {notice.dm ? <textarea readOnly value={notice.dm} rows={4} onFocus={(e) => e.currentTarget.select()} className="mt-2 w-full rounded border border-input bg-background p-2 text-sm text-foreground" /> : null}
         </div>
       ) : null}
-      {rows.length === 0 ? <div className="py-12 text-center text-sm text-muted-foreground"><div className="text-base font-semibold text-foreground">Awaiting verification</div>No creators have been approved by Seth or verified yet.</div> : null}
-      <p className="text-center text-[11px] text-muted-foreground">{unverified} qualified creators hidden until Seth approves them.</p>
+      {mine.length === 0 ? <div className="py-8 text-center text-sm text-muted-foreground"><div className="text-base font-semibold text-foreground">Nothing assigned to you</div>Claim creators from the shared pool below.</div> : null}
       <ul className="space-y-2">
-        {rows.map((c) => {
-          const sent = isAssumed(c);
+        {mine.map((c) => {
+          const sent = Boolean(c.outreachSentAt);
           const h = handleOf(c.tiktok!);
           return (
             <li key={c.id} className="flex items-stretch gap-2">
-              <a
-                href={sent ? undefined : c.tiktok!}
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-disabled={sent || savingId === c.id}
+              <a href={sent ? undefined : c.tiktok!} target="_blank" rel="noopener noreferrer" aria-disabled={sent || savingId === c.id}
                 onClick={(e) => { if (sent || lock.current) { e.preventDefault(); return; } onTap(c); }}
-                className={`flex min-h-[64px] flex-1 flex-col justify-center rounded-xl border-2 px-4 py-3 ${sent ? "border-emerald-600 bg-emerald-100 text-emerald-950" : "border-border bg-card text-foreground active:bg-secondary"}`}
-              >
+                className={`flex min-h-[64px] flex-1 flex-col justify-center rounded-xl border-2 px-4 py-3 ${sent ? "border-emerald-600 bg-emerald-100 text-emerald-950" : "border-border bg-card text-foreground active:bg-secondary"}`}>
                 <span className="text-base font-semibold">{sent ? "✓ " : ""}{c.name}</span>
                 <span className="text-xs opacity-75">{h ? `@${h}` : "TikTok"}{savingId === c.id ? " · saving…" : sent ? " · assumed sent" : ""}</span>
               </a>
-              {sent ? (
-                <button type="button" onClick={() => void undo(c)} className="rounded-xl border border-border px-3 text-xs text-muted-foreground">Undo</button>
-              ) : null}
+              {sent
+                ? <button type="button" onClick={() => void simple(c, "undo_sent", `Undo ${c.name}? It goes back to not contacted.`)} className="rounded-xl border border-border px-3 text-xs text-muted-foreground">Undo</button>
+                : <button type="button" onClick={() => void simple(c, "release", `Give ${c.name} back to the shared pool?`)} className="rounded-xl border border-border px-2 text-[11px] text-muted-foreground">Return</button>}
             </li>
           );
         })}
       </ul>
+      <section className="rounded-xl border border-border bg-card">
+        <button onClick={() => setShowPool((v) => !v)} className="flex w-full justify-between px-4 py-3 text-sm font-semibold">
+          <span>Shared pool: {available.length} available</span><span>{showPool ? "Hide" : "Show"}</span>
+        </button>
+        {showPool ? (
+          <ul className="divide-y divide-border border-t border-border text-sm">
+            {pool.filter((c) => statusOf(c) !== "contacted" || (c.outreachSentAt || "").slice(0, 10) === today).slice(0, 100).map((c) => {
+              const st = statusOf(c);
+              return (
+                <li key={c.id} className="flex items-center gap-2 px-4 py-2">
+                  <span className="min-w-0 flex-1 truncate">{c.name}</span>
+                  <span className="text-[11px] text-muted-foreground">{st === "assigned" ? `assigned · ${c.outreachAssignee}` : st === "contacted" ? `contacted · ${c.outreachSentBy ?? "CRM"}` : st}</span>
+                  {st === "available" ? <button disabled={savingId === c.id} onClick={() => void simple(c, "claim")} className="rounded-md bg-primary px-3 py-1 text-xs font-semibold text-primary-foreground">Claim</button> : null}
+                </li>
+              );
+            })}
+          </ul>
+        ) : null}
+      </section>
     </div>
   );
 }

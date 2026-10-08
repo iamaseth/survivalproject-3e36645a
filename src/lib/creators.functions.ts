@@ -413,3 +413,26 @@ export const sethReviewCreator = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return { ok: true };
   });
+
+// Shared outreach pool. All checks and locking happen in public.outreach_action.
+export const getMyOutreachSender = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const [{ data: sender }, { data: approver }] = await Promise.all([
+      context.supabase.rpc("outreach_my_sender" as never),
+      context.supabase.rpc("is_creator_approver" as never),
+    ]);
+    return { sender: (sender as string | null) ?? null, approver: approver === true };
+  });
+
+export const outreachPoolAction = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { id: string; action: "claim" | "assign" | "release" | "sent" | "undo_sent"; target?: string }) => {
+    if (!d?.id || !["claim", "assign", "release", "sent", "undo_sent"].includes(d.action)) throw new Error("Invalid request");
+    return d;
+  })
+  .handler(async ({ data, context }) => {
+    const { data: r, error } = await context.supabase.rpc("outreach_action" as never, { p_id: data.id, p_action: data.action, p_target: data.target ?? null } as never);
+    if (error) throw new Error(error.message);
+    return r as { ok: boolean; me: string | null };
+  });
