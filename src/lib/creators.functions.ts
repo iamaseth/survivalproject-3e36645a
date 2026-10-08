@@ -317,3 +317,42 @@ export const importCreatorQualifications = createServerFn({ method: "POST" })
     }
     return { updated, skipped, total: data.rows.length };
   });
+
+/** Add a manually discovered TikTok creator, without duplicating existing handles. */
+export const addTikTokOutreachCreator = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: { profile: string; name?: string; followers?: string }) => {
+    if (!data?.profile) throw new Error("TikTok profile required");
+    return data;
+  })
+  .handler(async ({ data, context }) => {
+    const normalized = normalizeCreatorProfile(data.profile, "tiktok");
+    if (!normalized) throw new Error("Enter a valid TikTok profile URL, such as https://www.tiktok.com/@americanprepper1");
+    const handle = normalized.slice("tiktok:@".length);
+    const url = `https://www.tiktok.com/@${handle}`;
+    // Check the actual profile column as well as the normalized-domain key,
+    // since legacy imports may not have populated normalized_domain.
+    const { data: existing, error: lookupError } = await context.supabase
+      .from("creators").select("id,name,tiktok,normalized_domain")
+      .or(`normalized_domain.eq.${normalized},tiktok.ilike.%${handle}%`)
+      .limit(100);
+    if (lookupError) throw new Error(lookupError.message);
+    const match = (existing ?? []).find((c: any) =>
+      c.normalized_domain === normalized || normalizeCreatorProfile(c.tiktok, "tiktok") === normalized
+    );
+    if (match) return { id: match.id as string, name: match.name as string, created: false };
+    const id = `TIKTOK-${handle.toUpperCase()}`;
+    const name = data.name?.trim() || `@${handle}`;
+    const { data: inserted, error } = await context.supabase.from("creators")
+      .upsert({
+        id, name, tiktok: url, normalized_domain: normalized,
+        primary_platforms: "TikTok", segment: "Preparedness / creator",
+        followers_signal: data.followers?.trim() || null,
+        qualification_status: "Qualified",
+        research_notes: "Manually discovered during TikTok outreach; verify fit before messaging.",
+        outreach_owner: "RENA", imported_by: context.userId,
+      } as never, { onConflict: "id", ignoreDuplicates: true })
+      .select("id");
+    if (error) throw new Error(error.message);
+    return { id, name, created: Boolean(inserted?.length) };
+  });
