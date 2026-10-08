@@ -32,6 +32,8 @@ function candidate(c: CreatorRow) {
 }
 
 function SethApproval() {
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const [doneCount, setDoneCount] = useState(0);
   const version = useCreatorsVersion();
   const check = useServerFn(amICreatorApprover);
   const [allowed, setAllowed] = useState<boolean | null>(null);
@@ -90,8 +92,22 @@ function SethApproval() {
         <span className="self-center text-xs text-muted-foreground">{lists.good} Good-screened shown first</span>
         {skipped.length ? <button onClick={() => setSkipped([])} className="ml-auto text-xs underline">Show {skipped.length} skipped</button> : null}
       </div>
+      {tab === "pending" ? (
+        <p className="rounded-md bg-secondary/40 p-2 text-xs">
+          <b>1</b> Click the @handle — prompt copies + TikTok opens · <b>2</b> Screenshot the profile · <b>3</b> Paste prompt + screenshot into ChatGPT · <b>4</b> Paste its DM here → Save · <b>5</b> Approve, or Not relevant.
+          <span className="ml-2 text-muted-foreground">Reviewed this session: {doneCount}</span>
+        </p>
+      ) : null}
       {rows.length === 0 ? <div className="py-10 text-center text-sm text-muted-foreground">Nothing here.</div> : null}
-      {rows.slice(0, 10).map((c) => (
+      {tab === "pending" ? (
+        <div className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-card">
+          {rows.slice(0, 50).map((c, i) => (
+            <Row key={c.id} c={c} active={(activeId ?? rows[0]?.id) === c.id} onActivate={() => setActiveId(c.id)}
+              onDone={() => { setDoneCount((n) => n + 1); setActiveId(rows[i + 1]?.id ?? null); force((n) => n + 1); }}
+              onSkip={() => { setActiveId(rows[i + 1]?.id ?? null); setSkipped((s) => [...s, c.id]); }} />
+          ))}
+        </div>
+      ) : rows.slice(0, 20).map((c) => (
         <Card key={c.id} c={c} onDone={() => force((n) => n + 1)} onSkip={() => setSkipped((s) => [...s, c.id])} />
       ))}
     </div>
