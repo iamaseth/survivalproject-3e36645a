@@ -128,16 +128,6 @@ function CreatorPipeline() {
   const needsPersonalization = useMemo(() => creators.filter((c) => stageFor(c) === "not_contacted" && !personalizationReady(c) && c.personalizationStatus?.toLowerCase() !== "needs review"), [creators]);
   const readyToContact = useMemo(() => creators.filter((c) => stageFor(c) === "not_contacted" && personalizationReady(c) && c.qualificationStatus !== "Not Relevant"), [creators]);
   const outreachGrouped = useMemo(() => ({ ...grouped, not_contacted: grouped.not_contacted.filter((c) => !personalizationReady(c)) }), [grouped]);
-  const all=CREATORS.filter(c=>Boolean(c.tiktok));
-    const verified=all.filter(c=>/verified|confirmed|checked/i.test(c.fullVerification??"") && Boolean(c.verificationEvidence?.trim()) && Boolean(c.recentActivityCheck?.trim()));
-    const relevant=verified.filter(c=>c.qualificationStatus==="Qualified");
-    const irrelevant=verified.filter(c=>c.qualificationStatus==="Not Relevant");
-    const needsReview=all.filter(c=>c.qualificationStatus==="Needs Review");
-    const verifiedIds=new Set(verified.map(c=>c.id));
-    const notChecked=all.filter(c=>!verifiedIds.has(c.id) && c.qualificationStatus!=="Needs Review");
-    const pilot=notChecked.filter(c=>!c.contactedDate).slice(0,50);
-    return {relevant,irrelevant,needsReview,notChecked,pilot,verifiedOther:verified.length-relevant.length-irrelevant.length};
-  },[version]);
   const lastImport = typeof window !== "undefined" ? (() => { try { return JSON.parse(window.localStorage.getItem("survival-tabs-last-personalization-import") ?? "null") as {updated:number;skipped:number;total:number;file:string;at:string}|null; } catch { return null; } })() : null;
   const exportFilteredCreators = () => {
     const safe = (value: unknown) => String(value ?? "").replace(/"/g, '""').replace(/\r?\n/g, " ");
