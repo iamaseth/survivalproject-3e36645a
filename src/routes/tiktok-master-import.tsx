@@ -19,14 +19,17 @@ export const Route = createFileRoute("/tiktok-master-import")({
 });
 
 const FIELDS: Record<keyof Omit<MasterRow, "line">, string[]> = {
-  id: ["id", "creatorid", "crmid"],
+  id: ["creatorid", "id", "crmid"],
   profile: ["tiktokurl", "profileurl", "tiktokprofile", "tiktok", "url", "tiktokhandle", "handle", "profile"],
-  name: ["name", "displayname", "creator", "creatorname"],
+  name: ["creator", "name", "displayname", "creatorname"],
   qualification: ["qualificationstatus", "qualification", "finalqualification", "decision", "status"],
   dm: ["personalizeddm", "firstdm", "dm", "message", "personalizedmessage"],
-  evidence: ["verificationevidence", "reviewevidence", "evidence", "profileevidence"],
+  evidence: ["newscreeningevidence", "verificationevidence", "reviewevidence", "evidence", "profileevidence"],
   reviewer: ["reviewer", "reviewedby", "verifiedby"],
   reviewDate: ["reviewdate", "verifieddate", "verificationdate", "reviewedat", "verifiedat"],
+  decision: ["newscreeningdecision", "screeningdecision"],
+  publicUrl: ["publicevidenceurl", "evidenceurl"],
+  method: ["screeningmethod"],
   verified: ["verified", "profileverified", "verifiedfordm", "humanverified", "manuallyverified"],
 };
 
@@ -52,6 +55,7 @@ function ImportPage() {
   const [rows, setRows] = useState<MasterRow[]>([]);
   const [mapping, setMapping] = useState<Record<string, string | null>>({});
   const [createMissing, setCreateMissing] = useState(false);
+  const [batchLabel, setBatchLabel] = useState("");
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState("");
   const [preview, setPreview] = useState<RowResult[] | null>(null);
@@ -85,7 +89,7 @@ function ImportPage() {
     try {
       for (let i = 0; i < rows.length; i += 200) {
         setProgress(`${dryRun ? "Previewing" : "Importing"} rows ${i + 1}–${Math.min(i + 200, rows.length)} of ${rows.length}…`);
-        const r = await run({ data: { rows: rows.slice(i, i + 200), dryRun, createMissing, seenHandles: seen } });
+        const r = await run({ data: { rows: rows.slice(i, i + 200), dryRun, createMissing, seenHandles: seen, batchLabel } });
         all.push(...r.results); seen = [...seen, ...r.handles];
       }
       dryRun ? setPreview(all) : setApplied(all);
@@ -98,6 +102,8 @@ function ImportPage() {
     const n = (p: (r: RowResult) => boolean) => rs.filter(p).length;
     return [
       ["Rows", rs.length], ["Matched, will update", n((r) => r.outcome === "updated")], ["Matched, no change", n((r) => r.outcome === "unchanged")],
+      ["Good (screening)", n((r) => /^good$/i.test(r.decision || ""))], ["Good + DM ready", n((r) => /^good$/i.test(r.decision || "") && r.dmReady)],
+      ["Good, no DM", n((r) => /^good$/i.test(r.decision || "") && !r.dmReady)], ["Needs direct TikTok verification", n((r) => r.needsDirectVerification)],
       ["New creators", n((r) => r.outcome === "new")], ["Not in CRM (skipped)", n((r) => r.outcome === "new_skipped")],
       ["Verified → Rena", n((r) => r.changes.includes("verified for Rena") || (r.outcome === "new" && r.verified))],
       ["Good but unverified", n((r) => r.goodUnverified)], ["Conflicts (CRM kept)", n((r) => r.conflicts.length > 0 && r.outcome !== "invalid")],
@@ -121,6 +127,10 @@ function ImportPage() {
           </div>
         ) : null}
         <p className="text-xs text-muted-foreground">A row goes to Rena only if: qualification is Qualified, a "verified" column says yes, plus a reviewer name, a review date (YYYY-MM-DD) and at least 40 characters of evidence. Everything else stays "good but unverified" for the TikTok DM Review page.</p>
+        <p className="rounded-md border border-amber-400 bg-amber-50 p-2 text-xs text-amber-950">Screening decisions ("Good") come from public indexed sources, not a direct TikTok check. They are saved as screening notes only and never put anyone on Rena's list. "Draft DM - Do Not Send" is ignored.</p>
+        <label className="block text-sm">Batch label (e.g. Batch 24)
+          <input value={batchLabel} onChange={(e) => { setBatchLabel(e.target.value); setPreview(null); }} className="mt-1 block rounded-md border border-input bg-background p-2 text-sm" placeholder="Batch 24" />
+        </label>
         <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={createMissing} onChange={(e) => { setCreateMissing(e.target.checked); setPreview(null); }} />Also add creators not yet in the CRM</label>
         <div className="flex flex-wrap gap-2">
           <button disabled={busy || !rows.length} onClick={() => void go(true)} className="rounded-md border border-input px-4 py-2 text-sm font-semibold disabled:opacity-40">1. Preview (no changes)</button>
@@ -136,9 +146,9 @@ function ImportPage() {
             {summary(shown).map(([l, n]) => <div key={l} className="rounded-md bg-secondary/40 p-2"><div className="text-[11px] text-muted-foreground">{l}</div><div className="text-lg font-semibold">{n}</div></div>)}
           </div>
           <div className="max-h-[420px] overflow-auto text-xs">
-            <table className="w-full"><thead><tr className="text-left text-muted-foreground"><th>Line</th><th>Handle</th><th>Result</th><th>Changes</th><th>Conflicts</th></tr></thead>
+            <table className="w-full"><thead><tr className="text-left text-muted-foreground"><th>Line</th><th>Handle</th><th>Decision</th><th>Result</th><th>Changes</th><th>Conflicts</th></tr></thead>
               <tbody>{shown.filter((r) => r.outcome !== "unchanged" || r.conflicts.length).slice(0, 500).map((r) => (
-                <tr key={r.line} className="border-t border-border align-top"><td>{r.line}</td><td>{r.handle ? `@${r.handle}` : r.id}</td><td>{r.outcome}</td><td>{r.changes.join("; ")}</td><td>{r.conflicts.join("; ")}</td></tr>
+                <tr key={r.line} className="border-t border-border align-top"><td>{r.line}</td><td>{r.handle ? `@${r.handle}` : r.id}</td><td>{r.decision}</td><td>{r.outcome}{r.needsDirectVerification ? " · needs direct check" : ""}</td><td>{r.changes.join("; ")}</td><td>{r.conflicts.join("; ")}</td></tr>
               ))}</tbody></table>
           </div>
         </section>
