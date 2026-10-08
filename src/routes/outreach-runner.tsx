@@ -117,16 +117,27 @@ function OutreachRunner() {
     lockRef.current = true;
     setBusy(true);
     setActionFeedback(null);
+    // Reserve a reusable TikTok tab while this is still a direct button click.
+    // Browsers normally block window.open calls made after awaiting a server save.
+    const nextId = nextAfter(target.id, [target.id]);
+    const nextCreator = eligible.find((c) => c.id === nextId);
+    const nextProfile = nextCreator ? profileOf(nextCreator) : null;
+    const tikTokTab = nextProfile ? window.open("about:blank", "survival-tabs-next-tiktok") : null;
     try {
       await fn(target);
-      // Advance only after the database operation has completed successfully.
-      const nextId = nextAfter(target.id, [target.id]);
       setStatus(target.id, status);
       setJustActed(false);
       setCurrentId(nextId);
-      setActionFeedback({ kind: "success", message: `${target.name}: ${okMsg}. ${nextId ? "Next influencer loaded." : "Queue complete."}` });
+      if (tikTokTab && nextProfile) {
+        tikTokTab.location.replace(nextProfile.url);
+      }
+      const nextMessage = nextCreator
+        ? `Next: ${nextCreator.name} (${handleOf(nextProfile?.url || "") || "TikTok"}).`
+        : "Queue complete.";
+      setActionFeedback({ kind: "success", message: `${target.name}: ${okMsg}. ${nextMessage} ${tikTokTab ? "TikTok profile opened." : nextProfile ? "Use Open TikTok to view the next profile (pop-up blocked)." : ""}` });
       toast.success(okMsg);
     } catch (e) {
+      if (tikTokTab && !tikTokTab.closed) tikTokTab.close();
       const message = e instanceof Error ? e.message : errMsg;
       setActionFeedback({ kind: "error", message: `Could not save ${target.name}. Still on this influencer. ${message}` });
       toast.error(message);
