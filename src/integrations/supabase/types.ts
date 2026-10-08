@@ -1674,6 +1674,15 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      creator_final_research_valid: {
+        Args: {
+          p_date: string
+          p_dm: string
+          p_evidence: string
+          p_verification: string
+        }
+        Returns: boolean
+      }
       ensure_current_team_access: {
         Args: never
         Returns: Database["public"]["Enums"]["app_role"]
