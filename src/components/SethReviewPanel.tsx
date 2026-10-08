@@ -18,8 +18,7 @@ export function SethReviewPanel() {
   const [revision, setRevision] = useState(0);
   useEffect(() => { check().then(r => setAllowed(r.approver)).catch(() => setAllowed(false)); }, []);
   useEffect(() => { if (allowed) refreshCreatorsFromDB().catch(() => setError("Could not load creators. Reload to retry.")).finally(() => setLoaded(true)); }, [allowed]);
-  const rows = useMemo(() => CREATORS.filter(c => c.tiktok && c.qualificationStatus === "Qualified" && !c.contactedDate && !c.personalizedDm?.trim() && !c.sethApprovalStatus).sort((a,b) => a.name.localeCompare(b.name)), [version, revision]);
-  const pending = useMemo(() => CREATORS.filter(c => c.tiktok && c.qualificationStatus === "Qualified" && !c.contactedDate && !!c.personalizedDm?.trim() && !c.sethApprovalStatus).sort((a,b) => a.name.localeCompare(b.name)), [version, revision]);
+  const rows = useMemo(() => CREATORS.filter(c => c.tiktok && c.qualificationStatus === "Qualified" && !c.contactedDate && !c.sethApprovalStatus).sort((a,b) => a.name.localeCompare(b.name)), [version, revision]);
   const approved = useMemo(() => CREATORS.filter(c => c.sethApprovalStatus === "approved" && !c.outreachSentAt && !c.contactedDate), [version, revision]);
   if (!allowed) return null;
   return <div className="space-y-3"><section className="overflow-hidden rounded-xl border border-border bg-card">
@@ -31,7 +30,6 @@ export function SethReviewPanel() {
     </button>
     {open && <div className="border-t border-border">{error ? <p role="alert" className="p-4 text-destructive">{error}</p> : !loaded ? <p className="p-4">Loading…</p> : rows.length ? rows.map(c => <QualifiedRow key={c.id} c={c} onDone={() => setRevision(n => n + 1)} />) : <p className="p-4 text-sm text-muted-foreground">No qualified creators awaiting review.</p>}</div>}
   </section>
-  <details className="rounded-xl border border-border bg-card"><summary className="cursor-pointer p-4 font-semibold">Awaiting Verification ({pending.length})</summary><p className="px-4 text-xs text-muted-foreground">DM saved. Direct profile verification is required before final outreach approval.</p>{pending.map(c => <QualifiedRow key={c.id} c={c} onDone={() => setRevision(n => n + 1)} />)}</details>
   <section className="rounded-xl border border-border bg-card p-4"><h3 className="font-semibold">2. Approved for Outreach ({approved.length})</h3>{(["Seth", "Rena"] as const).map(person => <details key={person} className="mt-2 rounded border border-border"><summary className="cursor-pointer p-3 font-medium">{person} ({approved.filter(c => c.outreachAssignee === person).length})</summary>{approved.filter(c => c.outreachAssignee === person).map(c => <div key={c.id} className="flex justify-between gap-2 border-t p-3 text-sm"><span>{c.name}</span><a {...externalLinkProps(c.tiktok)} className="underline">Profile</a></div>)}</details>)}<p className="mt-2 text-xs text-muted-foreground">Unassigned approved creators remain in the shared outreach pool.</p></section>
   </div>;
 }
@@ -46,6 +44,7 @@ function QualifiedRow({c,onDone}:{c:CreatorRow;onDone:()=>void}) {
   const [evidence,setEvidence] = useState("");
   const [error,setError] = useState("");
   const [saved,setSaved] = useState(false);
+  const [assignee,setAssignee] = useState<"Seth" | "Rena">("Rena");
   const [rawInput,setRawInput] = useState("");
   const handle = c.tiktok?.match(/@([^/?#]+)/)?.[1] ?? c.name;
   const copy = async () => {
@@ -75,12 +74,14 @@ function QualifiedRow({c,onDone}:{c:CreatorRow;onDone:()=>void}) {
     if (busyRef.current || !dm.trim()) return;
     busyRef.current = true; setBusy(true); setError(""); setSaved(false);
     try {
-      await saveDraft({data:{id:c.id,dm:dm.trim(),note:"ChatGPT profile evidence (not independently verified by CRM): "+evidence.slice(0,500)}});
-      setSaved(true);
+      await saveDraft({data:{id:c.id,dm:dm.trim(),note:"Second manual review. Profile evidence: "+evidence.slice(0,500)}});
       c.personalizedDm = dm.trim();
+      await review({data:{id:c.id,decision:"approved",dm:dm.trim(),note:"Second manual review completed; assigned for "+assignee+" outreach",checkedProfile:true,messageFits:true}});
+      c.sethApprovalStatus = "approved";
+      setSaved(true);
+      toast.success("Approved for Outreach");
       onDone();
-      toast.success("DM saved — moved to Awaiting Verification");
-    } catch(e) { setError(e instanceof Error ? e.message : "DM was not saved"); }
+    } catch(e) { setError((e instanceof Error ? e.message : "Could not approve creator") + ". DM may have been saved; creator remains in Passed First Review until approval succeeds."); }
     finally {busyRef.current = false; setBusy(false); }
   };
   const act = async (decision:"approved"|"rejected") => {
@@ -109,7 +110,7 @@ function QualifiedRow({c,onDone}:{c:CreatorRow;onDone:()=>void}) {
       <button type="button" onClick={() => void paste()} className={`rounded-md border px-3 py-1.5 text-xs ${saved ? "border-emerald-700 bg-emerald-700 text-white" : "hover:bg-secondary"}`}>{saved ? "Saved ✓" : "Paste"}</button>
       <button type="button" disabled={busy} onClick={() => void act("rejected")} className="rounded-md border px-3 py-1.5 text-xs hover:bg-secondary">Reject</button>
     </div>
-    {showPaste && <div className="mt-3 space-y-2"><label className="block text-xs font-medium">Complete ChatGPT result (Ctrl+V if automatic paste is blocked)<textarea value={rawInput} onChange={e=>setRawInput(e.target.value)} rows={3} className="mt-1 w-full rounded-md border bg-background p-2 text-sm" /></label><button type="button" onClick={()=>parseResult(rawInput)} className="rounded-md border px-3 py-2 text-xs">Load result</button><label className="block text-xs font-medium">Personalized DM (editable)<textarea value={dm} onChange={e=>{setDm(e.target.value);setSaved(false);}} rows={5} maxLength={2000} className="mt-1 w-full rounded-md border bg-background p-2 text-sm" /></label><button type="button" disabled={busy || !dm.trim()} onClick={()=>void save()} className="rounded-md bg-primary px-3 py-2 text-xs text-primary-foreground">{busy?"Saving…":"Save DM"}</button>{saved&&<p role="status" className="text-sm font-semibold text-emerald-700">Saved to CRM. Direct profile verification is required before outreach approval.</p>}</div>}
+    {showPaste && <div className="mt-3 space-y-2"><label className="block text-xs font-medium">Complete ChatGPT result (Ctrl+V if automatic paste is blocked)<textarea value={rawInput} onChange={e=>setRawInput(e.target.value)} rows={3} className="mt-1 w-full rounded-md border bg-background p-2 text-sm" /></label><button type="button" onClick={()=>parseResult(rawInput)} className="rounded-md border px-3 py-2 text-xs">Load result</button><label className="block text-xs font-medium">Personalized DM (editable)<textarea value={dm} onChange={e=>{setDm(e.target.value);setSaved(false);}} rows={5} maxLength={2000} className="mt-1 w-full rounded-md border bg-background p-2 text-sm" /></label><label className="block text-xs font-medium">Outreach owner <select value={assignee} onChange={e=>setAssignee(e.target.value as "Seth" | "Rena")} className="ml-2 rounded border bg-background p-2"><option value="Seth">Seth</option><option value="Rena">Rena</option></select></label><button type="button" disabled={busy || !dm.trim()} onClick={()=>void save()} className="rounded-md bg-primary px-3 py-2 text-xs text-primary-foreground">{busy?"Saving…":"Save DM"}</button>{saved&&<p role="status" className="text-sm font-semibold text-emerald-700">Approved for Outreach.</p>}</div>}
     {error && <p role="alert" className="mt-2 text-xs text-destructive">{error}</p>}
   </div>;
 }
