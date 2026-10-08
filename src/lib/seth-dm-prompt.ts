@@ -51,3 +51,17 @@ export async function copyText(text: string): Promise<boolean> {
     return ok;
   } catch { return false; }
 }
+
+// Synchronous copy inside the click itself (before the new tab steals focus). Falls back to async clipboard.
+export function copyTextNow(text: string): boolean {
+  let ok = false;
+  try {
+    const ta = document.createElement("textarea");
+    ta.value = text; ta.setAttribute("readonly", ""); ta.style.position = "fixed"; ta.style.opacity = "0";
+    document.body.appendChild(ta); ta.select();
+    ok = document.execCommand("copy");
+    document.body.removeChild(ta);
+  } catch { ok = false; }
+  try { void navigator.clipboard?.writeText(text).catch(() => {}); } catch { /* ignore */ }
+  return ok;
+}
