@@ -18,17 +18,22 @@ export function SethReviewPanel() {
   const [revision, setRevision] = useState(0);
   useEffect(() => { check().then(r => setAllowed(r.approver)).catch(() => setAllowed(false)); }, []);
   useEffect(() => { if (allowed) refreshCreatorsFromDB().catch(() => setError("Could not load creators. Reload to retry.")).finally(() => setLoaded(true)); }, [allowed]);
-  const rows = useMemo(() => CREATORS.filter(c => c.tiktok && c.qualificationStatus === "Qualified" && !c.contactedDate && c.sethApprovalStatus !== "approved" && c.sethApprovalStatus !== "rejected").sort((a,b) => a.name.localeCompare(b.name)), [version, revision]);
+  const rows = useMemo(() => CREATORS.filter(c => c.tiktok && c.qualificationStatus === "Qualified" && !c.contactedDate && !c.personalizedDm?.trim() && !c.sethApprovalStatus).sort((a,b) => a.name.localeCompare(b.name)), [version, revision]);
+  const pending = useMemo(() => CREATORS.filter(c => c.tiktok && c.qualificationStatus === "Qualified" && !c.contactedDate && !!c.personalizedDm?.trim() && !c.sethApprovalStatus).sort((a,b) => a.name.localeCompare(b.name)), [version, revision]);
+  const approved = useMemo(() => CREATORS.filter(c => c.sethApprovalStatus === "approved" && !c.outreachSentAt && !c.contactedDate), [version, revision]);
   if (!allowed) return null;
-  return <section className="overflow-hidden rounded-xl border border-border bg-card">
+  return <div className="space-y-3"><section className="overflow-hidden rounded-xl border border-border bg-card">
     <button type="button" onClick={() => setOpen(v => !v)} aria-expanded={open} className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-secondary/40">
       {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
       <div className="grid h-7 w-7 place-items-center rounded-full bg-emerald-700 text-white">1</div>
-      <div className="min-w-0 flex-1 font-semibold">Qualified Influencers <span className="text-sm font-normal text-muted-foreground">({loaded && !error ? rows.length : "—"})</span></div>
+      <div className="min-w-0 flex-1 font-semibold">Passed First Review <span className="text-sm font-normal text-muted-foreground">({loaded && !error ? rows.length : "—"})</span></div>
       <span className="text-xs text-muted-foreground">{open ? "Close" : "Open"}</span>
     </button>
     {open && <div className="border-t border-border">{error ? <p role="alert" className="p-4 text-destructive">{error}</p> : !loaded ? <p className="p-4">Loading…</p> : rows.length ? rows.map(c => <QualifiedRow key={c.id} c={c} onDone={() => setRevision(n => n + 1)} />) : <p className="p-4 text-sm text-muted-foreground">No qualified creators awaiting review.</p>}</div>}
-  </section>;
+  </section>
+  <details className="rounded-xl border border-border bg-card"><summary className="cursor-pointer p-4 font-semibold">Awaiting Verification ({pending.length})</summary><p className="px-4 text-xs text-muted-foreground">DM saved. Direct profile verification is required before final outreach approval.</p>{pending.map(c => <QualifiedRow key={c.id} c={c} onDone={() => setRevision(n => n + 1)} />)}</details>
+  <section className="rounded-xl border border-border bg-card p-4"><h3 className="font-semibold">2. Approved for Outreach ({approved.length})</h3>{(["Seth", "Rena"] as const).map(person => <details key={person} className="mt-2 rounded border border-border"><summary className="cursor-pointer p-3 font-medium">{person} ({approved.filter(c => c.outreachAssignee === person).length})</summary>{approved.filter(c => c.outreachAssignee === person).map(c => <div key={c.id} className="flex justify-between gap-2 border-t p-3 text-sm"><span>{c.name}</span><a {...externalLinkProps(c.tiktok)} className="underline">Profile</a></div>)}</details>)}<p className="mt-2 text-xs text-muted-foreground">Unassigned approved creators remain in the shared outreach pool.</p></section>
+  </div>;
 }
 
 function QualifiedRow({c,onDone}:{c:CreatorRow;onDone:()=>void}) {
@@ -72,7 +77,9 @@ function QualifiedRow({c,onDone}:{c:CreatorRow;onDone:()=>void}) {
     try {
       await saveDraft({data:{id:c.id,dm:dm.trim(),note:"ChatGPT profile evidence (not independently verified by CRM): "+evidence.slice(0,500)}});
       setSaved(true);
-      toast.success("Personalized DM saved to CRM");
+      c.personalizedDm = dm.trim();
+      onDone();
+      toast.success("DM saved — moved to Awaiting Verification");
     } catch(e) { setError(e instanceof Error ? e.message : "DM was not saved"); }
     finally {busyRef.current = false; setBusy(false); }
   };
@@ -102,7 +109,7 @@ function QualifiedRow({c,onDone}:{c:CreatorRow;onDone:()=>void}) {
       <button type="button" onClick={() => void paste()} className={`rounded-md border px-3 py-1.5 text-xs ${saved ? "border-emerald-700 bg-emerald-700 text-white" : "hover:bg-secondary"}`}>{saved ? "Saved ✓" : "Paste"}</button>
       <button type="button" disabled={busy} onClick={() => void act("rejected")} className="rounded-md border px-3 py-1.5 text-xs hover:bg-secondary">Reject</button>
     </div>
-    {showPaste && <div className="mt-3 space-y-2"><label className="block text-xs font-medium">Complete ChatGPT result (Ctrl+V if automatic paste is blocked)<textarea value={rawInput} onChange={e=>setRawInput(e.target.value)} rows={3} className="mt-1 w-full rounded-md border bg-background p-2 text-sm" /></label><button type="button" onClick={()=>parseResult(rawInput)} className="rounded-md border px-3 py-2 text-xs">Load result</button><label className="block text-xs font-medium">Personalized DM (editable)<textarea value={dm} onChange={e=>{setDm(e.target.value);setSaved(false);}} rows={5} maxLength={2000} className="mt-1 w-full rounded-md border bg-background p-2 text-sm" /></label><button type="button" disabled={busy || !dm.trim()} onClick={()=>void save()} className="rounded-md bg-primary px-3 py-2 text-xs text-primary-foreground">{busy?"Saving…":"Save DM"}</button>{saved&&<p role="status" className="text-sm font-semibold text-emerald-700">Saved successfully to CRM. Outreach approval remains separate until profile verification.</p>}</div>}
+    {showPaste && <div className="mt-3 space-y-2"><label className="block text-xs font-medium">Complete ChatGPT result (Ctrl+V if automatic paste is blocked)<textarea value={rawInput} onChange={e=>setRawInput(e.target.value)} rows={3} className="mt-1 w-full rounded-md border bg-background p-2 text-sm" /></label><button type="button" onClick={()=>parseResult(rawInput)} className="rounded-md border px-3 py-2 text-xs">Load result</button><label className="block text-xs font-medium">Personalized DM (editable)<textarea value={dm} onChange={e=>{setDm(e.target.value);setSaved(false);}} rows={5} maxLength={2000} className="mt-1 w-full rounded-md border bg-background p-2 text-sm" /></label><button type="button" disabled={busy || !dm.trim()} onClick={()=>void save()} className="rounded-md bg-primary px-3 py-2 text-xs text-primary-foreground">{busy?"Saving…":"Save DM"}</button>{saved&&<p role="status" className="text-sm font-semibold text-emerald-700">Saved to CRM. Direct profile verification is required before outreach approval.</p>}</div>}
     {error && <p role="alert" className="mt-2 text-xs text-destructive">{error}</p>}
   </div>;
 }
