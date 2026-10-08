@@ -1696,6 +1696,10 @@ export type Database = {
         }
         Returns: Json
       }
+      seth_save_dm_draft: {
+        Args: { p_dm: string; p_id: string; p_note: string }
+        Returns: Json
+      }
       youtube_deep_enrichment_apply: {
         Args: { p_rows: Json; p_secret: string }
         Returns: Json
