@@ -54,17 +54,19 @@ function DmQueue() {
   const [swipingId,setSwipingId] = useState<string|null>(null);
   const [actionsId,setActionsId] = useState<string|null>(null);
   const [laterIds,setLaterIds] = useState<string[]>([]);
+  const [sessionSentIds,setSessionSentIds] = useState<string[]>([]);
 
   useEffect(() => { if ("serviceWorker" in navigator) navigator.serviceWorker.register("/rena-sw.js").catch(() => {}); }, []);
   useEffect(() => { who().then(setMe).catch(() => setMe({ sender: null, approver: false })); void hydrateCreatorsFromDB().catch(e => setLoadError(e instanceof Error ? e.message : "Could not load outreach queue")); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const pool = useMemo(() => { void version; return CREATORS.filter(inPool).sort((a, b) => a.name.localeCompare(b.name)); }, [version]);
-  const today = new Date().toISOString().slice(0, 10);
   const mine = pool.filter((c) => viewingSender && (
     (c.outreachAssignee === viewingSender && statusOf(c) === "assigned") ||
-    (c.outreachSentBy === viewingSender && (c.outreachSentAt || "").slice(0, 10) === today))).sort((a,b)=>Number(laterIds.includes(a.id))-Number(laterIds.includes(b.id)));
+    (c.outreachSentBy === viewingSender && Boolean(c.outreachSentAt) && sessionSentIds.includes(c.id)))).sort((a,b)=>Number(laterIds.includes(a.id))-Number(laterIds.includes(b.id)));
+  const pending = mine.filter(c=>!c.outreachSentAt);
+  const completedThisSession = mine.filter(c=>Boolean(c.outreachSentAt));
   const available = pool.filter((c) => statusOf(c) === "available");
-  const done = mine.filter((c) => c.outreachSentAt).length;
+  const done = completedThisSession.length;
 
   const refresh = async () => { try { setLoadError(null); await hydrateCreatorsFromDB(); } catch(e) { setLoadError(e instanceof Error ? e.message : "Could not refresh outreach queue"); } };
 
@@ -98,7 +100,7 @@ function DmQueue() {
   const simple = async (c: CreatorRow, action: "claim" | "release" | "undo_sent" | "sent", ask?: string) => {
     if (readOnlyPreview || lock.current || (ask && !confirm(ask))) return;
     lock.current = true; setSavingId(c.id);
-    try { await run(c, action); setNotice({ kind: "ok", text: action === "claim" ? `${c.name} is yours.` : action === "release" ? `${c.name} returned to the pool.` : action === "sent" ? `${c.name} marked sent.` : `${c.name} undone.` }); }
+    try { await run(c, action); if(action==="sent") setSessionSentIds(ids=>ids.includes(c.id)?ids:[...ids,c.id]); if(action==="undo_sent") setSessionSentIds(ids=>ids.filter(id=>id!==c.id)); setActionsId(null); setNotice({ kind: "ok", text: action === "claim" ? `${c.name} is yours.` : action === "release" ? `${c.name} returned to the pool.` : action === "sent" ? `${c.name} marked sent.` : `${c.name} undone.` }); }
     catch (e) { setNotice({ kind: "err", text: e instanceof Error ? e.message : "Could not save" }); void refresh(); }
     finally { lock.current = false; setSavingId(null); }
   };
@@ -129,11 +131,11 @@ function DmQueue() {
         <button onClick={() => void refresh()} className="rounded-md border border-input px-3 py-2 text-sm">Refresh</button>
       </div>
       <div className="sticky top-0 z-10 rounded-xl border border-border bg-card p-3">
-        <div className="flex justify-between text-sm font-semibold"><span>{done} done today</span><span>{mine.length - done} left</span></div>
+        <div className="flex justify-between text-sm font-semibold"><span>{done} done today</span><span>{pending.length} left</span></div>
         <div className="mt-2 h-2 overflow-hidden rounded-full bg-secondary">
           <div className="h-full bg-emerald-600 transition-all" style={{ width: `${mine.length ? (done / mine.length) * 100 : 0}%` }} />
         </div>
-        <p className="mt-2 text-[11px] text-muted-foreground">Green = marked sent. Swipe left for Undo, Not Relevant or Do later.</p>
+        <p className="mt-2 text-[11px] text-muted-foreground">Sent creators move to the completed section below and disappear when this page is reopened. Not Relevant creators are removed from the queue.</p>
       </div>
       {loadError ? <p role="alert" className="rounded border border-red-600 p-3 text-sm">{loadError}</p> : null}
       {notice ? (
@@ -142,9 +144,9 @@ function DmQueue() {
           {notice.dm ? <textarea readOnly value={notice.dm} rows={4} onFocus={(e) => e.currentTarget.select()} className="mt-2 w-full rounded border border-input bg-background p-2 text-sm text-foreground" /> : null}
         </div>
       ) : null}
-      {mine.length === 0 ? <div className="py-8 text-center text-sm text-muted-foreground"><div className="text-base font-semibold text-foreground">Nothing assigned to you</div>Claim creators from the shared pool below.</div> : null}
+      {pending.length === 0 ? <div className="py-8 text-center text-sm text-muted-foreground"><div className="text-base font-semibold text-foreground">No pending creators</div>New assignments will appear here.</div> : null}
       <ul className="space-y-2">
-        {mine.map((c) => {
+        {pending.map((c) => {
           const sent = Boolean(c.outreachSentAt);
           return (
             <li key={c.id} className="flex items-stretch gap-2" onTouchStart={e=>{const t=e.touches[0];touchStart.current={id:c.id,x:t.clientX,y:t.clientY};}} onTouchEnd={e=>{const t=e.changedTouches[0];swipeUndo(c,t.clientX,t.clientY);}}>
@@ -161,6 +163,7 @@ function DmQueue() {
           );
         })}
       </ul>
+      {completedThisSession.length > 0 && <section className="mt-5 space-y-2"><h2 className="text-sm font-semibold text-muted-foreground">Sent this session ({completedThisSession.length})</h2><ul className="space-y-2">{completedThisSession.map(c=><li key={c.id} className="flex items-center justify-between rounded-xl border-2 border-emerald-600 bg-emerald-100 px-4 py-3 text-emerald-950"><div><div className="font-semibold">✓ {c.name}</div><div className="text-xs">{c.followersSignal?.trim()?`${c.followersSignal.trim()} followers`:"Followers not recorded"}</div></div><button disabled={readOnlyPreview || savingId===c.id} onClick={()=>void simple(c,"undo_sent")} className="rounded-lg border border-emerald-700 px-3 py-2 text-sm">Undo</button></li>)}</ul></section>}
 
     </div>
   );
