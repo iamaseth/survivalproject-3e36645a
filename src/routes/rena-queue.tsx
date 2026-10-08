@@ -36,7 +36,7 @@ function statusOf(c: CreatorRow): "available" | "assigned" | "contacted" | "bloc
   return c.outreachAssignee ? "assigned" : "available";
 }
 
-function DmQueue() {
+export function DmQueue({ sender = "Rena" }: { sender?: "Rena" | "Seth" }) {
   const version = useCreatorsVersion();
   const who = useServerFn(getMyOutreachSender);
   const act = useServerFn(outreachPoolAction);
@@ -46,9 +46,9 @@ function DmQueue() {
   const [savingId, setSavingId] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
 
-  const [previewSender, setPreviewSender] = useState<string | null>("Rena");
+  const [previewSender, setPreviewSender] = useState<string | null>(sender);
   const viewingSender = previewSender ?? me?.sender ?? null;
-  const readOnlyPreview = Boolean(viewingSender && viewingSender !== me?.sender);
+  const readOnlyPreview = Boolean(viewingSender && viewingSender !== me?.sender && !(sender === "Seth" && me?.approver));
   const lock = useRef(false);
   const touchStart = useRef<{id:string;x:number;y:number}|null>(null);
   const [swipingId,setSwipingId] = useState<string|null>(null);
@@ -105,7 +105,7 @@ function DmQueue() {
     finally { lock.current = false; setSavingId(null); }
   };
 
-  const reject = async (c:CreatorRow) => { if (readOnlyPreview || lock.current || !confirm(`Mark ${c.name} Not Relevant and remove from Rena’s work?`)) return; lock.current=true;setSavingId(c.id);try { if(c.outreachSentAt) await act({data:{id:c.id,action:"undo_sent"}}); await updateWorkflow({data:{id:c.id,response_followup:"Not Relevant"}}); await refresh(); setActionsId(null);setNotice({kind:"ok",text:`${c.name} marked Not Relevant. CRM record retained.`}); } catch(e){setNotice({kind:"err",text:e instanceof Error?e.message:"Could not reject creator"});} finally {lock.current=false;setSavingId(null);} };
+  const reject = async (c:CreatorRow) => { if (readOnlyPreview || lock.current || !confirm(`Mark ${c.name} Not Relevant and remove from the outreach queue?`)) return; lock.current=true;setSavingId(c.id);try { if(c.outreachSentAt) await act({data:{id:c.id,action:"undo_sent"}}); await updateWorkflow({data:{id:c.id,response_followup:"Not Relevant"}}); await refresh(); setActionsId(null);setNotice({kind:"ok",text:`${c.name} marked Not Relevant. CRM record retained.`}); } catch(e){setNotice({kind:"err",text:e instanceof Error?e.message:"Could not reject creator"});} finally {lock.current=false;setSavingId(null);} };
 
   const swipeUndo = (c:CreatorRow, x:number, y:number) => { const start=touchStart.current; touchStart.current=null; if (!start || start.id!==c.id) return; if (start.x-x>70 && Math.abs(start.y-y)<55) { setSwipingId(c.id); setActionsId(c.id); } };
 
@@ -124,9 +124,9 @@ function DmQueue() {
     <div className="mx-auto max-w-xl space-y-3 pb-16">
       <div className="flex items-start justify-between gap-2">
         <div>
-          <h1 className="font-display text-2xl text-foreground">{viewingSender === "Rena" ? "Rena’s Outreach Queue" : `${viewingSender ?? "Team"}’s TikTok DMs`}</h1>
+          <h1 className="font-display text-2xl text-foreground">{viewingSender === "Rena" ? "Rena’s Outreach Queue" : viewingSender === "Seth" ? "Seth’s Outreach Queue" : `${viewingSender ?? "Team"}’s TikTok DMs`}</h1>
           <p className="text-sm text-muted-foreground">Tap a creator to copy the DM and open TikTok. Tap Sent after sending.</p>
-          {readOnlyPreview ? <p className="text-xs text-muted-foreground">Preview: tap to copy and open TikTok. Only Rena can mark messages done.</p> : null}
+          {readOnlyPreview ? <p className="text-xs text-muted-foreground">Preview: tap to copy and open TikTok. Only the assigned sender can mark messages done.</p> : null}
         </div>
         <button onClick={() => void refresh()} className="rounded-md border border-input px-3 py-2 text-sm">Refresh</button>
       </div>
