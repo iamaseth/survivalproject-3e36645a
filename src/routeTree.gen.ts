@@ -39,6 +39,7 @@ import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as SocialAccountsRouteImport } from './routes/social-accounts'
 import { Route as TeamActionsRouteImport } from './routes/team-actions'
 import { Route as TemplatesRouteImport } from './routes/templates'
+import { Route as TiktokDmReviewRouteImport } from './routes/tiktok-dm-review'
 import { Route as VideoRouteImport } from './routes/video'
 import { Route as WebsiteRouteImport } from './routes/website'
 import { Route as AssetsIdRouteImport } from './routes/assets.$id'
@@ -201,6 +202,11 @@ const TemplatesRoute = TemplatesRouteImport.update({
   path: '/templates',
   getParentRoute: () => rootRouteImport,
 } as any)
+const TiktokDmReviewRoute = TiktokDmReviewRouteImport.update({
+  id: '/tiktok-dm-review',
+  path: '/tiktok-dm-review',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const VideoRoute = VideoRouteImport.update({
   id: '/video',
   path: '/video',
@@ -293,6 +299,7 @@ export interface FileRoutesByFullPath {
   '/social-accounts': typeof SocialAccountsRoute
   '/team-actions': typeof TeamActionsRoute
   '/templates': typeof TemplatesRoute
+  '/tiktok-dm-review': typeof TiktokDmReviewRoute
   '/video': typeof VideoRoute
   '/website': typeof WebsiteRoute
   '/assets/$id': typeof AssetsIdRoute
@@ -336,6 +343,7 @@ export interface FileRoutesByTo {
   '/social-accounts': typeof SocialAccountsRoute
   '/team-actions': typeof TeamActionsRoute
   '/templates': typeof TemplatesRoute
+  '/tiktok-dm-review': typeof TiktokDmReviewRoute
   '/video': typeof VideoRoute
   '/website': typeof WebsiteRoute
   '/assets/$id': typeof AssetsIdRoute
@@ -380,6 +388,7 @@ export interface FileRoutesById {
   '/social-accounts': typeof SocialAccountsRoute
   '/team-actions': typeof TeamActionsRoute
   '/templates': typeof TemplatesRoute
+  '/tiktok-dm-review': typeof TiktokDmReviewRoute
   '/video': typeof VideoRoute
   '/website': typeof WebsiteRoute
   '/assets/$id': typeof AssetsIdRoute
@@ -425,6 +434,7 @@ export interface FileRouteTypes {
     | '/social-accounts'
     | '/team-actions'
     | '/templates'
+    | '/tiktok-dm-review'
     | '/video'
     | '/website'
     | '/assets/$id'
@@ -468,6 +478,7 @@ export interface FileRouteTypes {
     | '/social-accounts'
     | '/team-actions'
     | '/templates'
+    | '/tiktok-dm-review'
     | '/video'
     | '/website'
     | '/assets/$id'
@@ -511,6 +522,7 @@ export interface FileRouteTypes {
     | '/social-accounts'
     | '/team-actions'
     | '/templates'
+    | '/tiktok-dm-review'
     | '/video'
     | '/website'
     | '/assets/$id'
@@ -555,6 +567,7 @@ export interface RootRouteChildren {
   SocialAccountsRoute: typeof SocialAccountsRoute
   TeamActionsRoute: typeof TeamActionsRoute
   TemplatesRoute: typeof TemplatesRoute
+  TiktokDmReviewRoute: typeof TiktokDmReviewRoute
   VideoRoute: typeof VideoRoute
   WebsiteRoute: typeof WebsiteRoute
   ApiPublicCreatorContactQueueRoute: typeof ApiPublicCreatorContactQueueRoute
@@ -776,6 +789,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TemplatesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/tiktok-dm-review': {
+      id: '/tiktok-dm-review'
+      path: '/tiktok-dm-review'
+      fullPath: '/tiktok-dm-review'
+      preLoaderRoute: typeof TiktokDmReviewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/video': {
       id: '/video'
       path: '/video'
@@ -924,6 +944,7 @@ const rootRouteChildren: RootRouteChildren = {
   SocialAccountsRoute: SocialAccountsRoute,
   TeamActionsRoute: TeamActionsRoute,
   TemplatesRoute: TemplatesRoute,
+  TiktokDmReviewRoute: TiktokDmReviewRoute,
   VideoRoute: VideoRoute,
   WebsiteRoute: WebsiteRoute,
   ApiPublicCreatorContactQueueRoute: ApiPublicCreatorContactQueueRoute,
