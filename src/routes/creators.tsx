@@ -136,6 +136,17 @@ function CreatorPipeline() {
     rejected.forEach(c => { const niche=nicheLabel(c); patterns.set(niche,(patterns.get(niche)??0)+1); });
     return {total:all.length,rejected:rejected.length,contacted:all.filter(c=>Boolean(c.contactedDate)).length,review:all.filter(c=>c.qualificationStatus==="Needs Review").length,active:all.filter(c=>!c.contactedDate&&c.qualificationStatus!=="Not Relevant"&&c.qualificationStatus!=="Needs Review"&&c.responseFollowup!=="Not Relevant").length,patterns:[...patterns.entries()].sort((a,b)=>b[1]-a[1]).slice(0,10)};
   },[version]);
+  const tiktokVerification = useMemo(() => {
+    const all=CREATORS.filter(c=>Boolean(c.tiktok));
+    const verified=all.filter(c=>/verified|confirmed|checked/i.test(c.fullVerification??"") && Boolean(c.verificationEvidence?.trim()) && Boolean(c.recentActivityCheck?.trim()));
+    const relevant=verified.filter(c=>c.qualificationStatus==="Qualified");
+    const irrelevant=verified.filter(c=>c.qualificationStatus==="Not Relevant");
+    const needsReview=all.filter(c=>c.qualificationStatus==="Needs Review");
+    const verifiedIds=new Set(verified.map(c=>c.id));
+    const notChecked=all.filter(c=>!verifiedIds.has(c.id) && c.qualificationStatus!=="Needs Review");
+    const pilot=notChecked.filter(c=>!c.contactedDate).slice(0,50);
+    return {relevant,irrelevant,needsReview,notChecked,pilot,verifiedOther:verified.length-relevant.length-irrelevant.length};
+  },[version]);
   const lastImport = typeof window !== "undefined" ? (() => { try { return JSON.parse(window.localStorage.getItem("survival-tabs-last-personalization-import") ?? "null") as {updated:number;skipped:number;total:number;file:string;at:string}|null; } catch { return null; } })() : null;
   const exportPersonalization = (limit: number) => {
     const eligible = platformFilter === "all" ? needsPersonalization : needsPersonalization.filter((creator) => creatorPlatforms(creator).includes(platformFilter));
@@ -240,13 +251,24 @@ function CreatorPipeline() {
   const { rows: ytRows, totals, refresh: refreshYT } = useYouTubePipeline();
   return <div className="mx-auto max-w-[1500px]">
     <div className="mb-4 flex flex-wrap items-end justify-between gap-3"><div><div className="text-[11px] uppercase tracking-[0.18em] text-[color:var(--gold)]">Creator outreach</div><div className="mt-1 flex flex-wrap items-center gap-3"><h1 className="font-display text-3xl text-foreground">Creators</h1><label><span className="sr-only">Choose creator platform</span><select value={platformFilter} onChange={(e)=>setPlatformFilter(e.target.value as PlatformFilter)} className="min-w-[170px] rounded-md border-2 border-input bg-background px-3 py-2 text-base font-semibold">{PLATFORM_OPTIONS.map((option)=><option key={option.value} value={option.value}>{option.label}</option>)}</select></label></div></div><div /></div>
-    <div className="mb-4 rounded-xl border border-border bg-card p-3">
-      <button type="button" onClick={()=>setTiktokAuditOpen(v=>!v)} aria-expanded={tiktokAuditOpen} className="flex w-full items-center justify-between text-left text-sm font-semibold">TikTok relevance audit — existing CRM decisions <span>{tiktokAuditOpen?"Hide":"View audit"}</span></button>
-      {tiktokAuditOpen?<div className="mt-3 space-y-3 text-sm">
-        <div className="grid gap-2 sm:grid-cols-5">{[["TikTok records",tiktokAudit.total],["Not Relevant",tiktokAudit.rejected],["Needs Review",tiktokAudit.review],["Already contacted",tiktokAudit.contacted],["Potential outreach",tiktokAudit.active]].map(([label,count])=><div key={String(label)} className="rounded-md border border-border p-3"><div className="text-xs text-muted-foreground">{label}</div><div className="text-xl font-semibold">{count}</div></div>)}</div>
-        <div className="font-medium">Most common existing niches among Not Relevant decisions</div>
-        {tiktokAudit.patterns.length?tiktokAudit.patterns.map(([niche,count])=><div key={niche} className="flex justify-between border-b border-border py-1"><span>{niche}</span><strong>{count}</strong></div>):<p className="text-muted-foreground">No TikTok rejection patterns recorded yet.</p>}
-        <p className="text-xs text-muted-foreground">Counts use saved CRM fields, not live TikTok verification. Niches are inferred from existing research notes; a rejected niche is not automatically irrelevant for every creator. No records are changed by this audit.</p>
+    <div className="mb-4 rounded-xl border border-border bg-card p-4 space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="font-semibold">TikTok verification pipeline</h2><span className="text-xs text-muted-foreground">Saved CRM evidence only — no live TikTok scan</span></div>
+      <div className="grid gap-2 sm:grid-cols-4">{[
+        ["Verified Relevant",tiktokVerification.relevant.length],
+        ["Verified Not Relevant",tiktokVerification.irrelevant.length],
+        ["Needs Review",tiktokVerification.needsReview.length+tiktokVerification.verifiedOther],
+        ["Not Yet Checked",tiktokVerification.notChecked.length],
+      ].map(([label,count])=><div key={String(label)} className="rounded-md border border-border p-3"><div className="text-xs text-muted-foreground">{label}</div><div className="text-xl font-semibold">{count}</div></div>)}</div>
+      <p className="text-sm text-muted-foreground">Verified means the CRM has an explicit verification entry, evidence, and a recent activity check. Existing Qualified or Not Relevant labels without this evidence are not counted as verified. A verified entry is not proof that TikTok is currently active.</p>
+      <div className="flex flex-wrap items-center gap-3">
+        <a href={`/outreach-runner?ids=${encodeURIComponent(tiktokVerification.pilot.map(c=>c.id).join(","))}`} className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">Review first 50 TikTok profiles →</a>
+        <span className="text-xs text-muted-foreground">Pilot queue: {tiktokVerification.pilot.length} not-yet-verified, uncontacted profiles. Human review required.</span>
+      </div>
+      <button type="button" onClick={()=>setTiktokAuditOpen(v=>!v)} aria-expanded={tiktokAuditOpen} className="text-sm font-semibold underline">{tiktokAuditOpen?"Hide existing CRM decisions":"Show existing CRM decisions and niche counts"}</button>
+      {tiktokAuditOpen?<div className="space-y-2 text-sm">
+        <p>All TikTok records: {tiktokAudit.total} · Previously marked Not Relevant: {tiktokAudit.rejected} · Already contacted: {tiktokAudit.contacted} · Potential outreach (unverified): {tiktokAudit.active}</p>
+        <div className="font-medium">Niches among previously rejected records (not proof of irrelevance)</div>
+        {tiktokAudit.patterns.map(([niche,count])=><div key={niche} className="flex justify-between border-b border-border py-1"><span>{niche}</span><strong>{count}</strong></div>)}
       </div>:null}
     </div>
     <div className="mb-4 rounded-xl border border-border bg-card p-3">
