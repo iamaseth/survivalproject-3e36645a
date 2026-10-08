@@ -1,0 +1,19 @@
+{
+  "id": "/rena-queue",
+  "name": "Rena — Survival Tabs Outreach",
+  "short_name": "Rena Outreach",
+  "description": "Survival Tabs creator outreach queue",
+  "start_url": "/rena-queue",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f7f1e6",
+  "theme_color": "#173c2c",
+  "icons": [
+    {
+      "src": "/rena-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
