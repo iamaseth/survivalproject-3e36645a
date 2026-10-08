@@ -50,6 +50,7 @@ function OutreachRunner() {
   const [newFollowers, setNewFollowers] = useState("");
   const [addingCreator, setAddingCreator] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
+  const [actionFeedback, setActionFeedback] = useState<{ kind: "success" | "error"; message: string } | null>(null);
   const [addResult, setAddResult] = useState<{ id: string; name: string; profile: string; created: boolean } | null>(null);
   const [statuses, setStatuses] = useState<Record<string, RunnerStatus>>({});
   const [restored, setRestored] = useState(false);
@@ -115,6 +116,7 @@ function OutreachRunner() {
     if (!target || lockRef.current) return;
     lockRef.current = true;
     setBusy(true);
+    setActionFeedback(null);
     try {
       await fn(target);
       // Advance only after the database operation has completed successfully.
@@ -122,9 +124,12 @@ function OutreachRunner() {
       setStatus(target.id, status);
       setJustActed(false);
       setCurrentId(nextId);
+      setActionFeedback({ kind: "success", message: `${target.name}: ${okMsg}. ${nextId ? "Next influencer loaded." : "Queue complete."}` });
       toast.success(okMsg);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : errMsg);
+      const message = e instanceof Error ? e.message : errMsg;
+      setActionFeedback({ kind: "error", message: `Could not save ${target.name}. Still on this influencer. ${message}` });
+      toast.error(message);
     } finally {
       lockRef.current = false;
       setBusy(false);
@@ -249,6 +254,7 @@ function OutreachRunner() {
           </div>
         </div> : null}
       </section>
+      {actionFeedback ? <div role="status" aria-live="polite" className={`rounded-lg border-2 p-4 text-sm font-semibold ${actionFeedback.kind === "error" ? "border-red-600 bg-red-50 text-red-950" : "border-emerald-600 bg-emerald-50 text-emerald-950"}`}>{actionFeedback.message}</div> : null}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {([["Ready", counts.ready], ["Contacted", counts.contacted], ["Needs Review", counts.review], ["Not Relevant", counts.notRelevant]] as const).map(([l, n]) => (
           <div key={l} className="rounded-xl border border-border bg-card px-4 py-3">
