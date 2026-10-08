@@ -4,7 +4,8 @@ import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { CREATORS, refreshCreatorsFromDB, useCreatorsVersion, type CreatorRow } from "@/lib/creator-partnerships";
 import { amICreatorApprover, sethReviewCreator, sethSaveDmDraft } from "@/lib/creators.functions";
-import { hasGroundedDm, isFinalApprovalReady } from "@/lib/final-approval";
+import { hasGroundedDm } from "@/lib/final-approval";
+import { isDmVerified } from "@/lib/tiktok-dm-verification";
 import { externalLinkProps } from "@/lib/external-link";
 
 export function SethReviewPanel() {
@@ -45,13 +46,14 @@ function QualifiedRow({c,onDone}:{c:CreatorRow;onDone:()=>void}) {
   };
   const act = async (decision:"approved"|"rejected") => {
     if (busyRef.current) return;
-    if (decision === "approved" && (!isFinalApprovalReady(c) || !hasGroundedDm(c.verificationEvidence || "",dm))) {
+    if (decision === "approved" && (!isDmVerified(c) || !hasGroundedDm(c.verificationEvidence || "",dm))) {
       setError("Saved draft only. Direct profile evidence must be verified before outreach approval.");
       if (dm.trim()) { try { await saveDraft({data:{id:c.id,dm:dm.trim(),note:"User pasted revised DM; direct verification still required"}}); toast.success("DM draft saved for verification"); } catch(e) { setError(e instanceof Error ? e.message : "Could not save draft"); } }
       return;
     }
     busyRef.current=true;setBusy(true);setError("");
     try {
+      if (decision === "approved") await saveDraft({data:{id:c.id,dm:dm.trim(),note:"User pasted profile-specific DM"}});
       await review({data:{id:c.id,decision,dm:decision==="approved"?dm.trim():undefined,note:decision==="approved"?"User reviewed profile and pasted personalized DM":"Rejected from qualified review",checkedProfile:decision==="approved",messageFits:decision==="approved"}});
       c.sethApprovalStatus=decision;
       if(decision==="approved") c.personalizedDm=dm.trim();
