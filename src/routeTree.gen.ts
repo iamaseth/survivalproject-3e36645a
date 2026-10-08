@@ -35,6 +35,7 @@ import { Route as RenaQueueRouteImport } from './routes/rena-queue'
 import { Route as ReviewRouteImport } from './routes/review'
 import { Route as ReviewedSurvivalTabsMreRouteImport } from './routes/reviewed-survival-tabs-mre'
 import { Route as SeoRouteImport } from './routes/seo'
+import { Route as SethApprovalRouteImport } from './routes/seth-approval'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as SocialAccountsRouteImport } from './routes/social-accounts'
 import { Route as TeamActionsRouteImport } from './routes/team-actions'
@@ -183,6 +184,11 @@ const SeoRoute = SeoRouteImport.update({
   path: '/seo',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SethApprovalRoute = SethApprovalRouteImport.update({
+  id: '/seth-approval',
+  path: '/seth-approval',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SettingsRoute = SettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
@@ -301,6 +307,7 @@ export interface FileRoutesByFullPath {
   '/review': typeof ReviewRoute
   '/reviewed-survival-tabs-mre': typeof ReviewedSurvivalTabsMreRoute
   '/seo': typeof SeoRoute
+  '/seth-approval': typeof SethApprovalRoute
   '/settings': typeof SettingsRoute
   '/social-accounts': typeof SocialAccountsRoute
   '/team-actions': typeof TeamActionsRoute
@@ -346,6 +353,7 @@ export interface FileRoutesByTo {
   '/review': typeof ReviewRoute
   '/reviewed-survival-tabs-mre': typeof ReviewedSurvivalTabsMreRoute
   '/seo': typeof SeoRoute
+  '/seth-approval': typeof SethApprovalRoute
   '/settings': typeof SettingsRoute
   '/social-accounts': typeof SocialAccountsRoute
   '/team-actions': typeof TeamActionsRoute
@@ -392,6 +400,7 @@ export interface FileRoutesById {
   '/review': typeof ReviewRoute
   '/reviewed-survival-tabs-mre': typeof ReviewedSurvivalTabsMreRoute
   '/seo': typeof SeoRoute
+  '/seth-approval': typeof SethApprovalRoute
   '/settings': typeof SettingsRoute
   '/social-accounts': typeof SocialAccountsRoute
   '/team-actions': typeof TeamActionsRoute
@@ -439,6 +448,7 @@ export interface FileRouteTypes {
     | '/review'
     | '/reviewed-survival-tabs-mre'
     | '/seo'
+    | '/seth-approval'
     | '/settings'
     | '/social-accounts'
     | '/team-actions'
@@ -484,6 +494,7 @@ export interface FileRouteTypes {
     | '/review'
     | '/reviewed-survival-tabs-mre'
     | '/seo'
+    | '/seth-approval'
     | '/settings'
     | '/social-accounts'
     | '/team-actions'
@@ -529,6 +540,7 @@ export interface FileRouteTypes {
     | '/review'
     | '/reviewed-survival-tabs-mre'
     | '/seo'
+    | '/seth-approval'
     | '/settings'
     | '/social-accounts'
     | '/team-actions'
@@ -575,6 +587,7 @@ export interface RootRouteChildren {
   ReviewRoute: typeof ReviewRoute
   ReviewedSurvivalTabsMreRoute: typeof ReviewedSurvivalTabsMreRoute
   SeoRoute: typeof SeoRoute
+  SethApprovalRoute: typeof SethApprovalRoute
   SettingsRoute: typeof SettingsRoute
   SocialAccountsRoute: typeof SocialAccountsRoute
   TeamActionsRoute: typeof TeamActionsRoute
@@ -774,6 +787,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SeoRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/seth-approval': {
+      id: '/seth-approval'
+      path: '/seth-approval'
+      fullPath: '/seth-approval'
+      preLoaderRoute: typeof SethApprovalRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/settings': {
       id: '/settings'
       path: '/settings'
@@ -960,6 +980,7 @@ const rootRouteChildren: RootRouteChildren = {
   ReviewRoute: ReviewRoute,
   ReviewedSurvivalTabsMreRoute: ReviewedSurvivalTabsMreRoute,
   SeoRoute: SeoRoute,
+  SethApprovalRoute: SethApprovalRoute,
   SettingsRoute: SettingsRoute,
   SocialAccountsRoute: SocialAccountsRoute,
   TeamActionsRoute: TeamActionsRoute,
