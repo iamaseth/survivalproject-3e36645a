@@ -161,6 +161,21 @@ export type Database = {
         }
         Relationships: []
       }
+      creator_approvers: {
+        Row: {
+          created_at: string
+          email: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+        }
+        Relationships: []
+      }
       creator_reply_classifications: {
         Row: {
           category: string
@@ -495,6 +510,11 @@ export type Database = {
           response_followup: string | null
           sample_status: string | null
           segment: string | null
+          seth_approval_history: Json
+          seth_approval_note: string | null
+          seth_approval_status: string | null
+          seth_approved_at: string | null
+          seth_approved_by: string | null
           seth_next_action: string | null
           subscriber_count: number | null
           target_audience: string | null
@@ -561,6 +581,11 @@ export type Database = {
           response_followup?: string | null
           sample_status?: string | null
           segment?: string | null
+          seth_approval_history?: Json
+          seth_approval_note?: string | null
+          seth_approval_status?: string | null
+          seth_approved_at?: string | null
+          seth_approved_by?: string | null
           seth_next_action?: string | null
           subscriber_count?: number | null
           target_audience?: string | null
@@ -627,6 +652,11 @@ export type Database = {
           response_followup?: string | null
           sample_status?: string | null
           segment?: string | null
+          seth_approval_history?: Json
+          seth_approval_note?: string | null
+          seth_approval_status?: string | null
+          seth_approved_at?: string | null
+          seth_approved_by?: string | null
           seth_next_action?: string | null
           subscriber_count?: number | null
           target_audience?: string | null
@@ -1616,6 +1646,18 @@ export type Database = {
         Returns: Database["public"]["Enums"]["app_role"]
       }
       get_rena_chat_user_id: { Args: never; Returns: string }
+      is_creator_approver: { Args: never; Returns: boolean }
+      seth_review_creator: {
+        Args: {
+          p_checked_profile: boolean
+          p_decision: string
+          p_dm: string
+          p_id: string
+          p_message_fits: boolean
+          p_note: string
+        }
+        Returns: Json
+      }
       youtube_deep_enrichment_apply: {
         Args: { p_rows: Json; p_secret: string }
         Returns: Json
