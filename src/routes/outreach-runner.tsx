@@ -45,12 +45,14 @@ function OutreachRunner() {
   const updateFn = useServerFn(updateCreatorWorkflow);
   const qualifyFn = useServerFn(importCreatorQualifications);
   const [statuses, setStatuses] = useState<Record<string, RunnerStatus>>({});
+  const [restored, setRestored] = useState(false);
   const [currentId, setCurrentId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [justActed, setJustActed] = useState(false);
 
   useEffect(() => {
-    try { setStatuses(JSON.parse(localStorage.getItem(LS_KEY) || "{}")); } catch { /* ignore */ }
+    try { setStatuses(JSON.parse(localStorage.getItem(LS_KEY) || "{}")); } catch { setStatuses({}); }
+    setRestored(true);
   }, []);
 
   const setStatus = (id: string, s: RunnerStatus) => {
@@ -69,7 +71,7 @@ function OutreachRunner() {
     ).sort((a, b) => a.name.localeCompare(b.name));
   }, [version, readyIds]);
 
-  const queue = eligible.filter((c) => !statuses[c.id]);
+  const queue = restored ? eligible.filter((c) => !statuses[c.id]) : [];
   const counts = {
     ready: eligible.filter((c) => !statuses[c.id]).length,
     contacted: Object.values(statuses).filter((s) => s === "contacted").length,
@@ -77,7 +79,8 @@ function OutreachRunner() {
     notRelevant: Object.values(statuses).filter((s) => s === "skipped").length,
   };
 
-  const current = (currentId && CREATORS.find((c) => c.id === currentId)) || queue[0] || null;
+  // Never show an already completed creator or the first creator before local progress is restored.
+  const current = (currentId && queue.find((c) => c.id === currentId)) || queue[0] || null;
   const lockRef = useRef(false);
 
   // Next eligible creator after `fromId` in the existing queue order, skipping
@@ -107,6 +110,7 @@ function OutreachRunner() {
     setBusy(true);
     try {
       await fn(target);
+      // Advance only after the database operation has completed successfully.
       const nextId = nextAfter(target.id, [target.id]);
       setStatus(target.id, status);
       setJustActed(false);
@@ -129,7 +133,8 @@ function OutreachRunner() {
 
   const markContacted = () => runAction(async (c) => {
     const p = profileOf(c);
-    await updateFn({ data: { id: c.id, contacted_date: today, contact_method: c.contactMethod || `${p?.platform ?? "Other"} DM`, response_followup: "Waiting reply" } });
+    const saved = await updateFn({ data: { id: c.id, contacted_date: today, contact_method: c.contactMethod || `${p?.platform ?? "Other"} DM`, response_followup: "Waiting reply" } });
+    if (!saved?.updated) throw new Error("Contact status could not be saved.");
     c.contactedDate = today;
   }, "contacted", "Marked contacted", "Could not update creator");
 
@@ -137,7 +142,8 @@ function OutreachRunner() {
     const existing = (c.renaNotes || "").trim();
     const note = `${today} — Outreach Runner: Not Relevant`;
     const rena_notes = existing ? `${existing}\n${note}` : note;
-    await updateFn({ data: { id: c.id, response_followup: "Not Relevant", rena_notes } });
+    const saved = await updateFn({ data: { id: c.id, response_followup: "Not Relevant", rena_notes } });
+    if (!saved?.updated) throw new Error("Not Relevant status could not be saved.");
     c.responseFollowup = "Not Relevant";
     c.renaNotes = rena_notes;
     await persistQualification(c.id, "Not Relevant");
@@ -148,7 +154,8 @@ function OutreachRunner() {
     const existing = (c.renaNotes || "").trim();
     const note = `${today} — Outreach Runner: needs review before contact`;
     const rena_notes = existing ? `${existing}\n${note}` : note;
-    await updateFn({ data: { id: c.id, rena_notes } });
+    const saved = await updateFn({ data: { id: c.id, rena_notes } });
+    if (!saved?.updated) throw new Error("Review note could not be saved.");
     c.renaNotes = rena_notes;
     await persistQualification(c.id, "Needs Review");
     c.qualificationStatus = "Needs Review";
