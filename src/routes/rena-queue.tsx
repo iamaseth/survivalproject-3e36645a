@@ -49,6 +49,8 @@ function DmQueue() {
   const viewingSender = previewSender ?? me?.sender ?? null;
   const readOnlyPreview = Boolean(viewingSender && viewingSender !== me?.sender);
   const lock = useRef(false);
+  const touchStart = useRef<{id:string;x:number;y:number}|null>(null);
+  const [swipingId,setSwipingId] = useState<string|null>(null);
 
   useEffect(() => { if ("serviceWorker" in navigator) navigator.serviceWorker.register("/rena-sw.js").catch(() => {}); }, []);
   useEffect(() => { who().then(setMe).catch(() => setMe({ sender: null, approver: false })); void hydrateCreatorsFromDB().catch(e => setLoadError(e instanceof Error ? e.message : "Could not load outreach queue")); }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -97,6 +99,8 @@ function DmQueue() {
     finally { lock.current = false; setSavingId(null); }
   };
 
+  const swipeUndo = (c:CreatorRow, x:number, y:number) => { const start=touchStart.current; touchStart.current=null; if (!start || start.id!==c.id) return; if (start.x-x>70 && Math.abs(start.y-y)<55 && c.outreachSentAt && !readOnlyPreview) { setSwipingId(c.id); void simple(c,"undo_sent"); } };
+
   const tone = { ok: "border-emerald-600 bg-emerald-50 text-emerald-950", warn: "border-amber-500 bg-amber-50 text-amber-950", err: "border-red-600 bg-red-50 text-red-950" };
 
   if (me === null) return <div className="p-8 text-sm text-muted-foreground">Loading…</div>;
@@ -123,7 +127,7 @@ function DmQueue() {
         <div className="mt-2 h-2 overflow-hidden rounded-full bg-secondary">
           <div className="h-full bg-emerald-600 transition-all" style={{ width: `${mine.length ? (done / mine.length) * 100 : 0}%` }} />
         </div>
-        <p className="mt-2 text-[11px] text-muted-foreground">Green = assumed sent (not confirmed). If TikTok blocks a message, stop and undo that row.</p>
+        <p className="mt-2 text-[11px] text-muted-foreground">Green = marked done (not confirmed by TikTok). Swipe left on a green tile to undo.</p>
       </div>
       {loadError ? <p role="alert" className="rounded border border-red-600 p-3 text-sm">{loadError}</p> : null}
       {notice ? (
@@ -137,9 +141,9 @@ function DmQueue() {
         {mine.map((c) => {
           const sent = Boolean(c.outreachSentAt);
           return (
-            <li key={c.id} className="flex items-stretch gap-2">
+            <li key={c.id} className="flex items-stretch gap-2" onTouchStart={e=>{const t=e.touches[0];touchStart.current={id:c.id,x:t.clientX,y:t.clientY};}} onTouchEnd={e=>{const t=e.changedTouches[0];swipeUndo(c,t.clientX,t.clientY);}}>
               <a href={sent ? undefined : c.tiktok!} target="_blank" rel="noopener noreferrer" aria-disabled={sent || savingId === c.id}
-                onClick={(e) => { if (sent || lock.current) { e.preventDefault(); return; } onTap(c); }}
+                onClick={(e) => { if (sent || lock.current || swipingId===c.id) { e.preventDefault(); setSwipingId(null); return; } onTap(c); }}
                 className={`flex min-h-[76px] flex-1 flex-col justify-center rounded-xl border-2 px-4 py-3 ${sent ? "border-emerald-600 bg-emerald-100 text-emerald-950" : "border-border bg-card text-foreground active:bg-secondary"}`}>
                 <span className="text-base font-semibold">{sent ? "✓ " : ""}{c.name}</span>
                 <span className="text-xs opacity-75">{c.followersSignal?.trim() ? `${c.followersSignal.trim()} followers` : "Followers not recorded"}{savingId === c.id ? " · saving…" : sent ? " · done" : ""}</span>
