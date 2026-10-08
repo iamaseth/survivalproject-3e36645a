@@ -50,6 +50,7 @@ function OutreachRunner() {
   const [newFollowers, setNewFollowers] = useState("");
   const [addingCreator, setAddingCreator] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
+  const [addResult, setAddResult] = useState<{ id: string; name: string; profile: string; created: boolean } | null>(null);
   const [statuses, setStatuses] = useState<Record<string, RunnerStatus>>({});
   const [restored, setRestored] = useState(false);
   const [currentId, setCurrentId] = useState<string | null>(null);
@@ -170,23 +171,27 @@ function OutreachRunner() {
   const addCreator = async () => {
     if (addingCreator || !newProfile.trim()) return;
     setAddingCreator(true);
+    setAddResult(null);
     try {
       const result = await addCreatorFn({ data: {
         profile: newProfile.trim(), name: newName.trim(), followers: newFollowers.trim()
       } });
-      toast.success(result.created ? "Influencer added to CRM" : "Influencer already in CRM", {
-        description: result.name,
-      });
-      // Refresh the server-backed roster before showing the new creator.
-      // The optional ids query is preserved, with the new id appended.
-      const params = new URLSearchParams(window.location.search);
-      const ids = params.get("ids");
-      if (ids) params.set("ids", [...new Set([...ids.split(",").filter(Boolean), result.id])].join(","));
-      window.location.assign(`/outreach-runner?${params.toString()}`);
+      setAddResult({ ...result, profile: newProfile.trim() });
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Could not add influencer");
+    } finally {
       setAddingCreator(false);
     }
+  };
+
+  const continueAfterAdd = () => {
+    if (!addResult) return;
+    const params = new URLSearchParams(window.location.search);
+    const ids = params.get("ids");
+    if (ids) params.set("ids", [...new Set([...ids.split(",").filter(Boolean), addResult.id])].join(","));
+    // The new record is loaded from the CRM on navigation, rather than being
+    // temporarily inserted into the in-memory list.
+    window.location.assign(`/outreach-runner?${params.toString()}`);
   };
 
   const profile = current ? profileOf(current) : null;
@@ -213,22 +218,29 @@ function OutreachRunner() {
         </button>
         {addOpen ? <div className="mt-3 grid gap-3 sm:grid-cols-3">
           <label className="text-xs font-medium">TikTok profile URL *
-            <input value={newProfile} onChange={(e) => setNewProfile(e.target.value)}
+            <input value={newProfile} onChange={(e) => { setNewProfile(e.target.value); setAddResult(null); }}
               placeholder="https://www.tiktok.com/@americanprepper1"
               className="mt-1 w-full rounded-md border border-input bg-background p-2 text-sm" />
           </label>
           <label className="text-xs font-medium">Display name (optional)
-            <input value={newName} onChange={(e) => setNewName(e.target.value)}
+            <input value={newName} onChange={(e) => { setNewName(e.target.value); setAddResult(null); }}
               placeholder="Americanprepper"
               className="mt-1 w-full rounded-md border border-input bg-background p-2 text-sm" />
           </label>
           <label className="text-xs font-medium">Followers (optional)
-            <input value={newFollowers} onChange={(e) => setNewFollowers(e.target.value)}
+            <input value={newFollowers} onChange={(e) => { setNewFollowers(e.target.value); setAddResult(null); }}
               placeholder="29.9K"
               className="mt-1 w-full rounded-md border border-input bg-background p-2 text-sm" />
           </label>
+          {addResult ? <div role="status" aria-live="polite" className="sm:col-span-3 rounded-lg border-2 border-emerald-600 bg-emerald-50 p-4 text-emerald-950">
+            <div className="text-lg font-bold">{addResult.created ? "Influencer added to CRM" : "Already in CRM — no duplicate created"}</div>
+            <div className="mt-1 text-sm font-medium">{addResult.name}</div>
+            <div className="break-all text-xs">{addResult.profile}</div>
+            <div className="mt-1 text-xs">CRM ID: {addResult.id}</div>
+            <button type="button" onClick={continueAfterAdd} className="mt-3 rounded-md bg-emerald-700 px-4 py-2 text-sm font-semibold text-white">Continue to Outreach →</button>
+          </div> : null}
           <div className="sm:col-span-3 flex items-center gap-3">
-            <button type="button" disabled={addingCreator || !newProfile.trim()}
+            <button type="button" disabled={addingCreator || !newProfile.trim() || Boolean(addResult)}
               onClick={() => void addCreator()}
               className="rounded-md bg-emerald-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
               {addingCreator ? "Checking CRM…" : "Add to CRM & Open Queue"}
