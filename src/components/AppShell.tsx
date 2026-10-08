@@ -60,6 +60,7 @@ const navItems: NavItem[] = [
     children: [
       { to: "/communications", label: "Communications" },
       { to: "/outreach-runner", label: "Outreach Runner" },
+      { to: "/tiktok-dm-review", label: "TikTok DM Review" },
       { to: "/rena-queue", label: "Rena TikTok DMs" },
     ],
   },

@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { CREATORS, useCreatorsVersion, type CreatorRow } from "@/lib/creator-partnerships";
 import { updateCreatorWorkflow } from "@/lib/creators.functions";
+import { baseCandidate, isDmVerified, TIKTOK_PROFILE_RE } from "@/lib/tiktok-dm-verification";
 
 export const Route = createFileRoute("/rena-queue")({
   head: () => ({
@@ -30,13 +31,10 @@ const isAssumed = (c: CreatorRow) => c.contactMethod === ASSUMED_METHOD;
 const handleOf = (url: string) => url.match(/@([A-Za-z0-9._-]+)/)?.[1] ?? null;
 
 function eligible(c: CreatorRow) {
-  if (!c.tiktok || !/^https:\/\/(www\.)?tiktok\.com\/@/i.test(c.tiktok)) return false;
-  if (!c.personalizedDm?.trim()) return false;
-  if (c.qualificationStatus !== "Qualified") return false;
+  if (!c.tiktok || !TIKTOK_PROFILE_RE.test(c.tiktok) || !c.personalizedDm?.trim()) return false;
+  if (!isDmVerified(c)) return false; // individual human review required
   if (isAssumed(c)) return true; // keep showing green rows so they can be undone
-  if (c.contactedDate) return false;
-  if (/not relevant|dm blocked|do not contact/i.test(c.responseFollowup || "")) return false;
-  return true;
+  return baseCandidate(c);
 }
 
 function RenaQueue() {
@@ -57,6 +55,7 @@ function RenaQueue() {
     return CREATORS.filter(eligible).sort((a, b) => a.name.localeCompare(b.name));
   }, [version]);
   const done = rows.filter(isAssumed).length;
+  const unverified = useMemo(() => { void version; return CREATORS.filter((c) => baseCandidate(c) && !isDmVerified(c)).length; }, [version]);
 
   const savePrev = (next: Record<string, Prev>) => { setPrev(next); localStorage.setItem(LS_PREV, JSON.stringify(next)); };
 
@@ -123,7 +122,8 @@ function RenaQueue() {
           {notice.dm ? <textarea readOnly value={notice.dm} rows={4} onFocus={(e) => e.currentTarget.select()} className="mt-2 w-full rounded border border-input bg-background p-2 text-sm text-foreground" /> : null}
         </div>
       ) : null}
-      {rows.length === 0 ? <div className="py-12 text-center text-sm text-muted-foreground">No qualified TikTok creators with a saved DM are waiting.</div> : null}
+      {rows.length === 0 ? <div className="py-12 text-center text-sm text-muted-foreground"><div className="text-base font-semibold text-foreground">Awaiting verification</div>No creators have passed individual profile review yet.</div> : null}
+      <p className="text-center text-[11px] text-muted-foreground">{unverified} qualified creators hidden until a researcher verifies them.</p>
       <ul className="space-y-2">
         {rows.map((c) => {
           const sent = isAssumed(c);
