@@ -4,7 +4,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { CREATORS, useCreatorsVersion, type CreatorRow } from "@/lib/creator-partnerships";
 import { amICreatorApprover, outreachPoolAction, sethReviewCreator } from "@/lib/creators.functions";
-import { hydrateCreatorsFromDB } from "@/lib/creator-partnerships";
+import { hydrateCreatorsFromDB, refreshCreatorsFromDB } from "@/lib/creator-partnerships";
 import { TIKTOK_PROFILE_RE } from "@/lib/tiktok-dm-verification";
 import { externalLinkProps } from "@/lib/external-link";
 
@@ -37,6 +37,12 @@ function SethApproval() {
   const [tab, setTab] = useState<"pending" | "rejected" | "approved">("pending");
   const [skipped, setSkipped] = useState<string[]>([]);
   const [, force] = useState(0);
+  const [loadState, setLoadState] = useState<"loading" | "ok" | string>("loading");
+  const reload = () => {
+    setLoadState("loading");
+    refreshCreatorsFromDB().then(() => setLoadState("ok")).catch((e) => setLoadState(e instanceof Error ? e.message : "Could not load creators"));
+  };
+  useEffect(() => { if (allowed) reload(); }, [allowed]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { check().then((r) => setAllowed(r.approver)).catch(() => setAllowed(false)); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -45,6 +51,7 @@ function SethApproval() {
     const base = CREATORS.filter(candidate);
     const screened = (c: CreatorRow) => /screening[^\n]*Decision Good/i.test(c.researchNotes || "") ? 0 : 1;
     return {
+      good: base.filter((c) => screened(c) === 0).length,
       pending: base.filter((c) => !c.sethApprovalStatus && !skipped.includes(c.id)).sort((a, b) => screened(a) - screened(b) || a.name.localeCompare(b.name)),
       rejected: CREATORS.filter((c) => c.sethApprovalStatus === "rejected"),
       approved: CREATORS.filter((c) => c.sethApprovalStatus === "approved"),
@@ -60,6 +67,13 @@ function SethApproval() {
   );
 
   const rows = lists[tab];
+  if (loadState === "loading") return <div className="p-8 text-sm text-muted-foreground">Loading creators from the database…</div>;
+  if (loadState !== "ok") return (
+    <div className="mx-auto max-w-lg rounded-xl border border-destructive p-6 text-sm">
+      <p>Couldn't load creators: {loadState}</p>
+      <button onClick={reload} className="mt-3 rounded-md border border-input px-3 py-1.5">Try again</button>
+    </div>
+  );
   return (
     <div className="mx-auto max-w-3xl space-y-4">
       <div>
@@ -72,6 +86,7 @@ function SethApproval() {
             {t === "pending" ? "To review" : t === "approved" ? "Approved" : "Rejected"} ({lists[t].length})
           </button>
         ))}
+        <span className="self-center text-xs text-muted-foreground">{lists.good} Good-screened shown first</span>
         {skipped.length ? <button onClick={() => setSkipped([])} className="ml-auto text-xs underline">Show {skipped.length} skipped</button> : null}
       </div>
       {rows.length === 0 ? <div className="py-10 text-center text-sm text-muted-foreground">Nothing here.</div> : null}
