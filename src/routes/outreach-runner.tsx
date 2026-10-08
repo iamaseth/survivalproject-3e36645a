@@ -239,6 +239,7 @@ function OutreachRunner() {
                 </button>
 
                 <button
+                  disabled={busy}
                   onClick={goNext}
                   className={`${baseButton} ${justActed ? "bg-slate-900 text-white ring-2 ring-slate-400" : "border border-slate-300 bg-slate-100 text-slate-900 hover:bg-slate-200"}`}
                 >
