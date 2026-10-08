@@ -40,15 +40,18 @@ function DmQueue() {
   const [notice, setNotice] = useState<{ kind: "ok" | "warn" | "err"; text: string; dm?: string } | null>(null);
   const [savingId, setSavingId] = useState<string | null>(null);
   const [showPool, setShowPool] = useState(false);
+  const [previewSender, setPreviewSender] = useState<string | null>(null);
+  const viewingSender = previewSender ?? me?.sender ?? null;
+  const readOnlyPreview = Boolean(previewSender && previewSender !== me?.sender);
   const lock = useRef(false);
 
   useEffect(() => { who().then(setMe).catch(() => setMe({ sender: null, approver: false })); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const pool = useMemo(() => { void version; return CREATORS.filter(inPool).sort((a, b) => a.name.localeCompare(b.name)); }, [version]);
   const today = new Date().toISOString().slice(0, 10);
-  const mine = pool.filter((c) => me?.sender && (
-    (c.outreachAssignee === me.sender && statusOf(c) === "assigned") ||
-    (c.outreachSentBy === me.sender && (c.outreachSentAt || "").slice(0, 10) === today)));
+  const mine = pool.filter((c) => viewingSender && (
+    (c.outreachAssignee === viewingSender && statusOf(c) === "assigned") ||
+    (c.outreachSentBy === viewingSender && (c.outreachSentAt || "").slice(0, 10) === today)));
   const available = pool.filter((c) => statusOf(c) === "available");
   const done = mine.filter((c) => c.outreachSentAt).length;
 
@@ -60,7 +63,7 @@ function DmQueue() {
   };
 
   const onTap = (c: CreatorRow) => {
-    if (lock.current || c.outreachSentAt) return;
+    if (readOnlyPreview || lock.current || c.outreachSentAt) return;
     lock.current = true; setSavingId(c.id);
     const dm = c.personalizedDm!.trim();
     const copy = navigator.clipboard?.writeText(dm) ?? Promise.reject(new Error("no clipboard"));
@@ -80,7 +83,7 @@ function DmQueue() {
   };
 
   const simple = async (c: CreatorRow, action: "claim" | "release" | "undo_sent", ask?: string) => {
-    if (lock.current || (ask && !confirm(ask))) return;
+    if (readOnlyPreview || lock.current || (ask && !confirm(ask))) return;
     lock.current = true; setSavingId(c.id);
     try { await run(c, action); setNotice({ kind: "ok", text: action === "claim" ? `${c.name} is yours.` : action === "release" ? `${c.name} returned to the pool.` : `${c.name} undone.` }); }
     catch (e) { setNotice({ kind: "err", text: e instanceof Error ? e.message : "Could not save" }); void refresh(); }
@@ -90,7 +93,7 @@ function DmQueue() {
   const tone = { ok: "border-emerald-600 bg-emerald-50 text-emerald-950", warn: "border-amber-500 bg-amber-50 text-amber-950", err: "border-red-600 bg-red-50 text-red-950" };
 
   if (me === null) return <div className="p-8 text-sm text-muted-foreground">Loading…</div>;
-  if (!me.sender) return (
+  if (!me.sender && !me.approver) return (
     <div className="mx-auto max-w-lg rounded-xl border border-border bg-card p-6 text-sm">
       <h1 className="font-display text-2xl">TikTok DMs</h1>
       <p className="mt-2">Your account isn't set up as a DM sender (Seth, BoBo or Rena). Ask Seth to add you.</p>
@@ -102,8 +105,9 @@ function DmQueue() {
     <div className="mx-auto max-w-xl space-y-3 pb-16">
       <div className="flex items-start justify-between gap-2">
         <div>
-          <h1 className="font-display text-2xl text-foreground">{me.sender}'s TikTok DMs</h1>
-          <p className="text-sm text-muted-foreground">Tap a creator: DM copies + TikTok opens. Paste, send, come back, tap the next one.</p>
+          <h1 className="font-display text-2xl text-foreground">{viewingSender ?? "Team"}'s TikTok DMs</h1>
+          <p className="text-sm text-muted-foreground">{readOnlyPreview ? "Viewing another sender’s queue. Read-only preview; no messages or assignments will be changed." : "Tap a creator: DM copies + TikTok opens. Paste, send, come back, tap the next one."}</p>
+          {me.approver ? <label className="mt-2 flex items-center gap-2 text-sm">View queue <select aria-label="View sender queue" className="rounded-md border border-input bg-background px-2 py-1" value={previewSender ?? me.sender ?? ""} onChange={e => setPreviewSender(e.target.value === me.sender ? null : e.target.value)}><option value={me.sender ?? ""}>My queue ({me.sender ?? "Team"})</option>{["Seth","Rena","BoBo"].filter(name => name !== me.sender).map(name => <option key={name} value={name}>{name}’s view (read-only)</option>)}</select></label> : null}
         </div>
         <button onClick={() => void refresh()} className="rounded-md border border-input px-2 py-1 text-xs">Refresh</button>
       </div>
@@ -128,12 +132,12 @@ function DmQueue() {
           return (
             <li key={c.id} className="flex items-stretch gap-2">
               <a href={sent ? undefined : c.tiktok!} target="_blank" rel="noopener noreferrer" aria-disabled={sent || savingId === c.id}
-                onClick={(e) => { if (sent || lock.current) { e.preventDefault(); return; } onTap(c); }}
+                onClick={(e) => { if (readOnlyPreview || sent || lock.current) { if (readOnlyPreview || sent) e.preventDefault(); return; } onTap(c); }}
                 className={`flex min-h-[64px] flex-1 flex-col justify-center rounded-xl border-2 px-4 py-3 ${sent ? "border-emerald-600 bg-emerald-100 text-emerald-950" : "border-border bg-card text-foreground active:bg-secondary"}`}>
                 <span className="text-base font-semibold">{sent ? "✓ " : ""}{c.name}</span>
                 <span className="text-xs opacity-75">{h ? `@${h}` : "TikTok"}{savingId === c.id ? " · saving…" : sent ? " · assumed sent" : ""}</span>
               </a>
-              {sent
+              {readOnlyPreview ? null : sent
                 ? <button type="button" onClick={() => void simple(c, "undo_sent", `Undo ${c.name}? It goes back to not contacted.`)} className="rounded-xl border border-border px-3 text-xs text-muted-foreground">Undo</button>
                 : <button type="button" onClick={() => void simple(c, "release", `Give ${c.name} back to the shared pool?`)} className="rounded-xl border border-border px-2 text-[11px] text-muted-foreground">Return</button>}
             </li>
@@ -152,7 +156,7 @@ function DmQueue() {
                 <li key={c.id} className="flex items-center gap-2 px-4 py-2">
                   <span className="min-w-0 flex-1 truncate">{c.name}</span>
                   <span className="text-[11px] text-muted-foreground">{st === "assigned" ? `assigned · ${c.outreachAssignee}` : st === "contacted" ? `contacted · ${c.outreachSentBy ?? "CRM"}` : st}</span>
-                  {st === "available" ? <button disabled={savingId === c.id} onClick={() => void simple(c, "claim")} className="rounded-md bg-primary px-3 py-1 text-xs font-semibold text-primary-foreground">Claim</button> : null}
+                  {st === "available" && !readOnlyPreview ? <button disabled={savingId === c.id} onClick={() => void simple(c, "claim")} className="rounded-md bg-primary px-3 py-1 text-xs font-semibold text-primary-foreground">Claim</button> : null}
                 </li>
               );
             })}
