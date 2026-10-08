@@ -8,3 +8,5 @@
 > Commits you push to the connected branch sync back to Lovable and show up in
 > the editor, so keep the branch in a working state.
 <!-- LOVABLE:END -->
+
+- The Influencers Seth Review uses a separate compact row from the legacy approval page and submits DM plus approval through one existing transactional review RPC, preserving legacy controls and atomic audit history.

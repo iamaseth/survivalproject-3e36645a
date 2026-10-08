@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
-import { Link } from "@tanstack/react-router";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { ChevronDown, ChevronRight } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { CREATORS, useCreatorsVersion, refreshCreatorsFromDB, type CreatorRow } from "@/lib/creator-partnerships";
@@ -23,38 +24,33 @@ export function SethReviewPanel() {
   const [allowed, setAllowed] = useState(false);
   const [open, setOpen] = useState(true);
   const [activeId, setActiveId] = useState<string | null>(null);
-  const [skipped, setSkipped] = useState<string[]>([]);
   const [done, setDone] = useState(0);
   const [loaded, setLoaded] = useState(false);
-  const [, force] = useState(0);
+  const [loadError, setLoadError] = useState("");
   useEffect(() => { check().then((r) => setAllowed(r.approver === true)).catch(() => setAllowed(false)); }, []); // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => { if (allowed) refreshCreatorsFromDB().catch(() => {}).finally(() => setLoaded(true)); }, [allowed]);
+  useEffect(() => { if (allowed) refreshCreatorsFromDB().catch(() => setLoadError("Could not load creators. Reload to retry.")).finally(() => setLoaded(true)); }, [allowed]);
   const rows = useMemo(() => {
     void version;
     const good = (c: CreatorRow) => /screening[^\n]*Decision Good/i.test(c.researchNotes || "") ? 0 : 1;
-    return CREATORS.filter((c) => isSethCandidate(c) && !c.sethApprovalStatus && !skipped.includes(c.id))
+    return CREATORS.filter((c) => isSethCandidate(c) && !c.sethApprovalStatus)
       .sort((a, b) => good(a) - good(b) || a.name.localeCompare(b.name));
-  }, [version, skipped, done]); // eslint-disable-line react-hooks/exhaustive-deps
-  const approvedQueue = useMemo(() => { void version; return CREATORS.filter((c) => c.sethApprovalStatus === "approved" && !c.contactedDate && !c.outreachSentAt).length; }, [version, done]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [version, done]); // eslint-disable-line react-hooks/exhaustive-deps
   if (!allowed) return null;
   return (
-    <section id="seth-review" className="overflow-hidden rounded-xl border-2 border-primary/40 bg-card">
-      <button onClick={() => setOpen((v) => !v)} className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-secondary/40">
+    <section id="seth-review" className="overflow-hidden rounded-xl border border-border bg-card">
+      <Button variant="ghost" onClick={() => setOpen((v) => !v)} aria-expanded={open} className="h-auto w-full justify-start gap-3 rounded-none px-4 py-3 text-left hover:bg-secondary/40">
+        {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
         <div className="min-w-0 flex-1">
-          <div className="font-semibold">Seth Review <span className="ml-1 text-sm font-normal text-muted-foreground">({rows.length} to review · {approvedQueue} approved in shared DM queue · {done} this session)</span></div>
-          <div className="text-xs text-muted-foreground">Only Seth-approved creators go to the shared DM queue (Rena, Seth, BoBo). "Ready for Outreach" below is NOT approved — it's unverified.</div>
+          <div className="font-semibold">Seth Review <span className="ml-1 text-sm font-normal text-muted-foreground">({loadError ? "—" : rows.length})</span></div>
         </div>
-        <span className="rounded-md border border-input bg-background px-2.5 py-1 text-xs">{open ? "Close" : "Open"}</span>
-      </button>
+      </Button>
       {open ? (
         <div className="border-t border-border">
-          <p className="bg-secondary/40 px-3 py-2 text-xs"><b>1</b> Click @handle — prompt copies + TikTok opens · <b>2</b> Screenshot profile · <b>3</b> Paste prompt + screenshot into ChatGPT · <b>4</b> Paste DM → Save &amp; Approve, or Not relevant. <Link to="/seth-approval" className="ml-2 underline">Approved / Rejected / Undo</Link></p>
-          {!loaded ? <div className="px-4 py-4 text-sm text-muted-foreground">Loading…</div> : rows.length === 0 ? <div className="px-4 py-4 text-sm text-muted-foreground">Nothing to review.</div> : (
+          {loadError ? <div role="alert" className="px-4 py-4 text-sm text-destructive">{loadError}</div> : !loaded ? <div className="px-4 py-4 text-sm text-muted-foreground">Loading…</div> : rows.length === 0 ? <div className="px-4 py-4 text-sm text-muted-foreground">Nothing to review.</div> : (
             <div className="divide-y divide-border">
               {rows.slice(0, 50).map((c, i) => (
-                <SethReviewRow key={c.id} c={c} active={(activeId ?? rows[0]?.id) === c.id} onActivate={() => setActiveId(c.id)}
-                  onDone={() => { setActiveId(rows[i + 1]?.id ?? null); setDone((n) => n + 1); force((n) => n + 1); }}
-                  onSkip={() => { setActiveId(rows[i + 1]?.id ?? null); setSkipped((s) => [...s, c.id]); }} />
+                <CompactSethReviewRow key={c.id} c={c} active={(activeId ?? rows[0]?.id) === c.id} onActivate={() => setActiveId(c.id)}
+                  onDone={() => { setActiveId(rows[i + 1]?.id ?? null); setDone((n) => n + 1); }} />
               ))}
             </div>
           )}
@@ -65,6 +61,79 @@ export function SethReviewPanel() {
 }
 
 const GENERIC_DM_RE = /natural fit for the preparedness content you already share|I came across your content/i;
+
+function CompactSethReviewRow({ c, active, onActivate, onDone }: { c: CreatorRow; active: boolean; onActivate: () => void; onDone: () => void }) {
+  const review = useServerFn(sethReviewCreator);
+  const inFlight = useRef(false);
+  const [busy, setBusy] = useState(false);
+  // Never prefill with the existing DM: approval requires a fresh manual paste.
+  const [dm, setDm] = useState("");
+  const [profileOpened, setProfileOpened] = useState(false);
+  const [copyFailed, setCopyFailed] = useState(false);
+  const [error, setError] = useState("");
+  const handle = c.tiktok?.match(/@([^/?#]+)/)?.[1] ?? c.name;
+  const screening = ((c.researchNotes || "").match(SETH_SCREEN_RE) || []).map((s) => s.replace("[TikTok master import] ", ""));
+  const prompt = buildDmPrompt(c, screening);
+  const locked = Boolean(c.contactedDate || c.outreachSentAt || c.sethApprovalStatus);
+  const newDm = dm.trim();
+  const invalidDm = !newDm || newDm === (c.personalizedDm || "").trim() || newDm.length > 2000 || GENERIC_DM_RE.test(newDm) || /^\s*(NOT RELEVANT|NEEDS MANUAL REVIEW)/i.test(newDm);
+  const copy = async () => {
+    const ok = await copyText(prompt);
+    setCopyFailed(!ok);
+    if (ok) toast.success("Prompt copied");
+    else toast.error("Copy blocked — select the prompt below");
+  };
+  const decide = async (decision: "approved" | "rejected") => {
+    if (inFlight.current || locked) return;
+    if (decision === "approved") {
+      if (!profileOpened || invalidDm) return;
+      // This explicit approval action replaces the two checkboxes, not the review requirement.
+      if (!window.confirm("I personally checked the real TikTok profile, and this new DM accurately fits the creator. Approve for outreach?")) return;
+    }
+    inFlight.current = true;
+    setBusy(true);
+    setError("");
+    const note = decision === "approved" ? "Personally checked real TikTok profile and confirmed new DM fits — explicit Approve confirmation" : "Not Relevant — rejected in Seth Review";
+    try {
+      // One transactional RPC preserves the previous DM and saves the new DM + approval together.
+      await review({ data: { id: c.id, decision, dm: decision === "approved" ? newDm : undefined, note, checkedProfile: decision === "approved", messageFits: decision === "approved" } });
+      if (decision === "approved") c.personalizedDm = newDm;
+      c.sethApprovalStatus = decision;
+      c.sethApprovedAt = new Date().toISOString();
+      c.sethApprovalNote = note;
+      toast.success(decision === "approved" ? "Approved" : "Rejected — undo in Seth Approval");
+      onDone();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not save. Try again.");
+    } finally {
+      inFlight.current = false;
+      setBusy(false);
+    }
+  };
+  return (
+    <div className={active ? "bg-secondary/30 px-4 py-2" : "px-4 py-2"}>
+      <div className="flex min-w-0 items-center gap-3">
+        <a {...externalLinkProps(c.tiktok)} className="min-w-0 break-all text-sm font-medium text-primary underline" onClick={() => {
+          onActivate();
+          setProfileOpened(true);
+          const ok = copyTextNow(prompt);
+          setCopyFailed(!ok);
+          if (ok) toast.success("Prompt copied");
+        }}>@{handle} ↗</a>
+        <Button variant="ghost" size="sm" className="ml-auto shrink-0" disabled={busy} onClick={() => { onActivate(); void copy(); }}>Copy</Button>
+      </div>
+      {active ? <div className="mt-2 space-y-2">
+        {copyFailed ? <div className="space-y-1"><p className="text-xs text-destructive">Clipboard blocked — Copy or select below.</p><textarea aria-label="ChatGPT prompt" readOnly value={prompt} rows={3} onFocus={(e) => e.currentTarget.select()} className="w-full rounded-md border border-input bg-background p-2 text-xs" /></div> : null}
+        <textarea aria-label={`Paste DM for @${handle}`} placeholder="Paste DM" disabled={busy || locked} value={dm} maxLength={2000} onChange={(e) => setDm(e.target.value)} rows={3} className="w-full rounded-md border border-input bg-background p-2 text-sm" />
+        <div className="flex gap-2">
+          <Button size="sm" disabled={busy || locked || !profileOpened || invalidDm} title="Approve confirms you personally checked the profile and the new DM fits" onClick={() => void decide("approved")}>Approve</Button>
+          <Button size="sm" variant="outline" disabled={busy || locked} onClick={() => void decide("rejected")}>Reject</Button>
+        </div>
+        {error ? <p role="alert" className="text-xs text-destructive">{error}</p> : null}
+      </div> : null}
+    </div>
+  );
+}
 
 export function SethReviewRow({ c, active, onActivate, onDone, onSkip }: { c: CreatorRow; active: boolean; onActivate: () => void; onDone: () => void; onSkip: () => void }) {
   const review = useServerFn(sethReviewCreator);
