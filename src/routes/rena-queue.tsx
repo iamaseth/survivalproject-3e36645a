@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { CREATORS, hydrateCreatorsFromDB, useCreatorsVersion, type CreatorRow } from "@/lib/creator-partnerships";
-import { getMyOutreachSender, outreachPoolAction } from "@/lib/creators.functions";
+import { getMyOutreachSender, outreachPoolAction, updateCreatorWorkflow } from "@/lib/creators.functions";
 import { TIKTOK_PROFILE_RE } from "@/lib/tiktok-dm-verification";
 
 export const Route = createFileRoute("/rena-queue")({
@@ -40,6 +40,7 @@ function DmQueue() {
   const version = useCreatorsVersion();
   const who = useServerFn(getMyOutreachSender);
   const act = useServerFn(outreachPoolAction);
+  const updateWorkflow = useServerFn(updateCreatorWorkflow);
   const [me, setMe] = useState<{ sender: string | null; approver: boolean } | null>(null);
   const [notice, setNotice] = useState<{ kind: "ok" | "warn" | "err"; text: string; dm?: string } | null>(null);
   const [savingId, setSavingId] = useState<string | null>(null);
@@ -82,7 +83,8 @@ function DmQueue() {
       try { await copy; } catch { copied = false; }
       try {
         if (readOnlyPreview) { setNotice({ kind: copied ? "ok" : "warn", text: copied ? "DM copied for preview. Open TikTok; nothing was marked sent." : "Copy this DM manually. Preview did not change CRM status.", dm: copied ? undefined : dm }); return; }
-        await run(c, "sent");
+        setNotice({kind:"ok",text:`DM copied for ${c.name}. Send it in TikTok, then tap Sent to mark completed.`});
+        return;
         setNotice(copied
           ? { kind: "ok", text: `DM for ${c.name} copied. Paste it in TikTok, send, then come back and tap the next row.` }
           : { kind: "warn", text: `Your phone blocked automatic copy for ${c.name}. Press and hold the message below, copy it, then paste in TikTok.`, dm });
@@ -93,13 +95,15 @@ function DmQueue() {
     })();
   };
 
-  const simple = async (c: CreatorRow, action: "claim" | "release" | "undo_sent", ask?: string) => {
+  const simple = async (c: CreatorRow, action: "claim" | "release" | "undo_sent" | "sent", ask?: string) => {
     if (readOnlyPreview || lock.current || (ask && !confirm(ask))) return;
     lock.current = true; setSavingId(c.id);
-    try { await run(c, action); setNotice({ kind: "ok", text: action === "claim" ? `${c.name} is yours.` : action === "release" ? `${c.name} returned to the pool.` : `${c.name} undone.` }); }
+    try { await run(c, action); setNotice({ kind: "ok", text: action === "claim" ? `${c.name} is yours.` : action === "release" ? `${c.name} returned to the pool.` : action === "sent" ? `${c.name} marked sent.` : `${c.name} undone.` }); }
     catch (e) { setNotice({ kind: "err", text: e instanceof Error ? e.message : "Could not save" }); void refresh(); }
     finally { lock.current = false; setSavingId(null); }
   };
+
+  const reject = async (c:CreatorRow) => { if (readOnlyPreview || lock.current || !confirm(`Mark ${c.name} Not Relevant and remove from Rena’s work?`)) return; lock.current=true;setSavingId(c.id);try { if(c.outreachSentAt) await act({data:{id:c.id,action:"undo_sent"}}); await updateWorkflow({data:{id:c.id,response_followup:"Not Relevant"}}); await refresh(); setActionsId(null);setNotice({kind:"ok",text:`${c.name} marked Not Relevant. CRM record retained.`}); } catch(e){setNotice({kind:"err",text:e instanceof Error?e.message:"Could not reject creator"});} finally {lock.current=false;setSavingId(null);} };
 
   const swipeUndo = (c:CreatorRow, x:number, y:number) => { const start=touchStart.current; touchStart.current=null; if (!start || start.id!==c.id) return; if (start.x-x>70 && Math.abs(start.y-y)<55) { setSwipingId(c.id); setActionsId(c.id); } };
 
@@ -119,7 +123,7 @@ function DmQueue() {
       <div className="flex items-start justify-between gap-2">
         <div>
           <h1 className="font-display text-2xl text-foreground">{viewingSender === "Rena" ? "Rena’s Outreach Queue" : `${viewingSender ?? "Team"}’s TikTok DMs`}</h1>
-          <p className="text-sm text-muted-foreground">Tap a creator to copy the DM, open TikTok and mark it done.</p>
+          <p className="text-sm text-muted-foreground">Tap a creator to copy the DM and open TikTok. Tap Sent after sending.</p>
           {readOnlyPreview ? <p className="text-xs text-muted-foreground">Preview: tap to copy and open TikTok. Only Rena can mark messages done.</p> : null}
         </div>
         <button onClick={() => void refresh()} className="rounded-md border border-input px-3 py-2 text-sm">Refresh</button>
@@ -129,7 +133,7 @@ function DmQueue() {
         <div className="mt-2 h-2 overflow-hidden rounded-full bg-secondary">
           <div className="h-full bg-emerald-600 transition-all" style={{ width: `${mine.length ? (done / mine.length) * 100 : 0}%` }} />
         </div>
-        <p className="mt-2 text-[11px] text-muted-foreground">Green = marked done (not confirmed by TikTok). Swipe left on a tile for Undo, Delete or Do later.</p>
+        <p className="mt-2 text-[11px] text-muted-foreground">Green = marked sent. Swipe left for Undo, Not Relevant or Do later.</p>
       </div>
       {loadError ? <p role="alert" className="rounded border border-red-600 p-3 text-sm">{loadError}</p> : null}
       {notice ? (
@@ -150,8 +154,9 @@ function DmQueue() {
                 <span className="text-base font-semibold">{sent ? "✓ " : ""}{c.name}</span>
                 <span className="text-xs opacity-75">{c.followersSignal?.trim() ? `${c.followersSignal.trim()} followers` : "Followers not recorded"}{savingId === c.id ? " · saving…" : sent ? " · done" : ""}</span>
               </a>
+              {!sent && !readOnlyPreview && <button type="button" disabled={savingId===c.id} onClick={()=>void simple(c,"sent")} className="rounded-xl bg-emerald-700 px-3 text-sm font-semibold text-white">Sent</button>}
               <button type="button" onClick={()=>setActionsId(v=>v===c.id?null:c.id)} className="rounded-xl border border-border px-3 text-sm" aria-label={`Actions for ${c.name}`}>•••</button>
-              {actionsId===c.id && <div className="flex flex-wrap items-center gap-2 rounded-xl border bg-card p-2 text-xs">{sent && <button disabled={readOnlyPreview} onClick={()=>{setActionsId(null);void simple(c,"undo_sent");}} className="rounded border px-2 py-2">Undo</button>}<button disabled={readOnlyPreview || sent} onClick={()=>{setActionsId(null);void simple(c,"release",`Remove ${c.name} from Rena’s queue? The creator stays in the CRM.`);}} className="rounded border px-2 py-2">Delete from queue</button><button onClick={()=>{setLaterIds(ids=>ids.includes(c.id)?ids:[...ids,c.id]);setActionsId(null);setNotice({kind:"ok",text:`${c.name} moved to the end of this queue for now.`});}} className="rounded border px-2 py-2">Do later</button></div>}
+              {actionsId===c.id && <div className="flex flex-wrap items-center gap-2 rounded-xl border bg-card p-2 text-xs">{sent && <button disabled={readOnlyPreview} onClick={()=>{setActionsId(null);void simple(c,"undo_sent");}} className="rounded border px-2 py-2">Undo</button>}<button disabled={readOnlyPreview || sent} onClick={()=>{setActionsId(null);void simple(c,"release",`Remove ${c.name} from Rena’s queue? The creator stays in the CRM.`);}} className="rounded border px-2 py-2">Remove assignment</button><button disabled={readOnlyPreview} onClick={()=>void reject(c)} className="rounded border px-2 py-2">Not Relevant</button><button onClick={()=>{setLaterIds(ids=>ids.includes(c.id)?ids:[...ids,c.id]);setActionsId(null);setNotice({kind:"ok",text:`${c.name} moved to the end of this queue for now.`});}} className="rounded border px-2 py-2">Do later</button></div>}
             </li>
           );
         })}
