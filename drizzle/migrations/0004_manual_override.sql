@@ -1,0 +1,2 @@
+-- Manual review overrides automated qualification only.
+-- Preserve contact restrictions and historical decisions.
