@@ -450,3 +450,22 @@ export const outreachPoolAction = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return r as { ok: boolean; me: string | null };
   });
+
+
+/** Authorized, audited manual review; overrides automated qualification only. */
+export const manualQualificationOverride = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { id: string; decision: "approved" | "rejected"; dm?: string; evidence?: string; assignee?: "Seth" | "Rena"; checkedProfile: boolean }) => {
+    if (!d?.id || !["approved", "rejected"].includes(d.decision)) throw new Error("Invalid manual review");
+    if (!d.checkedProfile) throw new Error("Confirm that you reviewed the correct profile");
+    return d;
+  })
+  .handler(async ({ data, context }) => {
+    const { data: result, error } = await context.supabase.rpc("manual_qualification_override" as never, {
+      p_id: data.id, p_decision: data.decision, p_dm: data.dm ?? null,
+      p_evidence: data.evidence ?? null, p_assignee: data.assignee ?? "Rena",
+      p_checked_profile: data.checkedProfile,
+    } as never);
+    if (error) throw new Error(error.message);
+    return result as { ok: boolean; decision: string };
+  });
