@@ -78,6 +78,9 @@ function QualifiedRow({c,onDone}:{c:CreatorRow;onDone:()=>void}) {
   };
   const save = async () => {
     if (busyRef.current || !dm.trim()) return;
+    const blockedFlag = (c.responseFollowup || "").match(/not relevant|dm blocked|do not contact|do not send/i)?.[0];
+    if (blockedFlag) { setError(`Approval blocked by existing CRM follow-up flag: "${blockedFlag}". Review the creator\u0027s existing contact history before changing this flag. No approval attempted.`); return; }
+    if (c.contactedDate || c.outreachSentAt) { setError("Creator is already marked contacted or sent. Approval is locked; review the existing outreach record."); return; }
     if (!profileChecked) { setError("Open the TikTok profile and confirm you personally reviewed it before approval."); return; }
     if (evidence.trim().length < 40) { setError("Add at least 40 characters of specific profile evidence before approval."); return; }
     if (!hasGroundedDm(evidence, dm)) { setError("The DM must reference at least two specific details from the profile evidence. Revise the message or evidence."); return; }
