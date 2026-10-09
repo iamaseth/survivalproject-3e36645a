@@ -161,7 +161,7 @@ export function DmQueue({ sender = "Rena" }: { sender?: "Rena" | "Seth" }) {
                 <button type="button" disabled={readOnlyPreview || sent} onClick={()=>void reject(c)} className="flex min-h-14 flex-col items-center justify-center rounded-lg bg-red-100 text-red-900 disabled:opacity-40"><span className="text-xl">✕</span>Reject</button>
                 <button type="button" onClick={()=>{setLaterIds(ids=>ids.includes(c.id)?ids:[...ids,c.id]);setActionsId(null);}} className="flex min-h-14 flex-col items-center justify-center rounded-lg bg-amber-100 text-amber-900"><span className="text-xl">◷</span>Later</button>
                 <button type="button" disabled={readOnlyPreview || sent} onClick={()=>{setActionsId(null);void simple(c,"sent");}} className="flex min-h-14 flex-col items-center justify-center rounded-lg bg-green-100 text-green-900 disabled:opacity-40"><span className="text-xl">✓</span>Sent</button>
-              </div>
+              </div>}
             </li>
           );
         })}
