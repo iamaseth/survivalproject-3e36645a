@@ -147,7 +147,7 @@ export function DmQueue({ sender = "Rena" }: { sender?: "Rena" | "Seth" }) {
         {pending.map((c) => {
           const sent = Boolean(c.outreachSentAt);
           return (
-            <li key={c.id} className="flex items-stretch gap-2" onTouchStart={e=>{const t=e.touches[0];touchStart.current={id:c.id,x:t.clientX,y:t.clientY};}} onTouchEnd={e=>{const t=e.changedTouches[0];swipeUndo(c,t.clientX,t.clientY);}}>
+            <li key={c.id} className="flex flex-wrap items-stretch gap-2" onTouchStart={e=>{const t=e.touches[0];touchStart.current={id:c.id,x:t.clientX,y:t.clientY};}} onTouchEnd={e=>{const t=e.changedTouches[0];swipeUndo(c,t.clientX,t.clientY);}}>
               <a href={sent ? undefined : c.tiktok!} target="_blank" rel="noopener noreferrer" aria-disabled={sent || savingId === c.id}
                 onClick={(e) => { if (sent || lock.current || swipingId===c.id) { e.preventDefault(); setSwipingId(null); return; } onTap(c); }}
                 className={`flex min-h-[76px] flex-1 flex-col justify-center rounded-xl border-2 px-4 py-3 ${sent ? "border-emerald-600 bg-emerald-100 text-emerald-950" : "border-border bg-card text-foreground active:bg-secondary"}`}>
