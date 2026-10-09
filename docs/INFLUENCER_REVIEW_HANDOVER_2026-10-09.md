@@ -70,3 +70,6 @@ Automate **public profile collection → evidence-backed AI prequalification →
 
 ## Non-negotiable data safeguards
 Do not delete creator rows or clear genuine `do not contact`, `do not send`, `dm blocked`, opt-out, sent, or contacted records. Do not overwrite manual decisions with automated classifications. Back up before bulk changes. All profile conclusions must be evidence-backed.
+
+## Later master-file checkpoint discovered (2026-10-09)
+The actual Library `survival-tabs-influencer-master.csv` (2,067 rows) contains **1,032 screened rows** and **1,035 `Not checked` rows**. Decisions: Good 103; Bad 436; Uncertain 436; Uncertain — Manual Review 57. The Screening Method field references **Playwright Batch 41 and Batch 42** (100 each), so the older Batch 37 checkpoint is stale. **Do not restart at Batch 38**. This is a screening-status inventory, not proof all 1,032 had reliable direct TikTok verification. Reconcile with the Lovable CRM before writing, and inspect the next `Not checked` rows in the master for Batch 43. Historical counts in preceding sections remain as historical snapshots.
