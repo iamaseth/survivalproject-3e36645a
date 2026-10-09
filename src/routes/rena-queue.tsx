@@ -85,11 +85,9 @@ export function DmQueue({ sender = "Rena" }: { sender?: "Rena" | "Seth" }) {
       try { await copy; } catch { copied = false; }
       try {
         if (readOnlyPreview) { setNotice({ kind: copied ? "ok" : "warn", text: copied ? "DM copied for preview. Open TikTok; nothing was marked sent." : "Copy this DM manually. Preview did not change CRM status.", dm: copied ? undefined : dm }); return; }
-        setNotice({kind:"ok",text:`DM copied for ${c.name}. Send it in TikTok, then tap Sent to mark completed.`});
-        return;
         setNotice(copied
-          ? { kind: "ok", text: `DM for ${c.name} copied. Paste it in TikTok, send, then come back and tap the next row.` }
-          : { kind: "warn", text: `Your phone blocked automatic copy for ${c.name}. Press and hold the message below, copy it, then paste in TikTok.`, dm });
+          ? { kind: "ok", text: `DM copied for ${c.name}. Send it in TikTok, then tap Sent.` }
+          : { kind: "warn", text: `Automatic copy was blocked for ${c.name}. Copy the message below manually.`, dm });
       } catch (e) {
         setNotice({ kind: "err", text: `Not marked: ${e instanceof Error ? e.message : "error"}. Don't send this one — someone else may have it.`, dm: undefined });
         void refresh();
