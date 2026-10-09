@@ -214,3 +214,8 @@ cd <repository-name>
 npm i
 npm run dev
 ```
+
+
+## Influencer review — BoBo handover
+
+Resume the current manual review or develop the free-first automation using [the durable bilingual handover](docs/INFLUENCER_REVIEW_HANDOVER_2026-10-09.md). **Use the live Lovable CRM as source of truth; do not restart from historical CSV batches.**
