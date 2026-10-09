@@ -24,7 +24,7 @@ BEGIN
     AND lower(btrim(r.response_followup)) <> 'not relevant' THEN
     RAISE EXCEPTION 'Mixed follow-up notes need separate review; not cleared';
   END IF;
-  IF NOT public.creator_final_research_valid(r.full_verification,p_evidence,r.verification_date::text,p_dm) THEN
+  IF NOT public.creator_final_research_valid(r.full_verification,p_evidence,r.verification_date::text,p_dm) OR NOT public.creator_final_research_valid(r.full_verification,r.verification_evidence,r.verification_date::text,r.personalized_dm) THEN
     RAISE EXCEPTION 'Verified research and grounded DM required';
   END IF;
  END IF;
