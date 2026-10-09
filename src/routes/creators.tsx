@@ -6,7 +6,7 @@ import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { ChevronDown, ChevronRight, Copy, Download, ExternalLink, Facebook, Globe, Image as ImageIcon, Instagram, Loader2, Mail, MessageCircle, Printer, Search, Upload, Youtube, X } from "lucide-react";
 import { CREATORS, creatorOutreachStage, creatorPersonalizationReady, creatorReadyToContact, type CreatorRow, useCreatorsVersion } from "@/lib/creator-partnerships";
-import { importCreatorPersonalization, importCreatorQualifications, updateCreatorWorkflow } from "@/lib/creators.functions";
+import { importCreatorPersonalization, importCreatorQualifications, updateCreatorWorkflow, addTikTokOutreachCreator } from "@/lib/creators.functions";
 import { externalLinkProps, outlookComposeUrl } from "@/lib/external-link";
 import { listEmailTemplates } from "@/lib/templates.functions";
 import { applyMergeFields, mergeContextForCreator, orderTemplatesForCreator, type EmailTemplate } from "@/lib/templates";
@@ -110,6 +110,12 @@ function CreatorPipeline() {
   const [qualificationImporting,setQualificationImporting]=useState(false);
   const importPersonalization=useServerFn(importCreatorPersonalization);
   const importQualifications=useServerFn(importCreatorQualifications);
+  const addTikTokCreator=useServerFn(addTikTokOutreachCreator);
+  const [addOpen,setAddOpen]=useState(false);
+  const [newProfile,setNewProfile]=useState("");
+  const [newName,setNewName]=useState("");
+  const [adding,setAdding]=useState(false);
+  const addCreator=async()=>{if(adding)return;setAdding(true);try{const result=await addTikTokCreator({data:{profile:newProfile.trim(),name:newName.trim()||undefined}});toast.success(result.created?"Creator added to Passed First Review":"Creator already exists — no duplicate added");setNewProfile("");setNewName("");setAddOpen(false);window.location.reload();}catch(e){toast.error(e instanceof Error?e.message:"Could not add creator");}finally{setAdding(false);}};
   const [openStages, setOpenStages] = useState<Record<StageKey, boolean>>({ not_contacted: false, contacted: false, follow_up: false, responded: false, sample: false });
   const nicheOptions = useMemo(() => [...new Set(CREATORS.map(nicheLabel))].sort((a,b)=>a.localeCompare(b)), [version]);
   const creators = useMemo(() => {
@@ -248,7 +254,8 @@ function CreatorPipeline() {
   };
   const { rows: ytRows, totals, refresh: refreshYT } = useYouTubePipeline();
   return <div className="mx-auto max-w-[1500px]">
-    <div className="mb-4 flex flex-wrap items-end justify-between gap-3"><div><div className="text-[11px] uppercase tracking-[0.18em] text-[color:var(--gold)]">Creator outreach</div><div className="mt-1 flex flex-wrap items-center gap-3"><h1 className="font-display text-3xl text-foreground">Creators</h1><label><span className="sr-only">Choose creator platform</span><select value={platformFilter} onChange={(e)=>setPlatformFilter(e.target.value as PlatformFilter)} className="min-w-[170px] rounded-md border-2 border-input bg-background px-3 py-2 text-base font-semibold">{PLATFORM_OPTIONS.map((option)=><option key={option.value} value={option.value}>{option.label}</option>)}</select></label></div></div><div /></div>
+    <div className="mb-4 flex flex-wrap items-end justify-between gap-3"><div><div className="text-[11px] uppercase tracking-[0.18em] text-[color:var(--gold)]">Creator outreach</div><div className="mt-1 flex flex-wrap items-center gap-3"><h1 className="font-display text-3xl text-foreground">Creators</h1><label><span className="sr-only">Choose creator platform</span><select value={platformFilter} onChange={(e)=>setPlatformFilter(e.target.value as PlatformFilter)} className="min-w-[170px] rounded-md border-2 border-input bg-background px-3 py-2 text-base font-semibold">{PLATFORM_OPTIONS.map((option)=><option key={option.value} value={option.value}>{option.label}</option>)}</select></label></div></div><button type="button" onClick={()=>setAddOpen(v=>!v)} className="rounded-md bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground">+ Add Creator</button></div>
+    {addOpen&&<form onSubmit={e=>{e.preventDefault();void addCreator();}} className="mb-4 space-y-3 rounded-xl border border-border bg-card p-4"><h2 className="font-semibold">Add TikTok creator to Passed First Review</h2><label className="block text-sm">TikTok profile URL (required)<input type="url" required value={newProfile} onChange={e=>setNewProfile(e.target.value)} placeholder="https://www.tiktok.com/@username" className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2"/></label><label className="block text-sm">Creator name (optional)<input value={newName} onChange={e=>setNewName(e.target.value)} placeholder="Creator name" className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2"/></label><p className="text-xs text-muted-foreground">Checks for duplicates and adds the creator as Qualified, awaiting final manual approval. No DM will be sent.</p><div className="flex gap-2"><button type="submit" disabled={adding||!newProfile.trim()} className="rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground">{adding?"Adding…":"Add to Passed First Review"}</button><button type="button" onClick={()=>setAddOpen(false)} className="rounded-md border px-4 py-2 text-sm">Cancel</button></div></form>}
     <div className="mb-4 rounded-xl border border-border bg-card p-3">
       <div className="grid gap-2 lg:grid-cols-[minmax(240px,1fr)_210px_220px_auto]">
         <label className="relative"><span className="sr-only">Search creators</span><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"/><input value={query} onChange={(e)=>setQuery(e.target.value)} placeholder="Search creator, platform or niche…" className="w-full rounded-md border border-input bg-background py-2.5 pl-9 pr-3 text-sm"/></label>
