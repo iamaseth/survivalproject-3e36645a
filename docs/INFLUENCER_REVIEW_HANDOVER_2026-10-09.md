@@ -18,6 +18,22 @@ The historical batch checkpoint (last batch 27 / next batch 28, previously 1,455
 
 **BoBo's manual fallback:** review creators from the **unverified** queue, check their real profiles, record source evidence and decision, and save it in the CRM. Do not assume a `Qualified` or `Not Relevant` database value means a human checked the profile. For automation, pilot evidence-backed collection first and retain manual approval.
 
+## Live database reconciliation — 2026-10-09 (read-only query)
+
+Actual Lovable Cloud `public.creators`: **2,605** total.
+- `qualification_status IS NULL`: **1,840** (unclassified)
+- `qualification_status='Qualified'`: **381**
+- `qualification_status='Not Relevant'`: **246**
+- `qualification_status='Needs Review'`: **138**
+- `seth_approval_status='approved'`: **3**; `rejected`: **10**; NULL: **2,592**
+- Nonblank `verification_evidence`: **159** records (not necessarily evidence of complete human profile review)
+- Nonblank `verification_date`: **3** records
+- TikTok URLs present: **2,083** records
+- Nonblank `last_researched`: **1,863** records (a date alone is not proof of review)
+- Research statuses include `Researching` 1,343; `Needs review` 578; `Imported — needs review` 182; other categories.
+
+**Interpretation:** At least **1,840** have no qualification status, and another **138** are explicitly Needs Review: **1,978** require qualification/decision by current status. However, the remaining 627 labels are not proof of verified public-profile inspection. The count of **verified, evidence-backed human reviews is unknown**, not 627. Do not treat 159 evidence fields or 13 manual decisions as exhaustive verification counts. Reconcile each creator before asserting reviewed status. Counts may change after this snapshot.
+
 ## Current workflow / របៀបធ្វើការ
 1. Open creator in CRM, then open their actual public TikTok profile. / បើកប្រវត្តិ TikTok ពិត។
 2. If automatic collection is unavailable, use **Obsidian Web Clipper → Copy to clipboard** and paste Markdown into ChatGPT. The custom Chrome clipper was attempted but did not work on the user's computer; do not depend on it.
