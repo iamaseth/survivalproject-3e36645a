@@ -10,6 +10,14 @@
 - At the last inspection there were ~2,605 creators in the live `creators` table. This is a dated snapshot, not a current count.
 - Historical master list `survival-tabs-influencer-master.csv` (2,067 creators) and older batch checkpoint 28 refer to an earlier separate workflow. Do not import or restart it without reconciling against live CRM IDs and duplicates.
 
+## IMPORTANT: 2,000+ creator qualification is NOT completed
+
+The user explicitly confirms the full qualification pass of 2,000+ creators **has not been performed**. Do not confuse imported records, automated labels, or a handful of manually reviewed examples with actual completed creator qualification. **Never report the entire list as qualified or screened.**
+
+The historical batch checkpoint (last batch 27 / next batch 28, previously 1,455 unchecked) is only a dated snapshot from a separate process, not verified current progress. The CRM has more rows than the original list and may contain duplicate/imported/staging records. Before resuming, reconcile original creator identifiers against live CRM, count actual evidence-backed profile reviews separately from automated labels, and produce an explicit reviewed/unreviewed queue. Continue from the last verified review; do not start over or falsely mark the rest complete.
+
+**BoBo's manual fallback:** review creators from the **unverified** queue, check their real profiles, record source evidence and decision, and save it in the CRM. Do not assume a `Qualified` or `Not Relevant` database value means a human checked the profile. For automation, pilot evidence-backed collection first and retain manual approval.
+
 ## Current workflow / របៀបធ្វើការ
 1. Open creator in CRM, then open their actual public TikTok profile. / បើកប្រវត្តិ TikTok ពិត។
 2. If automatic collection is unavailable, use **Obsidian Web Clipper → Copy to clipboard** and paste Markdown into ChatGPT. The custom Chrome clipper was attempted but did not work on the user's computer; do not depend on it.
