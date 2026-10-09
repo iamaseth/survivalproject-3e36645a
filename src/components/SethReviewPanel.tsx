@@ -3,7 +3,7 @@ import { ChevronDown, ChevronRight } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { CREATORS, refreshCreatorsFromDB, useCreatorsVersion, type CreatorRow } from "@/lib/creator-partnerships";
-import { amICreatorApprover, sethReviewCreator, sethSaveDmDraft, outreachPoolAction } from "@/lib/creators.functions";
+import { amICreatorApprover, sethReviewCreator, sethSaveDmDraft, recordTikTokDmReview, outreachPoolAction } from "@/lib/creators.functions";
 import { hasGroundedDm } from "@/lib/final-approval";
 import { isDmVerified } from "@/lib/tiktok-dm-verification";
 import { externalLinkProps } from "@/lib/external-link";
@@ -41,11 +41,13 @@ function QualifiedRow({c,onDone}:{c:CreatorRow;onDone:()=>void}) {
   const review = useServerFn(sethReviewCreator);
   const saveDraft = useServerFn(sethSaveDmDraft);
   const assign = useServerFn(outreachPoolAction);
+  const verify = useServerFn(recordTikTokDmReview);
   const busyRef = useRef(false);
   const [busy,setBusy] = useState(false);
   const [showPaste,setShowPaste] = useState(false);
   const [dm,setDm] = useState("");
   const [evidence,setEvidence] = useState("");
+  const [profileChecked,setProfileChecked] = useState(false);
   const [error,setError] = useState("");
   const [saved,setSaved] = useState(false);
   const [assignee,setAssignee] = useState<"Seth" | "Rena">("Rena");
@@ -76,19 +78,26 @@ function QualifiedRow({c,onDone}:{c:CreatorRow;onDone:()=>void}) {
   };
   const save = async () => {
     if (busyRef.current || !dm.trim()) return;
+    if (!profileChecked) { setError("Open the TikTok profile and confirm you personally reviewed it before approval."); return; }
+    if (evidence.trim().length < 40) { setError("Add at least 40 characters of specific profile evidence before approval."); return; }
+    if (!hasGroundedDm(evidence, dm)) { setError("The DM must reference at least two specific details from the profile evidence. Revise the message or evidence."); return; }
     busyRef.current = true; setBusy(true); setError(""); setSaved(false);
     try {
-      await saveDraft({data:{id:c.id,dm:dm.trim(),note:"Second manual review. Profile evidence: "+evidence.slice(0,500)}});
-      c.personalizedDm = dm.trim();
-      await review({data:{id:c.id,decision:"approved",dm:dm.trim(),note:"Second manual review completed; assigned for "+assignee+" outreach",checkedProfile:true,messageFits:true}});
-      c.sethApprovalStatus = "approved";
-      await assign({data:{id:c.id,action:"assign",target:assignee}});
-      c.outreachAssignee = assignee;
-      setSaved(true);
-      toast.success("Approved for Outreach");
-      onDone();
-    } catch(e) { setError((e instanceof Error ? e.message : "Could not approve creator") + ". The DM may be saved; refresh to confirm approval and assignment status."); }
-    finally {busyRef.current = false; setBusy(false); }
+      await saveDraft({data:{id:c.id,dm:dm.trim(),note:"Manual review. Profile evidence: "+evidence.slice(0,500)}});
+      await verify({data:{id:c.id,decision:"verified",evidence:evidence.trim(),reviewer:"Seth",checks:{profileOpened:true,relevant:true,urlCorrect:true,dmGrounded:true}}});
+      await review({data:{id:c.id,decision:"approved",dm:dm.trim(),note:"Profile directly reviewed; assigned to "+assignee,checkedProfile:true,messageFits:true}});
+      // Only mark local approval after the server confirms it.
+      c.personalizedDm=dm.trim(); c.sethApprovalStatus="approved";
+      try {
+        await assign({data:{id:c.id,action:"assign",target:assignee}});
+        c.outreachAssignee=assignee;
+        toast.success("Approved and assigned to "+assignee);
+      } catch(e) {
+        setError("Approved, but assignment to "+assignee+" failed: "+(e instanceof Error?e.message:"Unknown error")+". Find the creator under Unassigned and retry.");
+      }
+      setSaved(true); onDone();
+    } catch(e) { setError((e instanceof Error ? e.message : "Could not approve creator") + ". Approval was not confirmed. Refresh to check before retrying."); }
+    finally {busyRef.current=false;setBusy(false);}
   };
   const act = async (decision:"approved"|"rejected") => {
     if (busyRef.current) return;
@@ -116,7 +125,7 @@ function QualifiedRow({c,onDone}:{c:CreatorRow;onDone:()=>void}) {
       <button type="button" onClick={() => void paste()} className={`rounded-md border px-3 py-1.5 text-xs ${saved ? "border-emerald-700 bg-emerald-700 text-white" : "hover:bg-secondary"}`}>{saved ? "Saved ✓" : "Paste"}</button>
       <button type="button" disabled={busy} onClick={() => void act("rejected")} className="rounded-md border px-3 py-1.5 text-xs hover:bg-secondary">Reject</button>
     </div>
-    {showPaste && <div className="mt-3 space-y-2"><label className="block text-xs font-medium">Complete ChatGPT result (Ctrl+V if automatic paste is blocked)<textarea value={rawInput} onChange={e=>setRawInput(e.target.value)} rows={3} className="mt-1 w-full rounded-md border bg-background p-2 text-sm" /></label><button type="button" onClick={()=>parseResult(rawInput)} className="rounded-md border px-3 py-2 text-xs">Load result</button><label className="block text-xs font-medium">Personalized DM (editable)<textarea value={dm} onChange={e=>{setDm(e.target.value);setSaved(false);}} rows={5} maxLength={2000} className="mt-1 w-full rounded-md border bg-background p-2 text-sm" /></label><label className="block text-xs font-medium">Outreach owner <select value={assignee} onChange={e=>setAssignee(e.target.value as "Seth" | "Rena")} className="ml-2 rounded border bg-background p-2"><option value="Seth">Seth</option><option value="Rena">Rena</option></select></label><button type="button" disabled={busy || !dm.trim()} onClick={()=>void save()} className="rounded-md bg-primary px-3 py-2 text-xs text-primary-foreground">{busy?"Saving…":"Save DM"}</button>{saved&&<p role="status" className="text-sm font-semibold text-emerald-700">Approved for Outreach.</p>}</div>}
+    {showPaste && <div className="mt-3 space-y-2"><label className="block text-xs font-medium">Complete ChatGPT result (Ctrl+V if automatic paste is blocked)<textarea value={rawInput} onChange={e=>setRawInput(e.target.value)} rows={3} className="mt-1 w-full rounded-md border bg-background p-2 text-sm" /></label><button type="button" onClick={()=>parseResult(rawInput)} className="rounded-md border px-3 py-2 text-xs">Load result</button><label className="block text-xs font-medium">Personalized DM (editable)<textarea value={dm} onChange={e=>{setDm(e.target.value);setSaved(false);}} rows={5} maxLength={2000} className="mt-1 w-full rounded-md border bg-background p-2 text-sm" /></label><label className="block text-xs font-medium">Specific profile evidence (40+ characters)<textarea value={evidence} onChange={e=>setEvidence(e.target.value)} rows={3} maxLength={2000} placeholder="Describe actual posts you reviewed, such as emergency food storage and power outage equipment." className="mt-1 w-full rounded-md border bg-background p-2 text-sm" /></label><label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={profileChecked} onChange={e=>setProfileChecked(e.target.checked)} /> I opened the correct TikTok profile, reviewed its content, and confirm this DM fits.</label><label className="block text-xs font-medium">Outreach owner <select value={assignee} onChange={e=>setAssignee(e.target.value as "Seth" | "Rena")} className="ml-2 rounded border bg-background p-2"><option value="Seth">Seth</option><option value="Rena">Rena</option></select></label><button type="button" disabled={busy || !dm.trim()} onClick={()=>void save()} className="rounded-md bg-primary px-3 py-2 text-xs text-primary-foreground">{busy?"Saving…":"Approve & Save DM"}</button>{saved&&<p role="status" className="text-sm font-semibold text-emerald-700">Approved for Outreach.</p>}</div>}
     {error && <p role="alert" className="mt-2 text-xs text-destructive">{error}</p>}
   </div>;
 }
