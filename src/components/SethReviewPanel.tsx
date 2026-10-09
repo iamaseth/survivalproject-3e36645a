@@ -3,7 +3,7 @@ import { ChevronDown, ChevronRight } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { CREATORS, refreshCreatorsFromDB, useCreatorsVersion, type CreatorRow } from "@/lib/creator-partnerships";
-import { amICreatorApprover, sethReviewCreator, sethSaveDmDraft, recordTikTokDmReview, outreachPoolAction } from "@/lib/creators.functions";
+import { amICreatorApprover, sethReviewCreator, sethSaveDmDraft, recordTikTokDmReview, outreachPoolAction, manualQualificationOverride } from "@/lib/creators.functions";
 import { hasGroundedDm } from "@/lib/final-approval";
 import { isDmVerified } from "@/lib/tiktok-dm-verification";
 import { externalLinkProps } from "@/lib/external-link";
@@ -18,7 +18,7 @@ export function SethReviewPanel() {
   const [revision, setRevision] = useState(0);
   useEffect(() => { check().then(r => setAllowed(r.approver)).catch(() => setAllowed(false)); }, []);
   useEffect(() => { if (allowed) refreshCreatorsFromDB().catch(() => setError("Could not load creators. Reload to retry.")).finally(() => setLoaded(true)); }, [allowed]);
-  const rows = useMemo(() => CREATORS.filter(c => c.tiktok && c.qualificationStatus === "Qualified" && !c.contactedDate && !c.sethApprovalStatus).sort((a,b) => a.name.localeCompare(b.name)), [version, revision]);
+  const rows = useMemo(() => CREATORS.filter(c => c.tiktok && !c.contactedDate && !c.outreachSentAt && !c.sethApprovalStatus).sort((a,b) => a.name.localeCompare(b.name)), [version, revision]);
   const approved = useMemo(() => CREATORS.filter(c => c.sethApprovalStatus === "approved" && !c.outreachSentAt && !c.contactedDate), [version, revision]);
   const assignApproved = useServerFn(outreachPoolAction);
   const [assigning,setAssigning] = useState<string | null>(null);
@@ -39,6 +39,7 @@ export function SethReviewPanel() {
 
 function QualifiedRow({c,onDone}:{c:CreatorRow;onDone:()=>void}) {
   const review = useServerFn(sethReviewCreator);
+  const manualOverride = useServerFn(manualQualificationOverride);
   const saveDraft = useServerFn(sethSaveDmDraft);
   const assign = useServerFn(outreachPoolAction);
   const verify = useServerFn(recordTikTokDmReview);
@@ -78,8 +79,7 @@ function QualifiedRow({c,onDone}:{c:CreatorRow;onDone:()=>void}) {
   };
   const save = async () => {
     if (busyRef.current || !dm.trim()) return;
-    const blockedFlag = (c.responseFollowup || "").match(/not relevant|dm blocked|do not contact|do not send/i)?.[0];
-    if (blockedFlag) { setError(`Approval blocked by existing CRM follow-up flag: "${blockedFlag}". Review the creator\u0027s existing contact history before changing this flag. No approval attempted.`); return; }
+    if (/dm blocked|do not contact|do not send|opt.?out|unsubscribe/i.test(c.responseFollowup || "")) { setError("Explicit contact restriction. Approval is blocked."); return; }
     if (c.contactedDate || c.outreachSentAt) { setError("Creator is already marked contacted or sent. Approval is locked; review the existing outreach record."); return; }
     if (!profileChecked) { setError("Open the TikTok profile and confirm you personally reviewed it before approval."); return; }
     if (evidence.trim().length < 40) { setError("Add at least 40 characters of specific profile evidence before approval."); return; }
@@ -88,16 +88,12 @@ function QualifiedRow({c,onDone}:{c:CreatorRow;onDone:()=>void}) {
     try {
       await saveDraft({data:{id:c.id,dm:dm.trim(),note:"Manual review. Profile evidence: "+evidence.slice(0,500)}});
       await verify({data:{id:c.id,decision:"verified",evidence:evidence.trim(),reviewer:"Seth",checks:{profileOpened:true,relevant:true,urlCorrect:true,dmGrounded:true}}});
-      await review({data:{id:c.id,decision:"approved",dm:dm.trim(),note:"Profile directly reviewed; assigned to "+assignee,checkedProfile:true,messageFits:true}});
+      await manualOverride({data:{id:c.id,decision:"approved",dm:dm.trim(),evidence:evidence.trim(),assignee,checkedProfile:profileChecked}});
       // Only mark local approval after the server confirms it.
       c.personalizedDm=dm.trim(); c.sethApprovalStatus="approved";
-      try {
-        await assign({data:{id:c.id,action:"assign",target:assignee}});
-        c.outreachAssignee=assignee;
-        toast.success("Approved and assigned to "+assignee);
-      } catch(e) {
-        setError("Approved, but assignment to "+assignee+" failed: "+(e instanceof Error?e.message:"Unknown error")+". Find the creator under Unassigned and retry.");
-      }
+      c.outreachAssignee=assignee;
+      c.qualificationStatus="Qualified";
+      toast.success("Manually approved and assigned to "+assignee);
       setSaved(true); onDone();
     } catch(e) { setError((e instanceof Error ? e.message : "Could not approve creator") + ". Approval was not confirmed. Refresh to check before retrying."); }
     finally {busyRef.current=false;setBusy(false);}
@@ -112,7 +108,13 @@ function QualifiedRow({c,onDone}:{c:CreatorRow;onDone:()=>void}) {
     busyRef.current=true;setBusy(true);setError("");
     try {
       if (decision === "approved") await saveDraft({data:{id:c.id,dm:dm.trim(),note:"User pasted profile-specific DM"}});
-      await review({data:{id:c.id,decision,dm:decision==="approved"?dm.trim():undefined,note:decision==="approved"?"User reviewed profile and pasted personalized DM":"Rejected from qualified review",checkedProfile:decision==="approved",messageFits:decision==="approved"}});
+      if (decision === "rejected") {
+        if (!profileChecked) throw new Error("Confirm you reviewed the correct TikTok profile before rejecting");
+        await manualOverride({data:{id:c.id,decision:"rejected",checkedProfile:true}});
+        c.qualificationStatus="Not Relevant";
+      } else {
+        await review({data:{id:c.id,decision,dm:dm.trim(),note:"User reviewed profile",checkedProfile:true,messageFits:true}});
+      }
       c.sethApprovalStatus=decision;
       if(decision==="approved") c.personalizedDm=dm.trim();
       toast.success(decision==="approved"?"Approved for shared outreach":"Rejected");
@@ -126,7 +128,8 @@ function QualifiedRow({c,onDone}:{c:CreatorRow;onDone:()=>void}) {
       <a {...externalLinkProps(c.tiktok)} className="rounded-md border px-3 py-1.5 text-xs hover:bg-secondary">Open Profile ↗</a>
       <button type="button" onClick={() => void copy()} className="rounded-md border px-3 py-1.5 text-xs hover:bg-secondary">Copy</button>
       <button type="button" onClick={() => void paste()} className={`rounded-md border px-3 py-1.5 text-xs ${saved ? "border-emerald-700 bg-emerald-700 text-white" : "hover:bg-secondary"}`}>{saved ? "Saved ✓" : "Paste"}</button>
-      <button type="button" disabled={busy} onClick={() => void act("rejected")} className="rounded-md border px-3 py-1.5 text-xs hover:bg-secondary">Reject</button>
+      <label className="flex items-center gap-1 text-xs"><input type="checkbox" checked={profileChecked} onChange={e=>setProfileChecked(e.target.checked)} /> Profile reviewed</label>
+      <button type="button" disabled={busy || !profileChecked} onClick={() => void act("rejected")} className="rounded-md border px-3 py-1.5 text-xs hover:bg-secondary">Reject</button>
     </div>
     {showPaste && <div className="mt-3 space-y-2"><label className="block text-xs font-medium">Complete ChatGPT result (Ctrl+V if automatic paste is blocked)<textarea value={rawInput} onChange={e=>setRawInput(e.target.value)} rows={3} className="mt-1 w-full rounded-md border bg-background p-2 text-sm" /></label><button type="button" onClick={()=>parseResult(rawInput)} className="rounded-md border px-3 py-2 text-xs">Load result</button><label className="block text-xs font-medium">Personalized DM (editable)<textarea value={dm} onChange={e=>{setDm(e.target.value);setSaved(false);}} rows={5} maxLength={2000} className="mt-1 w-full rounded-md border bg-background p-2 text-sm" /></label><label className="block text-xs font-medium">Specific profile evidence (40+ characters)<textarea value={evidence} onChange={e=>setEvidence(e.target.value)} rows={3} maxLength={2000} placeholder="Describe actual posts you reviewed, such as emergency food storage and power outage equipment." className="mt-1 w-full rounded-md border bg-background p-2 text-sm" /></label><label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={profileChecked} onChange={e=>setProfileChecked(e.target.checked)} /> I opened the correct TikTok profile, reviewed its content, and confirm this DM fits.</label><label className="block text-xs font-medium">Outreach owner <select value={assignee} onChange={e=>setAssignee(e.target.value as "Seth" | "Rena")} className="ml-2 rounded border bg-background p-2"><option value="Seth">Seth</option><option value="Rena">Rena</option></select></label><button type="button" disabled={busy || !dm.trim()} onClick={()=>void save()} className="rounded-md bg-primary px-3 py-2 text-xs text-primary-foreground">{busy?"Saving…":"Approve & Save DM"}</button>{saved&&<p role="status" className="text-sm font-semibold text-emerald-700">Approved for Outreach.</p>}</div>}
     {error && <p role="alert" className="mt-2 text-xs text-destructive">{error}</p>}
