@@ -59,7 +59,7 @@ export const listBatchOneResults = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const { data, error } = await context.supabase.from("creators")
-      .select("id,name,tiktok,youtube,instagram,facebook,email,contact_route,followers_signal,qualification_status,seth_approval_status,verification_evidence")
+      .select("id,name,tiktok,youtube,instagram,facebook,email,contact_route,followers_signal,segment,target_audience,other_platform,qualification_status,seth_approval_status,verification_evidence")
       .like("id", "bobo-md-20261010-%").order("name");
     if (error) throw new Error(error.message);
     return data ?? [];
