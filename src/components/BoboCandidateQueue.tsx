@@ -52,6 +52,14 @@ export function BoboCandidateQueue() {
       localStorage.setItem(DATA_KEY,JSON.stringify(next));setCreators(next);setError("");
     } catch(e) { setError(e instanceof Error?e.message:String(e)); }
   }
+  function markdownTemplate(c:Candidate):string {
+    return `---\ntitle: "TikTok Research — @${c.handle}"\nsource: "${c.profile_url}"\ncreated: "${new Date().toISOString().slice(0,10)}"\ntags: [survival-tabs, influencer-research, bobo]\n---\n\n# @${c.handle}\n\n- Profile URL: ${c.profile_url}\n- Display name: \n- Followers (if visible): \n- Bio: \n- Research date: ${new Date().toISOString().slice(0,10)}\n\n## Recent content and evidence\n\nPaste relevant video captions, topics, and source links here.\n\n## Observations\n\nRecord what the creator actually posts. Do not qualify or draft a DM here.\n\n## Unverified or missing information\n\n`; 
+  }
+  function downloadMd() {
+    if(!current)return;
+    const blob=new Blob([markdownTemplate(current)],{type:"text/markdown;charset=utf-8"});
+    const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download=`tiktok-${current.handle}.md`;a.click();URL.revokeObjectURL(url);
+  }
   function mark(status:"saved"|"skipped") {
     if(!current)return;
     const next={...progress,[current.handle]:status};setProgress(next);localStorage.setItem(PROGRESS_KEY,JSON.stringify(next));
@@ -82,7 +90,7 @@ export function BoboCandidateQueue() {
     {current?<div className="space-y-3 rounded-lg border p-4">
       <strong className="block text-xl">@{current.handle}</strong>
       <a className="block rounded-lg bg-primary px-4 py-4 text-center text-lg font-bold text-primary-foreground" href={current.profile_url} target="_blank" rel="noopener noreferrer">Open TikTok Profile ↗ / បើក TikTok</a>
-      <p className="text-sm">Save the .md file in Obsidian before pressing Next.</p>
+      <p className="text-sm">Copy real profile details into the Markdown template, save it in Obsidian, then press Next. Downloading a blank template is not research.</p>\n      <button className="w-full rounded-lg border px-4 py-3 font-semibold" onClick={downloadMd}>Download .md template / ទាញយកឯកសារ .md</button>
       <button className="w-full rounded-lg bg-emerald-700 px-4 py-4 text-lg font-bold text-white" onClick={()=>mark("saved")}>Saved MD → Next / រក្សាទុក → បន្ទាប់</button>
       <button className="w-full rounded-lg border px-4 py-3" onClick={()=>mark("skipped")}>Skip → Next / រំលង</button>
     </div>:creators.length?<p className="font-bold">All candidate profiles accounted for.</p>:<p>Load the CSV to begin.</p>}
