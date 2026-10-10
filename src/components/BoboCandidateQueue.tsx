@@ -1,4 +1,4 @@
-import { CREATORS, useCreatorsVersion } from "@/lib/creator-partnerships";
+import { CREATORS, useCreatorsVersion, hydrateCreatorsFromDB } from "@/lib/creator-partnerships";
 import { useEffect, useMemo, useState } from "react";
 
 type Candidate = { handle: string; profile_url: string; first_pass_category?: string };
@@ -25,7 +25,8 @@ function normalizeHandle(value: string): string {
   return /^[a-z0-9._]{2,30}$/.test(v) ? v : "";
 }
 export function BoboCandidateQueue() {
-  useCreatorsVersion();
+  const creatorsVersion = useCreatorsVersion();
+  useEffect(()=>{ void hydrateCreatorsFromDB(); },[]);
   const [creators,setCreators]=useState<Candidate[]>([]);
   const [progress,setProgress]=useState<Progress>({});
   const [history,setHistory]=useState<string[]>([]);
@@ -43,7 +44,7 @@ export function BoboCandidateQueue() {
     }
     for (const c of creators) if (!byHandle.has(c.handle)) byHandle.set(c.handle,c);
     return [...byHandle.values()];
-  },[creators, CREATORS.length]);
+  },[creators, creatorsVersion]);
   const completed = (handle:string)=>Boolean(progress[handle]);
   const saved=allCreators.filter(c=>progress[c.handle]==="saved").length;
   const skipped=allCreators.filter(c=>progress[c.handle]==="skipped").length;
