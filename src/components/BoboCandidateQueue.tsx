@@ -28,8 +28,6 @@ export function BoboCandidateQueue() {
   const [progress,setProgress]=useState<Progress>({});
   const [history,setHistory]=useState<string[]>([]);
   const [error,setError]=useState("");
-  const [profileText,setProfileText]=useState("");
-  const [mdDownloaded,setMdDownloaded]=useState(false);
   useEffect(()=>{
     try { setCreators(JSON.parse(localStorage.getItem(DATA_KEY)||"[]")); setProgress(JSON.parse(localStorage.getItem(PROGRESS_KEY)||"{}")); } catch { setError("Could not load saved progress."); }
   },[]);
@@ -62,22 +60,10 @@ export function BoboCandidateQueue() {
     const blob=new Blob([markdownTemplate(current)],{type:"text/markdown;charset=utf-8"});
     const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download=`tiktok-${current.handle}.md`;a.click();URL.revokeObjectURL(url);
   }
-  function markdown(c:Candidate, evidence:string) {
-    const safe = (v:string)=>v.replaceAll("\\","\\\\").replaceAll('"','\\"');
-    return `---\ntitle: "TikTok @${safe(c.handle)}"\nsource: "${c.profile_url}"\ncreated: "${new Date().toISOString().slice(0,10)}"\ntags:\n  - influencer-research\n  - survival-tabs\n  - bobo\nreview_status: unreviewed\n---\n\n# TikTok @${c.handle}\n\nProfile: ${c.profile_url}\n\n## Captured public profile and video evidence\n\n${evidence.trim() || "No content captured. Do not qualify based on this file alone."}\n\n## Notes\n\n- Creator has not been qualified or approved.\n`;
-  }
-  function downloadMarkdown() {
-    if (!current || !profileText.trim()) { setError("Paste actual TikTok profile/video text before downloading the Markdown file."); return; }
-    const blob = new Blob([markdown(current,profileText)],{type:"text/markdown;charset=utf-8"});
-    const url=URL.createObjectURL(blob); const a=document.createElement("a");
-    a.href=url;a.download=`tiktok-${current.handle}.md`;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
-    setMdDownloaded(true);setError("");
-  }
   function mark(status:"saved"|"skipped") {
     if(!current)return;
-    if(status==="saved" && !mdDownloaded) {setError("Download the evidence Markdown first, then save it to Obsidian.");return;}
     const next={...progress,[current.handle]:status};setProgress(next);localStorage.setItem(PROGRESS_KEY,JSON.stringify(next));
-    setHistory(h=>[...h,current.handle]);setProfileText("");setMdDownloaded(false);setError("");
+    setHistory(h=>[...h,current.handle]);setError("");
   }
   function undo() {
     const last=history[history.length-1];if(!last)return;
@@ -91,7 +77,7 @@ export function BoboCandidateQueue() {
   }
   return <section className="space-y-4 rounded-xl border-2 border-primary p-4">
     <h2 className="text-xl font-bold">New Creator Research / ស្រាវជ្រាវអ្នកបង្កើតថ្មី</h2>
-    <p className="text-sm">Upload the 1,534-creator staging CSV once. Open each profile, save the Markdown file in Obsidian, then click Saved → Next. No creator qualification or CRM approval is changed.</p>
+    <p className="text-sm">Load the creator list once. Open TikTok, save the page in Obsidian, return and click Saved MD → Next. No typing or pasting required.</p>
     <label className="block rounded-lg border p-3 font-semibold">Load creator CSV / ផ្ទុក CSV
       <input type="file" accept=".csv,text/csv" className="mt-2 block w-full text-sm" onChange={e=>void upload(e.target.files?.[0])}/>
     </label>
