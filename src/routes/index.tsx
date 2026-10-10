@@ -80,7 +80,7 @@ function InfluencerHome() {
     // Old AI qualification statuses are intentionally ignored until a fresh-screening stage is persisted.
     const forNow = rows.filter(c => !rejected(c) && !approved(c) && !secondLook(c) && !moreResearch(c));
     return [
-      { name: "For Now", count: masterCounts?.workflowCounts?.research ?? forNow.length, to: "/bobo-queue" },
+      { name: "After First Screening", count: masterCounts?.workflowCounts?.research ?? forNow.length, to: "/bobo-queue" },
       { name: "AI Screened", count: masterCounts?.workflowCounts?.ai_screened ?? 0, to: "/ai-screened" },
       { name: "Manually Approved", count: masterCounts?.workflowCounts?.approved ?? 0, to: "/creators" },
       { name: "Sent", count: masterCounts?.workflowCounts?.sent ?? 0, to: "/creators" },
@@ -134,7 +134,7 @@ function InfluencerHome() {
         className="flex min-h-20 w-full items-center justify-between px-5 py-4 text-left hover:bg-muted/50">
         <span className="font-semibold">{i + 1}. {c.name}</span>
         <span className="flex items-center gap-4">
-          <span className="tabular-nums text-muted-foreground">{(platform === "All" && contactFilter === "All" ? (c.count) : c.visibleCount).toLocaleString()}</span>
+          <span className="tabular-nums text-muted-foreground">{c.count.toLocaleString()}</span>
           <ChevronDown className={`h-5 w-5 transition-transform ${expanded === i ? "rotate-180" : ""}`} />
         </span>
       </button>
