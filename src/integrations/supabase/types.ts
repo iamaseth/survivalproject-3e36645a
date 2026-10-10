@@ -1689,6 +1689,17 @@ export type Database = {
       }
       get_rena_chat_user_id: { Args: never; Returns: string }
       is_creator_approver: { Args: never; Returns: boolean }
+      manual_qualification_override: {
+        Args: {
+          p_assignee?: string
+          p_checked_profile?: boolean
+          p_decision: string
+          p_dm?: string
+          p_evidence?: string
+          p_id: string
+        }
+        Returns: Json
+      }
       outreach_action: {
         Args: { p_action: string; p_id: string; p_target?: string }
         Returns: Json
