@@ -41,7 +41,7 @@ function InfluencerHome() {
       .catch(error => { if(active) setWorkflowError(String(error)); })
       .finally(() => { if(active) setWorkflowLoading(false); });
     return () => {active=false;};
-  },[expanded,workflowPage,fetchSection,useCreatorsVersionValue,batch,secondLookIds]);
+  },[expanded,workflowPage,fetchSection,useCreatorsVersionValue]);
 
   const [platform, setPlatform] = useState("All");
   const [contactFilter, setContactFilter] = useState("All");
