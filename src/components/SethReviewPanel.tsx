@@ -7,6 +7,7 @@ import { amICreatorApprover, sethReviewCreator, sethSaveDmDraft, recordTikTokDmR
 import { hasGroundedDm } from "@/lib/final-approval";
 import { isDmVerified } from "@/lib/tiktok-dm-verification";
 import { externalLinkProps } from "@/lib/external-link";
+import { AI_SCREENED_131_IDS } from "@/lib/ai-screened-131";
 
 export function SethReviewPanel() {
   const check = useServerFn(amICreatorApprover);
@@ -18,8 +19,8 @@ export function SethReviewPanel() {
   const [revision, setRevision] = useState(0);
   useEffect(() => { check().then(r => setAllowed(r.approver)).catch(() => setAllowed(false)); }, []);
   useEffect(() => { if (allowed) refreshCreatorsFromDB().catch(() => setError("Could not load creators. Reload to retry.")).finally(() => setLoaded(true)); }, [allowed]);
-  const rows = useMemo(() => CREATORS.filter(c => c.tiktok && !c.contactedDate && !c.outreachSentAt && !c.sethApprovalStatus).sort((a,b) => a.name.localeCompare(b.name)), [version, revision]);
-  const approved = useMemo(() => CREATORS.filter(c => c.sethApprovalStatus === "approved" && !c.outreachSentAt && !c.contactedDate), [version, revision]);
+  const rows = useMemo(() => CREATORS.filter(c => AI_SCREENED_131_IDS.has(c.id) && c.tiktok && !c.contactedDate && !c.outreachSentAt && !c.sethApprovalStatus).sort((a,b) => a.name.localeCompare(b.name)), [version, revision]);
+  const approved = useMemo(() => CREATORS.filter(c => c.sethApprovalStatus === "approved" && !c.outreachSecondLookAt), [version, revision]);
   const [q,setQ] = useState("");
   const others = useMemo(() => CREATORS.filter(c => c.tiktok && !rows.includes(c) && !approved.includes(c)).filter(c => !q || (c.name+" "+c.tiktok).toLowerCase().includes(q.toLowerCase())).slice(0,100), [rows, approved, q]);
   const assignApproved = useServerFn(outreachPoolAction);
@@ -30,13 +31,13 @@ export function SethReviewPanel() {
     <button type="button" onClick={() => setOpen(v => !v)} aria-expanded={open} className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-secondary/40">
       {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
       <div className="grid h-7 w-7 place-items-center rounded-full bg-emerald-700 text-white">1</div>
-      <div className="min-w-0 flex-1 font-semibold">After First Review <span className="text-sm font-normal text-muted-foreground">({loaded && !error ? rows.length : "—"})</span></div>
+      <div className="min-w-0 flex-1 font-semibold">AI Screened — Ready for Manual Review <span className="text-sm font-normal text-muted-foreground">({loaded && !error ? rows.length : "—"})</span></div>
       <span className="text-xs text-muted-foreground">{open ? "Close" : "Open"}</span>
     </button>
-    {open && <div className="border-t border-border">{error ? <p role="alert" className="p-4 text-destructive">{error}</p> : !loaded ? <p className="p-4">Loading…</p> : rows.length ? rows.map(c => <QualifiedRow key={c.id} c={c} onDone={() => setRevision(n => n + 1)} />) : <p className="p-4 text-sm text-muted-foreground">No qualified creators awaiting review.</p>}</div>}
+    {open && <div className="border-t border-border">{error ? <p role="alert" className="p-4 text-destructive">{error}</p> : !loaded ? <p className="p-4">Loading…</p> : rows.length ? rows.map(c => <QualifiedRow key={c.id} c={c} onDone={() => setRevision(n => n + 1)} />) : <p className="p-4 text-sm text-muted-foreground">No AI-screened candidates awaiting manual review.</p>}</div>}
   </section>
-  <section className="rounded-xl border border-border bg-card p-4"><h3 className="font-semibold">2. Approved / Assigned ({approved.length})</h3>{(["Seth", "Rena"] as const).map(person => <details key={person} className="mt-2 rounded border border-border"><summary className="cursor-pointer p-3 font-medium">{person} ({approved.filter(c => c.outreachAssignee === person).length})</summary>{approved.filter(c => c.outreachAssignee === person).map(c => <div key={c.id} className="flex justify-between gap-2 border-t p-3 text-sm"><span>{c.name}</span><a {...externalLinkProps(c.tiktok)} className="underline">Profile</a></div>)}</details>)}<details open className="mt-2 rounded border border-border"><summary className="cursor-pointer p-3 font-medium">Unassigned ({approved.filter(c => !c.outreachAssignee).length})</summary>{approved.filter(c => !c.outreachAssignee).map(c => <div key={c.id} className="flex flex-wrap items-center gap-2 border-t p-3 text-sm"><span className="mr-auto">{c.name}</span><a {...externalLinkProps(c.tiktok)} className="underline">Profile</a><button type="button" disabled={assigning===c.id} onClick={()=>void moveTo(c,"Seth")} className="rounded border px-2 py-1">Assign Seth</button><button type="button" disabled={assigning===c.id} onClick={()=>void moveTo(c,"Rena")} className="rounded border px-2 py-1">Assign Rena</button></div>)}</details></section>
-  <details className="rounded-xl border border-border bg-card"><summary className="cursor-pointer p-4 font-semibold">Other Profiles</summary><div className="border-t p-3"><input value={q} onChange={e=>setQ(e.target.value)} placeholder="Search name or TikTok" className="w-full rounded-md border border-input bg-background p-2 text-sm" />{others.map(c => <div key={c.id} className="flex justify-between gap-2 border-t p-2 text-sm"><span>{c.name} <span className="text-muted-foreground">{c.sethApprovalStatus ?? c.qualificationStatus ?? ""}{c.contactedDate ? " · contacted" : ""}</span></span><a {...externalLinkProps(c.tiktok)} className="underline">Profile</a></div>)}<p className="pt-2 text-xs text-muted-foreground">Read-only; first 100 matches.</p></div></details>
+  <section className="rounded-xl border border-border bg-card p-4"><h3 className="font-semibold">Manually Approved — Seth / Rena ({approved.length})</h3>{(["Seth", "Rena"] as const).map(person => <details key={person} className="mt-2 rounded border border-border"><summary className="cursor-pointer p-3 font-medium">{person} ({approved.filter(c => c.outreachAssignee === person).length})</summary>{approved.filter(c => c.outreachAssignee === person).map(c => <div key={c.id} className="flex justify-between gap-2 border-t p-3 text-sm"><span>{c.name}</span><a {...externalLinkProps(c.tiktok)} className="underline">Profile</a></div>)}</details>)}<details open className="mt-2 rounded border border-border"><summary className="cursor-pointer p-3 font-medium">Unassigned ({approved.filter(c => !c.outreachAssignee).length})</summary>{approved.filter(c => !c.outreachAssignee).map(c => <div key={c.id} className="flex flex-wrap items-center gap-2 border-t p-3 text-sm"><span className="mr-auto">{c.name}</span><a {...externalLinkProps(c.tiktok)} className="underline">Profile</a><button type="button" disabled={assigning===c.id} onClick={()=>void moveTo(c,"Seth")} className="rounded border px-2 py-1">Assign Seth</button><button type="button" disabled={assigning===c.id} onClick={()=>void moveTo(c,"Rena")} className="rounded border px-2 py-1">Assign Rena</button></div>)}</details></section>
+
   </div>;
 }
 
