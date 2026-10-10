@@ -14,7 +14,8 @@ function BoboSearchQueue() {
   const [done,setDone]=useState<number[]>([]);
   const [ready,setReady]=useState(false);
   const [busy,setBusy]=useState<number|null>(null);
-  const [showDone,setShowDone]=useState(true);
+  const [showDone,setShowDone]=useState(false);
+  const [showOldSearches,setShowOldSearches]=useState(false);
   const [error,setError]=useState("");
 
   useEffect(()=>{ void load().then(r=>{setDone(r.done);setReady(true)}).catch(e=>setError(String(e))); },[]);
@@ -39,6 +40,8 @@ function BoboSearchQueue() {
 
   return <main className="mx-auto max-w-2xl p-4 pb-20 space-y-4">
     <BoboCandidateQueue />
+    <button className="text-sm underline text-muted-foreground" onClick={()=>setShowOldSearches(v=>!v)}>{showOldSearches?"Hide completed keyword searches":"Show previous 500 keyword searches / មើលការស្វែងរកចាស់"}</button>
+    {showOldSearches && <div className="space-y-4">
     <header className="sticky top-0 z-10 bg-background/95 py-3 border-b">
       <h1 className="text-2xl font-bold">BoBo · TikTok Search</h1>
       <div className="mt-1 text-lg font-semibold">{140+done.length} / 500 complete</div>
@@ -74,5 +77,6 @@ function BoboSearchQueue() {
       })}
     </section>
     {!next && <div className="rounded-xl border p-6 text-center text-xl font-bold">All 500 searches complete ✓</div>}
+    </div>}
   </main>;
 }
