@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { CREATORS, hydrateCreatorsFromDB, useCreatorsVersion, type CreatorRow } from "@/lib/creator-partnerships";
-import { getMyOutreachSender, outreachPoolAction, senderRejectAssigned } from "@/lib/creators.functions";
+import { getMyOutreachSender, outreachPoolAction, senderRejectAssigned, secondLookAction } from "@/lib/creators.functions";
 import { inRenaPool, isBlockedFollowup } from "@/lib/rena-queue-eligibility";
 
 export const Route = createFileRoute("/rena-queue")({
@@ -38,6 +38,7 @@ export function DmQueue({ sender = "Rena" }: { sender?: "Rena" | "Seth" }) {
   const who = useServerFn(getMyOutreachSender);
   const act = useServerFn(outreachPoolAction);
   const senderReject = useServerFn(senderRejectAssigned);
+  const secondLookAct = useServerFn(secondLookAction);
   const [me, setMe] = useState<{ sender: string | null; approver: boolean } | null>(null);
   const [notice, setNotice] = useState<{ kind: "ok" | "warn" | "err"; text: string; dm?: string } | null>(null);
   const [savingId, setSavingId] = useState<string | null>(null);
@@ -50,20 +51,16 @@ export function DmQueue({ sender = "Rena" }: { sender?: "Rena" | "Seth" }) {
   const touchStart = useRef<{id:string;x:number;y:number}|null>(null);
   const [swipingId,setSwipingId] = useState<string|null>(null);
   const [actionsId,setActionsId] = useState<string|null>(null);
-  const [laterIds,setLaterIds] = useState<string[]>([]);
-  const [showSecondLook,setShowSecondLook] = useState(false);
-  useEffect(() => { try { const saved = JSON.parse(window.localStorage.getItem("survival-tabs-second-look-v1") || "[]"); if (Array.isArray(saved)) setLaterIds(saved.filter((id): id is string => typeof id === "string")); } catch { /* ignore invalid local data */ } }, []);
-  const deferCreator = (id: string) => { setLaterIds(ids => { const next = ids.includes(id) ? ids : [...ids,id]; try { window.localStorage.setItem("survival-tabs-second-look-v1", JSON.stringify(next)); } catch { /* storage unavailable */ } return next; }); setActionsId(null); };
-  const restoreCreator = (id: string) => { setLaterIds(ids => { const next = ids.filter(x => x !== id); try { window.localStorage.setItem("survival-tabs-second-look-v1", JSON.stringify(next)); } catch { /* storage unavailable */ } return next; }); };
+  
+  const deferCreator = async (id: string) => { if (lock.current) return; lock.current=true; setSavingId(id); try { const result=await secondLookAct({data:{id,action:"later"}}); if(!result?.ok) throw new Error("Could not save Later"); await refresh(); setActionsId(null); setNotice({kind:"ok",text:"Moved to Seth’s Second Look list."}); } catch(e) { setNotice({kind:"err",text:e instanceof Error?e.message:"Could not save Later"}); } finally {lock.current=false;setSavingId(null);} };
   const [sessionSentIds,setSessionSentIds] = useState<string[]>([]);
 
   useEffect(() => { if ("serviceWorker" in navigator) navigator.serviceWorker.register("/rena-sw.js").catch(() => {}); }, []);
   useEffect(() => { who().then(setMe).catch(() => setMe({ sender: null, approver: false })); void hydrateCreatorsFromDB().catch(e => setLoadError(e instanceof Error ? e.message : "Could not load outreach queue")); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const pool = useMemo(() => { void version; return CREATORS.filter(inPool).sort((a, b) => a.name.localeCompare(b.name)); }, [version]);
-  const mine = pool.filter((c) => !c.outreachSentAt || sessionSentIds.includes(c.id)).sort((a,b)=>Number(laterIds.includes(a.id))-Number(laterIds.includes(b.id)));
-  const pending = mine.filter(c=>!c.outreachSentAt && !laterIds.includes(c.id));
-  const secondLook = mine.filter(c=>!c.outreachSentAt && laterIds.includes(c.id));
+  const mine = pool.filter((c) => !c.outreachSentAt || sessionSentIds.includes(c.id));
+  const pending = mine.filter(c=>!c.outreachSentAt && !c.outreachSecondLookAt);
   const completedThisSession = mine.filter(c=>Boolean(c.outreachSentAt));
   const available = pool.filter((c) => statusOf(c) === "available");
   const done = completedThisSession.length;
@@ -150,7 +147,7 @@ export function DmQueue({ sender = "Rena" }: { sender?: "Rena" | "Seth" }) {
         <div className="mt-2 h-2 overflow-hidden rounded-full bg-secondary">
           <div className="h-full bg-emerald-600 transition-all" style={{ width: `${mine.length ? (done / mine.length) * 100 : 0}%` }} />
         </div>
-        <p className="mt-2 text-[11px] text-muted-foreground">Sent creators move to the completed section. Later moves creators to Second Look on this device. Not Relevant creators are removed from the queue.</p>
+        <p className="mt-2 text-[11px] text-muted-foreground">Sent creators move to the completed section. Later moves creators to Seth’s shared Second Look. Not Relevant creators are removed from the queue.</p>
       </div>
       {loadError ? <p role="alert" className="rounded border border-red-600 p-3 text-sm">{loadError}</p> : null}
       {notice ? (
@@ -159,8 +156,6 @@ export function DmQueue({ sender = "Rena" }: { sender?: "Rena" | "Seth" }) {
           {notice.dm ? <textarea readOnly value={notice.dm} rows={4} onFocus={(e) => e.currentTarget.select()} className="mt-2 w-full rounded border border-input bg-background p-2 text-sm text-foreground" /> : null}
         </div>
       ) : null}
-      <button type="button" onClick={()=>setShowSecondLook(v=>!v)} className="w-full rounded-xl border border-amber-500 bg-amber-50 px-4 py-3 text-left text-sm font-semibold text-amber-950">Second Look ({secondLook.length}) {showSecondLook ? "▲" : "▼"}</button>
-      {showSecondLook && <section className="space-y-2 rounded-xl border border-amber-300 p-3"><p className="text-xs text-muted-foreground">Saved on this device. Not yet synchronized across team devices.</p>{secondLook.length === 0 ? <p className="text-sm">No creators waiting for a second look.</p> : secondLook.map(c=><div key={c.id} className="flex items-center justify-between gap-2 rounded-lg border p-3"><a href={c.tiktok!} target="_blank" rel="noopener noreferrer" className="min-w-0 flex-1 truncate font-medium underline">{c.name}</a><button type="button" onClick={()=>restoreCreator(c.id)} className="rounded-lg border px-3 py-2 text-sm">Return to queue</button></div>)}</section>}
       {pending.length === 0 ? <div className="py-8 text-center text-sm text-muted-foreground"><div className="text-base font-semibold text-foreground">No pending creators</div>Approved creators will appear here.</div> : null}
       <ul className="space-y-2">
         {pending.map((c) => {
@@ -178,7 +173,7 @@ export function DmQueue({ sender = "Rena" }: { sender?: "Rena" | "Seth" }) {
               {actionsId===c.id && <div className="basis-full grid w-full grid-cols-4 gap-1 rounded-xl border p-2 text-xs font-medium">
                 <button type="button" disabled={readOnlyPreview || !sent} onClick={()=>{setActionsId(null);void simple(c,"undo_sent");}} className="flex min-h-14 flex-col items-center justify-center rounded-lg bg-blue-100 text-blue-900 disabled:opacity-40"><span className="text-xl">↶</span>Undo</button>
                 <button type="button" disabled={readOnlyPreview || sent} onClick={()=>void reject(c)} className="flex min-h-14 flex-col items-center justify-center rounded-lg bg-red-100 text-red-900 disabled:opacity-40"><span className="text-xl">✕</span>Reject</button>
-                <button type="button" onClick={()=>{deferCreator(c.id);}} className="flex min-h-14 flex-col items-center justify-center rounded-lg bg-amber-100 text-amber-900"><span className="text-xl">◷</span>Later</button>
+                <button type="button" onClick={()=>{void deferCreator(c.id);}} className="flex min-h-14 flex-col items-center justify-center rounded-lg bg-amber-100 text-amber-900"><span className="text-xl">◷</span>Later</button>
                 <button type="button" disabled={readOnlyPreview || sent} onClick={()=>{setActionsId(null);void simple(c,"sent");}} className="flex min-h-14 flex-col items-center justify-center rounded-lg bg-green-100 text-green-900 disabled:opacity-40"><span className="text-xl">✓</span>Sent</button>
               </div>}
             </li>

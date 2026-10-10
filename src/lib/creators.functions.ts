@@ -485,3 +485,13 @@ export const senderRejectAssigned = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return r as { ok: boolean; sender: string };
   });
+
+/** Shared Second Look queue; database authorization is enforced by the RPC. */
+export const secondLookAction = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { id: string; action: "later" | "restore" }) => { if (!d?.id || !["later","restore"].includes(d.action)) throw new Error("Invalid Second Look action"); return d; })
+  .handler(async ({ data, context }) => {
+    const { data: result, error } = await context.supabase.rpc("outreach_second_look_action" as never, { p_id: data.id, p_action: data.action } as never);
+    if (error) throw new Error(error.message);
+    return result as { ok: boolean };
+  });
