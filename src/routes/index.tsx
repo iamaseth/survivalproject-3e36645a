@@ -69,11 +69,11 @@ function InfluencerHome() {
   const fromCreator = (c: (typeof CREATORS)[number]) => ({
     id:c.id, name:c.name, note:c.sethApprovalNote || c.researchNotes || c.verificationEvidence,
     tiktok:c.tiktok, youtube:c.youtube, instagram:c.instagram, facebook:c.facebook,
-    email:c.email, contact:c.contactRoute, followers:c.followersSignal
+    email:c.email, contact:c.contactRoute, followers:c.followersSignal, segment:c.segment, audience:c.targetAudience, geography:c.geography, source:c.primarySource, reach:c.reachSignal, confidence:c.contactConfidence, researched:c.lastResearched, status:c.researchStatus, priority:c.priority, evidence:c.verificationEvidence, offer:c.recommendedOffer, offerReason:c.offerReasoning, owner:c.outreachAssignee || c.outreachOwner, outreach:c.contactedDate, response:c.responseFollowup, next:c.sethNextAction, approval:c.sethApprovalStatus, platforms:c.primaryPlatforms
   });
   const fromBatch = (c: (typeof batch)[number]) => ({
     id:c.id, name:c.name, note:c.verification_evidence, tiktok:c.tiktok, youtube:c.youtube,
-    instagram:c.instagram, facebook:c.facebook, email:c.email, contact:c.contact_route, followers:c.followers_signal
+    instagram:c.instagram, facebook:c.facebook, email:c.email, contact:c.contact_route, followers:c.followers_signal, segment:null, audience:null, geography:null, source:"BoBo Markdown Batch 1", reach:null, confidence:null, researched:"2026-10-10", status:c.qualification_status, priority:null, evidence:c.verification_evidence, offer:null, offerReason:null, owner:null, outreach:null, response:null, next:null, approval:c.seth_approval_status, platforms:"TikTok"
   });
   const groups = categories.map((category, i) => {
     const rows = i === 1
@@ -108,7 +108,18 @@ function InfluencerHome() {
             {c.rows.map(person => <details key={person.id} className="rounded-lg border px-3 py-2">
               <summary className="cursor-pointer font-medium">{person.name || person.id}</summary>
               <div className="space-y-2 pt-2 text-sm">
-                <div className="flex flex-wrap gap-x-5 gap-y-1"><span><strong>Followers:</strong> {person.followers || "Not recorded"}</span><span><strong>Contact:</strong> {person.contact || "Not recorded"}</span></div>
+                <div className="grid grid-cols-1 gap-x-6 gap-y-2 sm:grid-cols-2">
+                  {([
+                    ["Followers",person.followers],["Reach",person.reach],["Niche",person.segment],["Audience",person.audience],
+                    ["Location",person.geography],["Platforms",person.platforms],["Contact method",person.contact],
+                    ["Contact confidence",person.confidence],["Source",person.source],["Last researched",person.researched],
+                    ["Research status",person.status],["Priority",person.priority],["Approval",person.approval],
+                    ["Assigned to",person.owner],["Contacted",person.outreach],["Response",person.response],
+                    ["Next action",person.next],["Recommended offer",person.offer]
+                  ] as const).map(([label,value]) => <div key={label}><strong>{label}:</strong> <span className="text-muted-foreground">{value || "Not recorded"}</span></div>)}
+                </div>
+                {person.evidence && <p><strong>Evidence:</strong> {person.evidence}</p>}
+                {person.offerReason && <p><strong>Offer reasoning:</strong> {person.offerReason}</p>}
                 {person.email && <a className="block underline" href={`mailto:${person.email}`}>{person.email}</a>}
                 {person.note && <p className="whitespace-pre-wrap text-muted-foreground">{person.note}</p>}
                 <div className="flex flex-wrap gap-3">{(["tiktok","youtube","instagram","facebook"] as const).map(p => {
