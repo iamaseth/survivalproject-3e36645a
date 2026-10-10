@@ -156,3 +156,29 @@ export const markBoboProfileTracking = createServerFn({ method: "POST" })
     if (saveError) throw new Error(saveError.message);
     return { ok: true };
   });
+
+export const getBoboResearchQueue = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const rows: Array<{ id: string; name: string; tiktok: string }> = [];
+    for (let offset = 0; ; offset += 1000) {
+      const { data, error } = await context.supabase.from("creators")
+        .select("id,name,tiktok,seth_approval_status")
+        .not("tiktok", "is", null)
+        .order("id")
+        .range(offset, offset + 999);
+      if (error) throw new Error(error.message);
+      for (const c of data ?? []) {
+        if (!c.tiktok || ["approved", "rejected"].includes(String(c.seth_approval_status ?? "").toLowerCase())) continue;
+        rows.push({ id: c.id, name: c.name ?? c.tiktok, tiktok: c.tiktok });
+      }
+      if (!data || data.length < 1000) break;
+    }
+    const seen = new Set<string>();
+    return rows.filter(c => {
+      const key = c.tiktok.toLowerCase().trim().replace(/\\/$/, "");
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  });
