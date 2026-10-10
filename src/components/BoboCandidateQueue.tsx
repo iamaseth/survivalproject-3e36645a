@@ -73,11 +73,11 @@ export function BoboCandidateQueue() {
   }
   return <section className="space-y-3">
     <h1 className="text-2xl font-bold">BoBo · TikTok Profiles</h1>
-    {!creators.length && <label className="block rounded-lg border p-3 text-sm">Load the 1,534 profiles once
+    {!creators.length && <label className="block rounded-lg border p-3 text-sm">New research profiles not loaded yet (1,534). Existing CRM profiles are shown below.
       <input type="file" accept=".csv,text/csv" className="mt-2 block w-full" onChange={e=>void upload(e.target.files?.[0])}/>
     </label>}
     {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
-    <p className="font-semibold">{saved+skipped} / {allCreators.length} done</p>
+    <p className="font-semibold">{saved+skipped} completed / {allCreators.length} profiles currently loaded</p>\n    <p className="text-xs text-muted-foreground">Existing CRM: {allCreators.length - creators.filter(c=>!CREATORS.some(row=>((row.tiktok||"").toLowerCase().includes("@"+c.handle)))).length} or fewer unique profiles; new research loaded: {creators.length} / 1,534. Some CRM records have no usable TikTok link.</p>
     <div className="h-2 rounded-full bg-muted overflow-hidden"><div className="h-full bg-primary" style={{width:`${allCreators.length?(saved+skipped)/allCreators.length*100:0}%`}} /></div>
     <p className="text-xs text-muted-foreground">Click profile → Obsidian Clipper → return → next. The clip should include the bio and visible videos; missing information can be checked later.</p>
     <div className="space-y-1">
