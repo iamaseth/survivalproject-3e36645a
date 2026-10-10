@@ -16,7 +16,6 @@ function InfluencerHome() {
   const loadBatch = useServerFn(listBatchOneResults);
   const [expanded, setExpanded] = useState<number | null>(null);
   const [platform, setPlatform] = useState("All");
-  const [typeFilter, setTypeFilter] = useState("All");
   const [contactFilter, setContactFilter] = useState("All");
   const [batch, setBatch] = useState<Array<{id:string;name:string;tiktok:string|null;youtube:string|null;instagram:string|null;facebook:string|null;email:string|null;contact_route:string|null;followers_signal:string|null;segment:string|null;target_audience:string|null;other_platform:string|null;qualification_status:string|null;seth_approval_status:string|null;verification_evidence:string|null}>>([]);
   useEffect(() => { void loadBatch().then(setBatch).catch(console.error); }, [loadBatch]);
@@ -85,18 +84,13 @@ function InfluencerHome() {
       : i >= 2 && i <= 5
       ? CREATORS.filter(c => i === 2 ? c.sethApprovalStatus === "approved" : i === 3 ? Boolean(c.outreachSecondLookAt) && !c.sethApprovalStatus : !c.sethApprovalStatus && /needs more research/i.test(c.researchStatus || "")).map(fromCreator)
       : [];
-    const filtered = rows.filter(c => (platform === "All" || Boolean(c[platform.toLowerCase() as "tiktok" | "youtube" | "instagram" | "facebook"])) && (typeFilter === "All" || [c.segment,c.audience,c.evidence].some(v => (v || "").toLowerCase().includes(typeFilter.toLowerCase()))) && (contactFilter === "All" || (contactFilter === "Email" ? Boolean(c.email) : contactFilter === "Contact page" ? Boolean(normalize(c.contactPage)) : Boolean(c.contact || c.tiktok || c.instagram))));
+    const filtered = rows.filter(c => (platform === "All" || Boolean(c[platform.toLowerCase() as "tiktok" | "youtube" | "instagram" | "facebook"])) && (contactFilter === "All" || (contactFilter === "Email" ? Boolean(c.email) : contactFilter === "Contact page" ? Boolean(normalize(c.contactPage)) : Boolean(c.contact || c.tiktok || c.instagram))));
     return { ...category, rows:filtered };
   });
   return <main className="mx-auto max-w-3xl space-y-3 p-4 sm:p-8">
     <h1 className="mb-4 text-2xl font-bold">Influencers</h1>
     <label className="mb-5 flex items-center gap-3 font-medium">Platform <select value={platform} onChange={e => setPlatform(e.target.value)} className="min-h-11 flex-1 rounded-lg border bg-background px-3 py-2">{["All","TikTok","YouTube","Instagram","Facebook"].map(p => <option key={p} value={p}>{p === "All" ? "All platforms" : p}</option>)}</select></label>
-    <div className="mb-5 grid gap-3 sm:grid-cols-2">
-      <label className="flex flex-col gap-1 text-sm font-medium">Creator type
-        <select value={typeFilter} onChange={e => setTypeFilter(e.target.value)} className="min-h-11 rounded-lg border bg-background px-3">
-          {["All","Preparedness","Homesteading","Gardening","Camping","Van life","Travel","Outdoor","DIY","Food","Lifestyle"].map(v => <option key={v} value={v}>{v === "All" ? "All types" : v}</option>)}
-        </select>
-      </label>
+    <div className="mb-5">
       <label className="flex flex-col gap-1 text-sm font-medium">Contact available
         <select value={contactFilter} onChange={e => setContactFilter(e.target.value)} className="min-h-11 rounded-lg border bg-background px-3">
           {["All","Email","Contact page","DM"].map(v => <option key={v} value={v}>{v === "All" ? "Any contact method" : v}</option>)}
