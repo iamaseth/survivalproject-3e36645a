@@ -2,8 +2,8 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { CREATORS, hydrateCreatorsFromDB, useCreatorsVersion, type CreatorRow } from "@/lib/creator-partnerships";
-import { getMyOutreachSender, outreachPoolAction, updateCreatorWorkflow } from "@/lib/creators.functions";
-import { TIKTOK_PROFILE_RE } from "@/lib/tiktok-dm-verification";
+import { getMyOutreachSender, outreachPoolAction, senderRejectAssigned } from "@/lib/creators.functions";
+import { inRenaPool, isBlockedFollowup } from "@/lib/rena-queue-eligibility";
 
 export const Route = createFileRoute("/rena-queue")({
   head: () => ({
@@ -25,11 +25,8 @@ export const Route = createFileRoute("/rena-queue")({
 });
 
 const handleOf = (url: string) => url.match(/@([A-Za-z0-9._-]+)/)?.[1] ?? null;
-const blocked = (c: CreatorRow) => /not relevant|dm blocked|do not contact/i.test(c.responseFollowup || "");
-
-function inPool(c: CreatorRow) {
-  return c.sethApprovalStatus === "approved" && Boolean(c.tiktok && TIKTOK_PROFILE_RE.test(c.tiktok)) && Boolean(c.personalizedDm?.trim());
-}
+const blocked = (c: CreatorRow) => isBlockedFollowup(c.responseFollowup) || c.qualificationStatus === "Not Relevant" || c.sethApprovalStatus === "rejected";
+const inPool = (c: CreatorRow) => inRenaPool(c);
 function statusOf(c: CreatorRow): "available" | "assigned" | "contacted" | "blocked" {
   if (c.outreachSentAt || c.contactedDate) return "contacted";
   if (blocked(c)) return "blocked";
@@ -40,7 +37,7 @@ export function DmQueue({ sender = "Rena" }: { sender?: "Rena" | "Seth" }) {
   const version = useCreatorsVersion();
   const who = useServerFn(getMyOutreachSender);
   const act = useServerFn(outreachPoolAction);
-  const updateWorkflow = useServerFn(updateCreatorWorkflow);
+  const senderReject = useServerFn(senderRejectAssigned);
   const [me, setMe] = useState<{ sender: string | null; approver: boolean } | null>(null);
   const [notice, setNotice] = useState<{ kind: "ok" | "warn" | "err"; text: string; dm?: string } | null>(null);
   const [savingId, setSavingId] = useState<string | null>(null);
@@ -103,9 +100,25 @@ export function DmQueue({ sender = "Rena" }: { sender?: "Rena" | "Seth" }) {
     finally { lock.current = false; setSavingId(null); }
   };
 
-  const reject = async (c:CreatorRow) => { if (readOnlyPreview || lock.current || !confirm(`Mark ${c.name} Not Relevant and remove from the outreach queue?`)) return; lock.current=true;setSavingId(c.id);try { if(c.outreachSentAt) await act({data:{id:c.id,action:"undo_sent"}}); await updateWorkflow({data:{id:c.id,response_followup:"Not Relevant"}}); await refresh(); setActionsId(null);setNotice({kind:"ok",text:`${c.name} marked Not Relevant. CRM record retained.`}); } catch(e){setNotice({kind:"err",text:e instanceof Error?e.message:"Could not reject creator"});} finally {lock.current=false;setSavingId(null);} };
+  const reject = async (c:CreatorRow) => {
+    if (readOnlyPreview || lock.current || c.outreachSentAt) return;
+    if (!confirm(`Reject ${c.name} as Not Relevant and remove from your queue?`)) return;
+    if (!confirm(`Confirm you reviewed the correct TikTok profile for ${c.name} (${c.tiktok}).`)) return;
+    lock.current=true;setSavingId(c.id);
+    try { await senderReject({data:{id:c.id,reason:`Rena queue rejection by ${me?.sender ?? "sender"}: Not Relevant after profile review`,checkedProfile:true}}); await refresh(); setActionsId(null); setNotice({kind:"ok",text:`${c.name} rejected as Not Relevant. History kept.`}); }
+    catch(e){setNotice({kind:"err",text:e instanceof Error?e.message:"Could not reject creator"});}
+    finally {lock.current=false;setSavingId(null);}
+  };
 
-  const swipeUndo = (c:CreatorRow, x:number, y:number) => { const start=touchStart.current; touchStart.current=null; if (!start || start.id!==c.id) return; if (start.x-x>70 && Math.abs(start.y-y)<55) { setSwipingId(c.id); setActionsId(c.id); } };
+  const swipeReject = (c:CreatorRow, x:number, y:number) => {
+    const start=touchStart.current; touchStart.current=null;
+    if (!start || start.id!==c.id || c.outreachSentAt) return;
+    if (start.x-x>70 && Math.abs(start.y-y)<55) {
+      setSwipingId(c.id); // suppress the synthetic click that would open TikTok
+      window.setTimeout(()=>setSwipingId(v=>v===c.id?null:v), 600);
+      if (!readOnlyPreview) void reject(c);
+    }
+  };
 
   const tone = { ok: "border-emerald-600 bg-emerald-50 text-emerald-950", warn: "border-amber-500 bg-amber-50 text-amber-950", err: "border-red-600 bg-red-50 text-red-950" };
 
@@ -147,9 +160,9 @@ export function DmQueue({ sender = "Rena" }: { sender?: "Rena" | "Seth" }) {
         {pending.map((c) => {
           const sent = Boolean(c.outreachSentAt);
           return (
-            <li key={c.id} className="flex flex-wrap items-stretch gap-2" onTouchStart={e=>{const t=e.touches[0];touchStart.current={id:c.id,x:t.clientX,y:t.clientY};}} onTouchEnd={e=>{const t=e.changedTouches[0];swipeUndo(c,t.clientX,t.clientY);}}>
+            <li key={c.id} className="flex flex-wrap items-stretch gap-2" onTouchStart={e=>{const t=e.touches[0];touchStart.current={id:c.id,x:t.clientX,y:t.clientY};}} onTouchEnd={e=>{const t=e.changedTouches[0];swipeReject(c,t.clientX,t.clientY);}}>
               <a href={sent ? undefined : c.tiktok!} target="_blank" rel="noopener noreferrer" aria-disabled={sent || savingId === c.id}
-                onClick={(e) => { if (sent || lock.current || swipingId===c.id) { e.preventDefault(); setSwipingId(null); return; } onTap(c); }}
+                onClick={(e) => { if (sent || lock.current || swipingId===c.id) { e.preventDefault(); return; } onTap(c); }}
                 className={`flex min-h-[76px] flex-1 flex-col justify-center rounded-xl border-2 px-4 py-3 ${sent ? "border-emerald-600 bg-emerald-100 text-emerald-950" : "border-border bg-card text-foreground active:bg-secondary"}`}>
                 <span className="text-base font-semibold">{sent ? "✓ " : ""}{c.name}</span>
                 <span className="text-xs opacity-75">{c.followersSignal?.trim() ? `${c.followersSignal.trim()} followers` : "Followers not recorded"}{savingId === c.id ? " · saving…" : sent ? " · done" : ""}</span>

@@ -29,6 +29,13 @@
       "when": 1791466867545,
       "tag": "0003_require_direct_research_for_final_approval",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1791592834122,
+      "tag": "0004_sender_reject_assigned",
+      "breakpoints": true
     }
   ]
 }

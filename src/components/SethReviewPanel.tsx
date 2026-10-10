@@ -109,7 +109,7 @@ function QualifiedRow({c,onDone}:{c:CreatorRow;onDone:()=>void}) {
     try {
       if (decision === "approved") await saveDraft({data:{id:c.id,dm:dm.trim(),note:"User pasted profile-specific DM"}});
       if (decision === "rejected") {
-        if (!profileChecked) throw new Error("Check "Profile reviewed" beside Paste before rejecting");
+        if (!profileChecked) throw new Error('Check "Profile reviewed" beside Paste before rejecting');
         await manualOverride({data:{id:c.id,decision:"rejected",checkedProfile:true}});
         c.qualificationStatus="Not Relevant";
       } else {
