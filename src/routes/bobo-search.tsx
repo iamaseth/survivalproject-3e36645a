@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useMemo, useState } from "react";
 import { getBoboActiveSearchProgress, putBoboActiveSearchProgress } from "@/lib/bobo-tiktok.functions";
+import { BoboCandidateQueue } from "@/components/BoboCandidateQueue";
 
 export const Route = createFileRoute("/bobo-search")({ component: BoboSearchQueue });
 
@@ -37,6 +38,7 @@ function BoboSearchQueue() {
   };
 
   return <main className="mx-auto max-w-2xl p-4 pb-20 space-y-4">
+    <BoboCandidateQueue />
     <header className="sticky top-0 z-10 bg-background/95 py-3 border-b">
       <h1 className="text-2xl font-bold">BoBo · TikTok Search</h1>
       <div className="mt-1 text-lg font-semibold">{140+done.length} / 500 complete</div>
