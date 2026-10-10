@@ -70,12 +70,12 @@ export function BoboCandidateQueue() {
     a.href=url;a.download="bobo-creator-md-progress.csv";a.click();URL.revokeObjectURL(url);
   }
   return <section className="space-y-3">
-    <h1 className="text-2xl font-bold">BoBo · TikTok Profiles</h1>
+    <h1 className="text-2xl font-bold">1. BoBo Research</h1>
     {!creators.length && <label className="block rounded-lg border p-3 text-sm">New research profiles not loaded yet (1,534). Existing CRM profiles are shown below.
       <input type="file" accept=".csv,text/csv" className="mt-2 block w-full" onChange={e=>void upload(e.target.files?.[0])}/>
     </label>}
     {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
-    <p className="font-semibold">{saved+skipped} opened / {allCreators.length} TikTok profiles</p>
+    <p className="font-semibold">{saved+skipped} opened / {allCreators.length} TikTok profiles · Daily goal: 500</p>
     <div className="h-2 rounded-full bg-muted overflow-hidden"><div className="h-full bg-primary" style={{width:`${allCreators.length?(saved+skipped)/allCreators.length*100:0}%`}} /></div>
     <p className="text-xs text-muted-foreground">Click profile → Obsidian Clipper → return → next. The clip should include the bio and visible videos; missing information can be checked later.</p>
     <div className="space-y-1">
