@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useMemo, useState } from "react";
-import { listBoboResearchQueue } from "@/lib/influencer-master.functions";
+import { listBoboResearchQueue, listBatchOneResults } from "@/lib/influencer-master.functions";
 import { getBoboProfileTracking, markBoboProfileTracking } from "@/lib/bobo-tiktok.functions";
 
 export const Route = createFileRoute("/bobo-queue")({ component: BoboQueue });
@@ -9,7 +9,7 @@ type Candidate = {source_table:string;source_id:string;display_name:string;profi
 const keyOf = (r: Candidate) => r.source_table + ":" + r.source_id;
 function BoboQueue() {
   const load = useServerFn(listBoboResearchQueue);
-  const loadProgress = useServerFn(getBoboProfileTracking);
+  const loadBatch = useServerFn(listBatchOneResults);\n  const loadProgress = useServerFn(getBoboProfileTracking);
   const save = useServerFn(markBoboProfileTracking);
   const [rows,setRows] = useState<Candidate[]>([]);
   const [opened,setOpened] = useState<string[]>([]);
@@ -19,13 +19,13 @@ function BoboQueue() {
     let active = true;
     void (async () => {
       try {
-        const [first, progress] = await Promise.all([load({data:{page:0}}),loadProgress()]);
+        const [first, progress, batch] = await Promise.all([load({data:{page:0}}),loadProgress(),loadBatch()]);
         const all = [...first.rows];
         for (let page = 1; page * 100 < first.total; page++) {
           const next = await load({data:{page}});
           all.push(...next.rows);
         }
-        if (active) {setRows(all);setOpened(progress.opened);setReady(true);}
+        const completed = new Set(batch.map(c => (c.tiktok || "").trim().toLowerCase().replace(/\\/$/, "")));\n        if (active) {setRows(all.filter(r => !completed.has((r.profile_url || "").trim().toLowerCase().replace(/\\/$/, ""))));setOpened(progress.opened);setReady(true);}
       } catch(e) { if(active) setError("Unable to load queue: " + String(e)); }
     })();
     return () => {active=false;};
