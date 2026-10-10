@@ -28,6 +28,8 @@ export function BoboCandidateQueue() {
   const [progress,setProgress]=useState<Progress>({});
   const [history,setHistory]=useState<string[]>([]);
   const [error,setError]=useState("");
+  const [profileText,setProfileText]=useState("");
+  const [mdDownloaded,setMdDownloaded]=useState(false);
   useEffect(()=>{
     try { setCreators(JSON.parse(localStorage.getItem(DATA_KEY)||"[]")); setProgress(JSON.parse(localStorage.getItem(PROGRESS_KEY)||"{}")); } catch { setError("Could not load saved progress."); }
   },[]);
@@ -40,7 +42,7 @@ export function BoboCandidateQueue() {
     try {
       const rows=parseCsv((await file.text()).replace(/^\uFEFF/,""));
       const header=rows.shift()?.map(v=>v.trim().toLowerCase())||[];
-      const handleCol=header.indexOf("handle"), urlCol=header.indexOf("profile_url"), catCol=header.indexOf("first_pass_category");
+      const handleCol=header.indexOf("handle"), catCol=header.indexOf("first_pass_category");
       if(handleCol<0) throw Error("CSV needs a handle column.");
       const seen=new Set<string>();
       const next=rows.map(r=>{
@@ -60,10 +62,22 @@ export function BoboCandidateQueue() {
     const blob=new Blob([markdownTemplate(current)],{type:"text/markdown;charset=utf-8"});
     const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download=`tiktok-${current.handle}.md`;a.click();URL.revokeObjectURL(url);
   }
+  function markdown(c:Candidate, evidence:string) {
+    const safe = (v:string)=>v.replaceAll("\\","\\\\").replaceAll('"','\\"');
+    return `---\ntitle: "TikTok @${safe(c.handle)}"\nsource: "${c.profile_url}"\ncreated: "${new Date().toISOString().slice(0,10)}"\ntags:\n  - influencer-research\n  - survival-tabs\n  - bobo\nreview_status: unreviewed\n---\n\n# TikTok @${c.handle}\n\nProfile: ${c.profile_url}\n\n## Captured public profile and video evidence\n\n${evidence.trim() || "No content captured. Do not qualify based on this file alone."}\n\n## Notes\n\n- Creator has not been qualified or approved.\n`;
+  }
+  function downloadMarkdown() {
+    if (!current || !profileText.trim()) { setError("Paste actual TikTok profile/video text before downloading the Markdown file."); return; }
+    const blob = new Blob([markdown(current,profileText)],{type:"text/markdown;charset=utf-8"});
+    const url=URL.createObjectURL(blob); const a=document.createElement("a");
+    a.href=url;a.download=`tiktok-${current.handle}.md`;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+    setMdDownloaded(true);setError("");
+  }
   function mark(status:"saved"|"skipped") {
     if(!current)return;
+    if(status==="saved" && !mdDownloaded) {setError("Download the evidence Markdown first, then save it to Obsidian.");return;}
     const next={...progress,[current.handle]:status};setProgress(next);localStorage.setItem(PROGRESS_KEY,JSON.stringify(next));
-    setHistory(h=>[...h,current.handle]);
+    setHistory(h=>[...h,current.handle]);setProfileText("");setMdDownloaded(false);setError("");
   }
   function undo() {
     const last=history[history.length-1];if(!last)return;
