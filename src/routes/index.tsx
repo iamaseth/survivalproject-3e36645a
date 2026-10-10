@@ -1,6 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { ArrowRight } from "lucide-react";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
+import { getInfluencerMasterCounts } from "@/lib/influencer-master.functions";
 import { CREATORS, hydrateCreatorsFromDB, useCreatorsVersion } from "@/lib/creator-partnerships";
 
 export const Route = createFileRoute("/")({
@@ -10,6 +12,9 @@ export const Route = createFileRoute("/")({
 
 function InfluencerHome() {
   const useCreatorsVersionValue = useCreatorsVersion();
+  const loadCounts = useServerFn(getInfluencerMasterCounts);
+  const [masterCounts, setMasterCounts] = useState<{ total: number; sources: Record<string,number> } | null>(null);
+  useEffect(() => { void loadCounts().then(setMasterCounts).catch(console.error); }, [loadCounts]);
   useEffect(() => { void hydrateCreatorsFromDB(); }, []);
   const categories = useMemo(() => {
     // Preserve every source record. Working-list deduplication uses verified social profile URLs,
@@ -41,20 +46,20 @@ function InfluencerHome() {
     // Old AI qualification statuses are intentionally ignored until a fresh-screening stage is persisted.
     const forNow = rows.filter(c => !rejected(c) && !approved(c) && !secondLook(c) && !moreResearch(c));
     return [
-      { name: "For Now", count: forNow.length, to: "/bobo-search" },
+      { name: "For Now", count: forNow.length, to: "/bobo-queue" },
       { name: "AI Screened", count: 0, to: "/creators" },
       { name: "Complete Manual Review", count: rows.filter(approved).length, to: "/creators" },
       { name: "Take a Second Look", count: rows.filter(secondLook).length, to: "/creators" },
       { name: "Rejected", count: rows.filter(rejected).length, to: "/creators" },
       { name: "Needs More Research", count: rows.filter(moreResearch).length, to: "/creators" },
-      { name: "Original List", count: CREATORS.length, to: "/creators" },
+      { name: "Original List", count: CREATORS.length, to: "/influencer-original" },
     ] as const;
   }, [useCreatorsVersionValue]);
   return <main className="mx-auto max-w-3xl space-y-3 p-4 sm:p-8">
     <h1 className="mb-6 text-2xl font-bold">Influencers</h1>
     {categories.map((c, i) => <Link key={c.name} to={c.to} className="flex min-h-20 items-center justify-between rounded-xl border bg-card px-5 py-4 hover:border-primary/50">
       <span className="font-semibold">{i + 1}. {c.name}</span>
-      <span className="flex items-center gap-4"><span className="tabular-nums text-muted-foreground">{c.count}</span><ArrowRight className="h-5 w-5" /></span>
+      <span className="flex items-center gap-4"><span className="tabular-nums text-muted-foreground">{c.name === "Original List" && masterCounts ? masterCounts.total.toLocaleString() : c.name === "For Now" && masterCounts ? `${masterCounts.sources.influencer_research_staging.toLocaleString()} new + existing` : c.count}</span><ArrowRight className="h-5 w-5" /></span>
     </Link>)}
   </main>;
 }
