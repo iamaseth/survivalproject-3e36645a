@@ -104,9 +104,8 @@ export function DmQueue({ sender = "Rena" }: { sender?: "Rena" | "Seth" }) {
   const reject = async (c:CreatorRow) => {
     if (readOnlyPreview || lock.current || c.outreachSentAt) return;
     if (!confirm(`Reject ${c.name} as Not Relevant and remove from your queue?`)) return;
-    if (!confirm(`Confirm you reviewed the correct TikTok profile for ${c.name} (${c.tiktok}).`)) return;
     lock.current=true;setSavingId(c.id);
-    try { const result = await senderReject({data:{id:c.id,reason:`Rena queue rejection by ${me?.sender ?? "sender"}: Not Relevant after profile review`,checkedProfile:true}}); if (!result?.ok) throw new Error("Server did not confirm rejection."); await refresh(); setActionsId(null); setNotice({kind:"ok",text:`${c.name} rejected as Not Relevant. History kept.`}); }
+    try { const result = await senderReject({data:{id:c.id,reason:`Rena queue rejection by ${me?.sender ?? "sender"}: Not Relevant`,checkedProfile:true}}); if (!result?.ok) throw new Error("Server did not confirm rejection."); await refresh(); setActionsId(null); setNotice({kind:"ok",text:`${c.name} rejected as Not Relevant. History kept.`}); }
     catch(e){setNotice({kind:"err",text:e instanceof Error?e.message:"Could not reject creator"});}
     finally {lock.current=false;setSavingId(null);}
   };
