@@ -52,9 +52,7 @@ export function DmQueue({ sender = "Rena" }: { sender?: "Rena" | "Seth" }) {
   const [swipingId,setSwipingId] = useState<string|null>(null);
   const [actionsId,setActionsId] = useState<string|null>(null);
   
-  const [showSecondLook,setShowSecondLook] = useState(false);
   const deferCreator = async (id: string) => { if (lock.current) return; lock.current=true; setSavingId(id); try { const result=await secondLookAct({data:{id,action:"later"}}); if(!result?.ok) throw new Error("Could not save Later"); await refresh(); setActionsId(null); setNotice({kind:"ok",text:"Moved to Seth’s Second Look list."}); } catch(e) { setNotice({kind:"err",text:e instanceof Error?e.message:"Could not save Later"}); } finally {lock.current=false;setSavingId(null);} };
-  const restoreCreator = async (id: string) => { if(lock.current)return; lock.current=true; try { const result=await secondLookAct({data:{id,action:"restore"}}); if(!result?.ok) throw new Error("Could not restore"); await refresh(); } catch(e){setNotice({kind:"err",text:e instanceof Error?e.message:"Could not restore"});} finally {lock.current=false;} };
   const [sessionSentIds,setSessionSentIds] = useState<string[]>([]);
 
   useEffect(() => { if ("serviceWorker" in navigator) navigator.serviceWorker.register("/rena-sw.js").catch(() => {}); }, []);
@@ -63,7 +61,6 @@ export function DmQueue({ sender = "Rena" }: { sender?: "Rena" | "Seth" }) {
   const pool = useMemo(() => { void version; return CREATORS.filter(inPool).sort((a, b) => a.name.localeCompare(b.name)); }, [version]);
   const mine = pool.filter((c) => !c.outreachSentAt || sessionSentIds.includes(c.id));
   const pending = mine.filter(c=>!c.outreachSentAt && !c.outreachSecondLookAt);
-  const secondLook = mine.filter(c=>!c.outreachSentAt && Boolean(c.outreachSecondLookAt));
   const completedThisSession = mine.filter(c=>Boolean(c.outreachSentAt));
   const available = pool.filter((c) => statusOf(c) === "available");
   const done = completedThisSession.length;
@@ -159,8 +156,6 @@ export function DmQueue({ sender = "Rena" }: { sender?: "Rena" | "Seth" }) {
           {notice.dm ? <textarea readOnly value={notice.dm} rows={4} onFocus={(e) => e.currentTarget.select()} className="mt-2 w-full rounded border border-input bg-background p-2 text-sm text-foreground" /> : null}
         </div>
       ) : null}
-      <button type="button" onClick={()=>setShowSecondLook(v=>!v)} className="w-full rounded-xl border border-amber-500 bg-amber-50 px-4 py-3 text-left text-sm font-semibold text-amber-950">Second Look ({secondLook.length}) {showSecondLook ? "▲" : "▼"}</button>
-      {showSecondLook && <section className="space-y-2 rounded-xl border border-amber-300 p-3"><p className="text-xs text-muted-foreground">Shared with the team. Seth can review these on the main Influencers page.</p>{secondLook.length === 0 ? <p className="text-sm">No creators waiting for a second look.</p> : secondLook.map(c=><div key={c.id} className="flex items-center justify-between gap-2 rounded-lg border p-3"><a href={c.tiktok!} target="_blank" rel="noopener noreferrer" className="min-w-0 flex-1 truncate font-medium underline">{c.name}</a><button type="button" onClick={()=>void restoreCreator(c.id)} className="rounded-lg border px-3 py-2 text-sm">Return to queue</button></div>)}</section>}
       {pending.length === 0 ? <div className="py-8 text-center text-sm text-muted-foreground"><div className="text-base font-semibold text-foreground">No pending creators</div>Approved creators will appear here.</div> : null}
       <ul className="space-y-2">
         {pending.map((c) => {
