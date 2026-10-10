@@ -46,6 +46,7 @@ const navItems: NavItem[] = [
     label: "Influencers",
     icon: Users,
     children: [
+      { to: "/bobo-research", label: "BoBo Research / ស្រាវជ្រាវ" },
       { to: "/reviewed-survival-tabs-mre", label: "Reviewed Creators" },
       { to: "/amazon-creators", label: "Amazon Creators" },
     ],
