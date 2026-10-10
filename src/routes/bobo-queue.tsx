@@ -1,26 +1,73 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { listBoboResearchQueue } from "@/lib/influencer-master.functions";
+import { getBoboProfileTracking, markBoboProfileTracking } from "@/lib/bobo-tiktok.functions";
 
 export const Route = createFileRoute("/bobo-queue")({ component: BoboQueue });
 type Candidate = {source_table:string;source_id:string;display_name:string;profile_url:string;stage:string};
+const keyOf = (r: Candidate) => r.source_table + ":" + r.source_id;
 function BoboQueue() {
   const load = useServerFn(listBoboResearchQueue);
-  const [page,setPage] = useState(0);
-  const [result,setResult] = useState<{rows:Candidate[];total:number}|null>(null);
+  const loadProgress = useServerFn(getBoboProfileTracking);
+  const save = useServerFn(markBoboProfileTracking);
+  const [rows,setRows] = useState<Candidate[]>([]);
+  const [opened,setOpened] = useState<string[]>([]);
+  const [ready,setReady] = useState(false);
   const [error,setError] = useState("");
-  useEffect(()=>{let active=true;load({data:{page}}).then(r=>{if(active)setResult(r as {rows:Candidate[];total:number})}).catch(e=>{if(active)setError(String(e))});return ()=>{active=false}},[load,page]);
+  useEffect(() => {
+    let active = true;
+    void (async () => {
+      try {
+        const [first, progress] = await Promise.all([load({data:{page:0}}),loadProgress()]);
+        const all = [...first.rows];
+        for (let page = 1; page * 100 < first.total; page++) {
+          const next = await load({data:{page}});
+          all.push(...next.rows);
+        }
+        if (active) {setRows(all);setOpened(progress.opened);setReady(true);}
+      } catch(e) { if(active) setError("Unable to load queue: " + String(e)); }
+    })();
+    return () => {active=false;};
+  }, []);
+  const unique = useMemo(() => {
+    const seen = new Set<string>();
+    return rows.filter(r => {
+      if (!r.profile_url) return false;
+      const url = r.profile_url.trim().toLowerCase().replace(/\/$/, "");
+      if(seen.has(url)) return false;
+      seen.add(url);
+      return true;
+    });
+  }, [rows]);
+  const done = useMemo(() => new Set(opened), [opened]);
+  const next = unique.find(r => !done.has(keyOf(r)));
+  const count = unique.filter(r => done.has(keyOf(r))).length;
+  async function open(r: Candidate) {
+    // Open the profile immediately in the user click, before awaiting persistence.
+    window.open(r.profile_url, "_blank", "noopener,noreferrer");
+    const id = keyOf(r);
+    if (done.has(id)) return;
+    setOpened(old => [...old,id]);
+    try { await save({data:{id,action:"opened"}}); }
+    catch(e) {setOpened(old=>old.filter(x=>x!==id));setError("Progress could not be saved: "+String(e));}
+  }
   return <main className="mx-auto max-w-3xl space-y-4 p-4 sm:p-8">
-    <Link to="/" className="underline">← Influencers</Link>
-    <h1 className="text-2xl font-bold">1. For Now — BoBo Research</h1>
-    <p>Open each creator profile, use Obsidian Web Clipper to save an MD file, then attach the research to the original record. Original information is never replaced.</p>
-    <p>{result ? `${result.total.toLocaleString()} research records (pending deduplication and reconciliation)` : "Loading queue…"}</p>
-    {error && <p role="alert">{error}</p>}
-    <div className="space-y-2">{result?.rows.map(r=><div key={r.source_table+":"+r.source_id} className="flex items-center justify-between gap-4 rounded border p-3">
-      <span className="min-w-0 truncate font-medium">{r.display_name || r.source_id}</span>
-      <a href={r.profile_url} target="_blank" rel="noopener noreferrer" className="shrink-0 rounded border px-4 py-2 font-medium">Open Profile ↗</a>
-    </div>)}</div>
-    <div className="flex items-center gap-3"><button className="rounded border px-4 py-2" disabled={page===0} onClick={()=>setPage(x=>x-1)}>Previous</button><span>Page {page+1}</span><button className="rounded border px-4 py-2" disabled={!result||(page+1)*100>=result.total} onClick={()=>setPage(x=>x+1)}>Next</button></div>
+    <Link to="/" className="text-sm underline">← Influencers</Link>
+    <button type="button" disabled={!ready || !next} onClick={()=>{if(next) void open(next);}}
+      className="w-full rounded-xl bg-primary px-5 py-5 text-xl font-bold text-primary-foreground disabled:opacity-50">
+      {!ready ? "Loading…" : next ? "Open Next Influencer ↗" : "All profiles opened ✓"}
+    </button>
+    <div className="text-center text-4xl font-bold tabular-nums">{ready ? count.toLocaleString() : "…"} / {ready ? unique.length.toLocaleString() : "…"}</div>
+    {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
+    <div className="divide-y rounded-lg border">
+      {unique.map((r,i)=><button key={keyOf(r)} type="button" onClick={()=>void open(r)}
+        className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-muted">
+        <span className="w-7 shrink-0 text-sm text-muted-foreground">{i+1}</span>
+        <span className={done.has(keyOf(r)) ? "line-through text-muted-foreground" : "font-medium"}>
+          {done.has(keyOf(r)) ? "✕ " : ""}{r.display_name || r.profile_url}
+        </span>
+      </button>)}
+    </div>
   </main>;
 }
