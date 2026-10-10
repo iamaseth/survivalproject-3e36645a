@@ -12,11 +12,26 @@ function InfluencerHome() {
   const useCreatorsVersionValue = useCreatorsVersion();
   useEffect(() => { void hydrateCreatorsFromDB(); }, []);
   const categories = useMemo(() => {
+    // Preserve every source record. Working-list deduplication uses verified social profile URLs,
+    // not a TikTok-only key or a creator name (which could merge unrelated people).
     const unique = new Map<string, (typeof CREATORS)[number]>();
+    const seenProfiles = new Map<string, string>();
     for (const c of CREATORS) {
-      const handle = c.tiktok?.match(/(?:tiktok\\.com\\/)?@([a-z0-9._]+)/i)?.[1]?.toLowerCase();
-      const key = handle ? `tiktok:${handle}` : `record:${c.id}`;
-      if (!unique.has(key)) unique.set(key, c);
+      const profiles = (["tiktok", "youtube", "instagram", "facebook"] as const)
+        .map(platform => {
+          const value = c[platform]?.trim();
+          if (!value) return "";
+          try {
+            const url = new URL(/^https?:\/\//i.test(value) ? value : `https://${value}`);
+            return `${platform}:${url.hostname.toLowerCase().replace(/^www\./, "")}${url.pathname.replace(/\/$/, "").toLowerCase()}`;
+          } catch { return ""; }
+        }).filter(Boolean);
+      const existingKey = profiles.map(p => seenProfiles.get(p)).find(Boolean);
+      const key = existingKey || `record:${c.id}`;
+      const prior = unique.get(key);
+      // A manual decision always takes precedence when duplicate records exist.
+      if (!prior || (!prior.sethApprovalStatus && c.sethApprovalStatus)) unique.set(key, c);
+      for (const profile of profiles) seenProfiles.set(profile, key);
     }
     const rows = [...unique.values()];
     const rejected = (c: (typeof rows)[number]) => c.sethApprovalStatus === "rejected";
