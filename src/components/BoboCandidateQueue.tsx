@@ -52,23 +52,6 @@ export function BoboCandidateQueue() {
       localStorage.setItem(DATA_KEY,JSON.stringify(next));setCreators(next);setError("");
     } catch(e) { setError(e instanceof Error?e.message:String(e)); }
   }
-  function markdownTemplate(c:Candidate):string {
-    return `---\ntitle: "TikTok Research — @${c.handle}"\nsource: "${c.profile_url}"\ncreated: "${new Date().toISOString().slice(0,10)}"\ntags: [survival-tabs, influencer-research, bobo]\n---\n\n# @${c.handle}\n\n- Profile URL: ${c.profile_url}\n- Display name: \n- Followers (if visible): \n- Bio: \n- Research date: ${new Date().toISOString().slice(0,10)}\n\n## Recent content and evidence\n\nPaste relevant video captions, topics, and source links here.\n\n## Observations\n\nRecord what the creator actually posts. Do not qualify or draft a DM here.\n\n## Unverified or missing information\n\n`; 
-  }
-  function downloadMd() {
-    if(!current)return;
-    const blob=new Blob([markdownTemplate(current)],{type:"text/markdown;charset=utf-8"});
-    const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download=`tiktok-${current.handle}.md`;a.click();URL.revokeObjectURL(url);
-  }
-  function mark(status:"saved"|"skipped") {
-    if(!current)return;
-    const next={...progress,[current.handle]:status};setProgress(next);localStorage.setItem(PROGRESS_KEY,JSON.stringify(next));
-    setHistory(h=>[...h,current.handle]);setError("");
-  }
-  function undo() {
-    const last=history[history.length-1];if(!last)return;
-    const next={...progress};delete next[last];setProgress(next);localStorage.setItem(PROGRESS_KEY,JSON.stringify(next));setHistory(h=>h.slice(0,-1));
-  }
   function exportProgress() {
     const rows=[["handle","profile_url","markdown_status"],...creators.map(c=>[c.handle,c.profile_url,progress[c.handle]||"pending"])];
     const csv=rows.map(r=>r.map(v=>'"'+v.replaceAll('"','""')+'"').join(",")).join("\r\n");
@@ -83,7 +66,7 @@ export function BoboCandidateQueue() {
     {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
     <p className="font-semibold">{saved+skipped} / {creators.length} done</p>
     <div className="h-2 rounded-full bg-muted overflow-hidden"><div className="h-full bg-primary" style={{width:`${creators.length?(saved+skipped)/creators.length*100:0}%`}} /></div>
-    <p className="text-xs text-muted-foreground">Click a profile. It opens TikTok and is crossed off automatically. Clip it to Obsidian, return, and click the next profile.</p>
+    <p className="text-xs text-muted-foreground">Click profile → Obsidian Clipper → return → next. The clip should include the bio and visible videos; missing information can be checked later.</p>
     <div className="space-y-1">
       {creators.map((c,i)=>{
         const finished=!!progress[c.handle];
