@@ -132,9 +132,10 @@ export function DmQueue({ sender = "Rena" }: { sender?: "Rena" | "Seth" }) {
     const start = touchStart.current;
     touchStart.current = null;
     if (!start || start.id !== c.id) return;
-    if (start.x - x > 70 && Math.abs(start.y - y) < 55) {
+    if (start.x - x > 70 && Math.abs(start.y - y) < 55 && !lock.current) {
       setSwipingId(c.id);
       if (!readOnlyPreview && !c.outreachSentAt) void reject(c);
+      else setActionsId(c.id);
     }
   };
 
