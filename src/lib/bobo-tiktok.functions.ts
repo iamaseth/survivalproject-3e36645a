@@ -116,3 +116,43 @@ export const putBoboActiveSearchProgress = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return { ok: true };
   });
+
+const BOBO_PROFILE_OPENED_KEY = "__bobo_profile_opened_v1";
+const BOBO_PROFILE_COMPLETED_KEY = "__bobo_profile_completed_v1";
+export const getBoboProfileTracking = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const [{ data, error }, countResult] = await Promise.all([
+      context.supabase.from("bobo_research_progress" as never).select("recent").eq("user_id", context.userId).maybeSingle(),
+      context.supabase.from("creators").select("id", { count: "exact", head: true }),
+    ]);
+    if (error) throw new Error(error.message);
+    if (countResult.error) throw new Error(countResult.error.message);
+    const recent = ((data as any)?.recent ?? {}) as Record<string, unknown>;
+    return {
+      opened: Array.isArray(recent[BOBO_PROFILE_OPENED_KEY]) ? recent[BOBO_PROFILE_OPENED_KEY] as string[] : [],
+      completed: Array.isArray(recent[BOBO_PROFILE_COMPLETED_KEY]) ? recent[BOBO_PROFILE_COMPLETED_KEY] as string[] : [],
+      total: countResult.count ?? 0,
+    };
+  });
+export const markBoboProfileTracking = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: { id: string; action: "opened" | "completed" | "skipped" }) => data)
+  .handler(async ({ context, data }) => {
+    if (!data.id || data.id.length > 200 || !["opened","completed","skipped"].includes(data.action)) throw new Error("Invalid profile update");
+    const { data: row, error } = await context.supabase.from("bobo_research_progress" as never)
+      .select("*").eq("user_id", context.userId).maybeSingle();
+    if (error) throw new Error(error.message);
+    const current = row as any;
+    const recent = { ...(current?.recent ?? {}) } as Record<string, string[]>;
+    const key = data.action === "opened" ? BOBO_PROFILE_OPENED_KEY : BOBO_PROFILE_COMPLETED_KEY;
+    const existing = Array.isArray(recent[key]) ? recent[key] : [];
+    recent[key] = [...new Set([...existing, data.id])];
+    const { error: saveError } = await context.supabase.from("bobo_research_progress" as never).upsert({
+      user_id: context.userId, current_index: current?.current_index ?? 0,
+      done_terms: current?.done_terms ?? [], total_saved: current?.total_saved ?? 0,
+      per_term: current?.per_term ?? {}, recent,
+    } as never, { onConflict: "user_id" });
+    if (saveError) throw new Error(saveError.message);
+    return { ok: true };
+  });
