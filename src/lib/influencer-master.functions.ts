@@ -64,3 +64,18 @@ export const listBatchOneResults = createServerFn({ method: "GET" })
     if (error) throw new Error(error.message);
     return data ?? [];
   });
+
+export const saveInfluencerDmDraft = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: { id: string; dm: string }) => data)
+  .handler(async ({ context, data }) => {
+    if (!/^bobo-md-20261010-[a-z0-9_]+$/.test(data.id)) throw new Error("Invalid creator");
+    const dm = data.dm.trim();
+    if (!dm || dm.length > 5000) throw new Error("Draft must be 1–5000 characters");
+    const { data: saved, error } = await context.supabase.from("creators")
+      .update({ personalized_dm: dm })
+      .eq("id", data.id)
+      .select("id,personalized_dm").single();
+    if (error) throw new Error(error.message);
+    return saved;
+  });
