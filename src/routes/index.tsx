@@ -118,6 +118,16 @@ function InfluencerHome() {
   });
   return <main className="mx-auto max-w-3xl space-y-3 p-4 sm:p-8">
     <h1 className="mb-4 text-2xl font-bold">Influencers</h1>
+    {masterCounts?.workflowCounts && <div className="rounded-xl border bg-card p-4" aria-label="Workflow progress">
+      <div className="flex items-center justify-between gap-3">
+        <span className="font-semibold">Workflow progress</span>
+        <span className="tabular-nums font-semibold">{(masterCounts.workflowCounts.sent + masterCounts.workflowCounts.second_look + masterCounts.workflowCounts.rejected).toLocaleString()} / {masterCounts.total.toLocaleString()}</span>
+      </div>
+      <div className="mt-2 h-2 overflow-hidden rounded-full bg-muted">
+        <div className="h-full bg-primary" style={{width: `${masterCounts.total ? 100*(masterCounts.workflowCounts.sent + masterCounts.workflowCounts.second_look + masterCounts.workflowCounts.rejected)/masterCounts.total : 0}%`}} />
+      </div>
+      <p className="mt-2 text-xs text-muted-foreground">Sections 1–3 are work in progress. Sections 4–6 are sent, second look, and rejected. Second Look may be reviewed again. Nothing moves automatically without a recorded review or outreach action.</p>
+    </div>
     <div className="mb-4 flex flex-wrap items-end gap-3">
       <label className="flex min-w-0 flex-1 flex-col gap-1 text-sm font-medium">Platform
         <select value={platform} onChange={e => setPlatform(e.target.value)} className="min-h-11 w-full rounded-lg border bg-background px-2">
