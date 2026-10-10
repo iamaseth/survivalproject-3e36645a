@@ -29,7 +29,6 @@ export function BoboCandidateQueue() {
   useEffect(()=>{ void hydrateCreatorsFromDB(); },[]);
   const [creators,setCreators]=useState<Candidate[]>([]);
   const [progress,setProgress]=useState<Progress>({});
-  const [history,setHistory]=useState<string[]>([]);
   const [error,setError]=useState("");
   useEffect(()=>{
     try { setCreators(JSON.parse(localStorage.getItem(DATA_KEY)||"[]")); setProgress(JSON.parse(localStorage.getItem(PROGRESS_KEY)||"{}")); } catch { setError("Could not load saved progress."); }
@@ -37,7 +36,6 @@ export function BoboCandidateQueue() {
   const allCreators = useMemo(()=>{
     const byHandle = new Map<string,Candidate>();
     for (const c of CREATORS) {
-      if (c.sethApprovalStatus === "approved" || c.sethApprovalStatus === "rejected") continue;
       const match = (c.tiktok || "").match(/(?:tiktok\.com\/)?@([a-zA-Z0-9._]+)/i);
       const handle = normalizeHandle(match?.[1] || "");
       if (handle) byHandle.set(handle,{handle,profile_url:`https://www.tiktok.com/@${handle}`});
@@ -45,7 +43,6 @@ export function BoboCandidateQueue() {
     for (const c of creators) if (!byHandle.has(c.handle)) byHandle.set(c.handle,c);
     return [...byHandle.values()];
   },[creators, creatorsVersion]);
-  const completed = (handle:string)=>Boolean(progress[handle]);
   const saved=allCreators.filter(c=>progress[c.handle]==="saved").length;
   const skipped=allCreators.filter(c=>progress[c.handle]==="skipped").length;
   async function upload(file?:File) {
@@ -77,7 +74,7 @@ export function BoboCandidateQueue() {
       <input type="file" accept=".csv,text/csv" className="mt-2 block w-full" onChange={e=>void upload(e.target.files?.[0])}/>
     </label>}
     {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
-    <p className="font-semibold">{saved+skipped} completed / {allCreators.length} profiles currently loaded</p>\n    <p className="text-xs text-muted-foreground">Existing CRM: {allCreators.length - creators.filter(c=>!CREATORS.some(row=>((row.tiktok||"").toLowerCase().includes("@"+c.handle)))).length} or fewer unique profiles; new research loaded: {creators.length} / 1,534. Some CRM records have no usable TikTok link.</p>
+    <p className="font-semibold">{saved+skipped} opened / {allCreators.length} TikTok profiles</p>
     <div className="h-2 rounded-full bg-muted overflow-hidden"><div className="h-full bg-primary" style={{width:`${allCreators.length?(saved+skipped)/allCreators.length*100:0}%`}} /></div>
     <p className="text-xs text-muted-foreground">Click profile → Obsidian Clipper → return → next. The clip should include the bio and visible videos; missing information can be checked later.</p>
     <div className="space-y-1">
