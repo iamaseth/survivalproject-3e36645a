@@ -469,3 +469,19 @@ export const manualQualificationOverride = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return result as { ok: boolean; decision: string };
   });
+
+/** Assigned sender rejects their own pending queue item (never approves, never touches sent history). */
+export const senderRejectAssigned = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { id: string; reason?: string; checkedProfile: boolean }) => {
+    if (!d?.id) throw new Error("Invalid request");
+    if (d.checkedProfile !== true) throw new Error("Confirm that you reviewed the correct profile");
+    return { id: d.id, reason: (d.reason ?? "").slice(0, 400), checkedProfile: true };
+  })
+  .handler(async ({ data, context }) => {
+    const { data: r, error } = await context.supabase.rpc("sender_reject_assigned" as never, {
+      p_id: data.id, p_reason: data.reason, p_checked_profile: data.checkedProfile,
+    } as never);
+    if (error) throw new Error(error.message);
+    return r as { ok: boolean; sender: string };
+  });
