@@ -1,3 +1,4 @@
+import { CREATORS, useCreatorsVersion } from "@/lib/creator-partnerships";
 import { useEffect, useMemo, useState } from "react";
 
 type Candidate = { handle: string; profile_url: string; first_pass_category?: string };
@@ -24,6 +25,7 @@ function normalizeHandle(value: string): string {
   return /^[a-z0-9._]{2,30}$/.test(v) ? v : "";
 }
 export function BoboCandidateQueue() {
+  useCreatorsVersion();
   const [creators,setCreators]=useState<Candidate[]>([]);
   const [progress,setProgress]=useState<Progress>({});
   const [history,setHistory]=useState<string[]>([]);
@@ -31,10 +33,20 @@ export function BoboCandidateQueue() {
   useEffect(()=>{
     try { setCreators(JSON.parse(localStorage.getItem(DATA_KEY)||"[]")); setProgress(JSON.parse(localStorage.getItem(PROGRESS_KEY)||"{}")); } catch { setError("Could not load saved progress."); }
   },[]);
-  const remaining=useMemo(()=>creators.filter(c=>!progress[c.handle]),[creators,progress]);
-  const saved=creators.filter(c=>progress[c.handle]==="saved").length;
-  const skipped=creators.filter(c=>progress[c.handle]==="skipped").length;
-  const current=remaining[0];
+  const allCreators = useMemo(()=>{
+    const byHandle = new Map<string,Candidate>();
+    for (const c of CREATORS) {
+      if (c.sethApprovalStatus === "approved" || c.sethApprovalStatus === "rejected") continue;
+      const match = (c.tiktok || "").match(/(?:tiktok\.com\/)?@([a-zA-Z0-9._]+)/i);
+      const handle = normalizeHandle(match?.[1] || "");
+      if (handle) byHandle.set(handle,{handle,profile_url:`https://www.tiktok.com/@${handle}`});
+    }
+    for (const c of creators) if (!byHandle.has(c.handle)) byHandle.set(c.handle,c);
+    return [...byHandle.values()];
+  },[creators, CREATORS.length]);
+  const completed = (handle:string)=>Boolean(progress[handle]);
+  const saved=allCreators.filter(c=>progress[c.handle]==="saved").length;
+  const skipped=allCreators.filter(c=>progress[c.handle]==="skipped").length;
   async function upload(file?:File) {
     if(!file)return;
     try {
@@ -53,7 +65,7 @@ export function BoboCandidateQueue() {
     } catch(e) { setError(e instanceof Error?e.message:String(e)); }
   }
   function exportProgress() {
-    const rows=[["handle","profile_url","markdown_status"],...creators.map(c=>[c.handle,c.profile_url,progress[c.handle]||"pending"])];
+    const rows=[["handle","profile_url","markdown_status"],...allCreators.map(c=>[c.handle,c.profile_url,progress[c.handle]||"pending"])];
     const csv=rows.map(r=>r.map(v=>'"'+v.replaceAll('"','""')+'"').join(",")).join("\r\n");
     const a=document.createElement("a");const url=URL.createObjectURL(new Blob([csv],{type:"text/csv"}));
     a.href=url;a.download="bobo-creator-md-progress.csv";a.click();URL.revokeObjectURL(url);
@@ -64,11 +76,11 @@ export function BoboCandidateQueue() {
       <input type="file" accept=".csv,text/csv" className="mt-2 block w-full" onChange={e=>void upload(e.target.files?.[0])}/>
     </label>}
     {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
-    <p className="font-semibold">{saved+skipped} / {creators.length} done</p>
-    <div className="h-2 rounded-full bg-muted overflow-hidden"><div className="h-full bg-primary" style={{width:`${creators.length?(saved+skipped)/creators.length*100:0}%`}} /></div>
+    <p className="font-semibold">{saved+skipped} / {allCreators.length} done</p>
+    <div className="h-2 rounded-full bg-muted overflow-hidden"><div className="h-full bg-primary" style={{width:`${allCreators.length?(saved+skipped)/allCreators.length*100:0}%`}} /></div>
     <p className="text-xs text-muted-foreground">Click profile → Obsidian Clipper → return → next. The clip should include the bio and visible videos; missing information can be checked later.</p>
     <div className="space-y-1">
-      {creators.map((c,i)=>{
+      {allCreators.map((c,i)=>{
         const finished=!!progress[c.handle];
         return <div key={c.handle} className={`flex items-center gap-3 rounded-lg border px-3 py-2 ${finished?"bg-muted opacity-60":""}`}>
           <span className={`w-8 shrink-0 text-center font-bold ${finished?"text-primary":""}`}>{finished?"✓":i+1}</span>
@@ -83,7 +95,7 @@ export function BoboCandidateQueue() {
         </div>;
       })}
     </div>
-    {!!creators.length && <div className="flex gap-3 pt-3">
+    {!!allCreators.length && <div className="flex gap-3 pt-3">
       <button className="rounded-lg border px-3 py-2 text-sm" onClick={exportProgress}>Export progress</button>
       <label className="rounded-lg border px-3 py-2 text-sm">Replace list<input type="file" accept=".csv,text/csv" className="sr-only" onChange={e=>void upload(e.target.files?.[0])}/></label>
     </div>}
