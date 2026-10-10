@@ -77,15 +77,15 @@ function InfluencerHome() {
     instagram:c.instagram, facebook:c.facebook, email:c.email, contact:c.contact_route, followers:c.followers_signal, segment:c.segment || c.verification_evidence, audience:c.target_audience, geography:null, source:"BoBo Markdown Batch 1", reach:null, confidence:null, researched:"2026-10-10", status:c.qualification_status, priority:null, evidence:c.verification_evidence, offer:null, offerReason:null, owner:null, outreach:null, response:null, next:null, approval:c.seth_approval_status, platforms:"TikTok", contactPage:c.other_platform
   });
   const groups = categories.map((category, i) => {
-    const rows = i === 1
+    const rows = i === 0 ? CREATORS.filter(c => !c.sethApprovalStatus && !c.outreachSecondLookAt && !/needs more research/i.test(c.researchStatus || "")).map(fromCreator) : i === 6 ? CREATORS.map(fromCreator) : i === 1
       ? batch.filter(c => c.qualification_status === "Qualified" && !c.seth_approval_status).map(fromBatch)
       : i === 4
       ? [...CREATORS.filter(c => c.sethApprovalStatus === "rejected").map(fromCreator), ...batch.filter(c => c.qualification_status === "Not Relevant" && !c.seth_approval_status).map(fromBatch)]
       : i >= 2 && i <= 5
       ? CREATORS.filter(c => i === 2 ? c.sethApprovalStatus === "approved" : i === 3 ? Boolean(c.outreachSecondLookAt) && !c.sethApprovalStatus : !c.sethApprovalStatus && /needs more research/i.test(c.researchStatus || "")).map(fromCreator)
       : [];
-    const filtered = rows.filter(c => (platform === "All" || Boolean(c[platform.toLowerCase() as "tiktok" | "youtube" | "instagram" | "facebook"])) && (contactFilter === "All" || (contactFilter === "Email" ? Boolean(c.email) : contactFilter === "Contact page" ? Boolean(normalize(c.contactPage)) : Boolean(c.contact || c.tiktok || c.instagram))));
-    return { ...category, rows:filtered };
+    const filtered = rows.filter(c => (platform === "All" || Boolean(normalize(c[platform.toLowerCase() as "tiktok" | "youtube" | "instagram" | "facebook"]))) && (contactFilter === "All" || (contactFilter === "Email" ? Boolean(c.email) : contactFilter === "Contact page" ? Boolean(normalize(c.contactPage)) : Boolean(c.contact || c.tiktok || c.instagram))));
+    return { ...category, rows:filtered, visibleCount:filtered.length };
   });
   return <main className="mx-auto max-w-3xl space-y-3 p-4 sm:p-8">
     <h1 className="mb-4 text-2xl font-bold">Influencers</h1>
@@ -102,7 +102,7 @@ function InfluencerHome() {
         className="flex min-h-20 w-full items-center justify-between px-5 py-4 text-left hover:bg-muted/50">
         <span className="font-semibold">{i + 1}. {i === 2 ? "Manually Approved" : c.name}</span>
         <span className="flex items-center gap-4">
-          <span className="tabular-nums text-muted-foreground">{(i === 6 && masterCounts ? masterCounts.total : i === 0 && masterCounts ? masterCounts.boboQueueCount : c.count).toLocaleString()}</span>
+          <span className="tabular-nums text-muted-foreground">{(platform === "All" && contactFilter === "All" ? (i === 6 && masterCounts ? masterCounts.total : i === 0 && masterCounts ? masterCounts.boboQueueCount : c.count) : c.visibleCount).toLocaleString()}</span>
           <ChevronDown className={`h-5 w-5 transition-transform ${expanded === i ? "rotate-180" : ""}`} />
         </span>
       </button>
@@ -110,7 +110,7 @@ function InfluencerHome() {
         {i === 0 && <p className="mb-3 text-sm text-muted-foreground">BoBo's full research queue, progress counter, and next-profile button.</p>}
         {i === 6 && <p className="mb-3 text-sm text-muted-foreground">Browse the complete original source records.</p>}
         {(i === 0 || i === 6) && <Link to={c.to} className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-3 font-semibold text-primary-foreground">Open full list <ExternalLink className="h-4 w-4" /></Link>}
-        {i !== 0 && i !== 6 && <>
+        {<>
           {c.rows.length === 0 && <p className="text-sm text-muted-foreground">No profiles in this section.</p>}
           <div className="max-h-[520px] space-y-2 overflow-y-auto">
             {c.rows.map(person => <details key={person.id} className="rounded-lg border px-3 py-2">
