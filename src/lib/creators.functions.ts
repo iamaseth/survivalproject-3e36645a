@@ -495,3 +495,8 @@ export const secondLookAction = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return result as { ok: boolean };
   });
+
+export type OutreachActivityRow = { creator_id: string; creator_name: string | null; action: "sent" | "rejected" | "later" | "undo_sent" | "restore"; actor: string; created_at: string };
+export const getOutreachTodayActivity = createServerFn({method:"GET"})
+ .middleware([requireSupabaseAuth])
+ .handler(async({context})=>{const {data,error}=await context.supabase.rpc("outreach_today_activity" as never);if(error)throw new Error(error.message);return (data??[]) as OutreachActivityRow[];});

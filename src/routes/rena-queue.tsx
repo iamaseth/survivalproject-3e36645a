@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { CREATORS, hydrateCreatorsFromDB, useCreatorsVersion, type CreatorRow } from "@/lib/creator-partnerships";
-import { getMyOutreachSender, outreachPoolAction, senderRejectAssigned, secondLookAction } from "@/lib/creators.functions";
+import { getMyOutreachSender, outreachPoolAction, senderRejectAssigned, secondLookAction, getOutreachTodayActivity, type OutreachActivityRow } from "@/lib/creators.functions";
 import { inRenaPool, isBlockedFollowup } from "@/lib/rena-queue-eligibility";
 
 export const Route = createFileRoute("/rena-queue")({
@@ -53,19 +53,25 @@ export function DmQueue({ sender = "Rena" }: { sender?: "Rena" | "Seth" }) {
   const [actionsId,setActionsId] = useState<string|null>(null);
   
   const deferCreator = async (id: string) => { if (lock.current) return; lock.current=true; setSavingId(id); try { const result=await secondLookAct({data:{id,action:"later"}}); if(!result?.ok) throw new Error("Could not save Later"); await refresh(); setActionsId(null); setNotice({kind:"ok",text:"Moved to Seth’s Second Look list."}); } catch(e) { setNotice({kind:"err",text:e instanceof Error?e.message:"Could not save Later"}); } finally {lock.current=false;setSavingId(null);} };
-  const [sessionSentIds,setSessionSentIds] = useState<string[]>([]);
+  const activityFn = useServerFn(getOutreachTodayActivity);
+  const [activity,setActivity] = useState<OutreachActivityRow[]>([]);
+  const [activityError,setActivityError] = useState<string|null>(null);
+  const [showActivity,setShowActivity] = useState(true);
+  const refreshActivity = async () => { try { setActivity(await activityFn());setActivityError(null); } catch(e) { setActivityError(e instanceof Error?e.message:"Could not load activity"); } };
 
   useEffect(() => { if ("serviceWorker" in navigator) navigator.serviceWorker.register("/rena-sw.js").catch(() => {}); }, []);
-  useEffect(() => { who().then(setMe).catch(() => setMe({ sender: null, approver: false })); void hydrateCreatorsFromDB().catch(e => setLoadError(e instanceof Error ? e.message : "Could not load outreach queue")); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { who().then(setMe).catch(() => setMe({ sender: null, approver: false })); void hydrateCreatorsFromDB().catch(e => setLoadError(e instanceof Error ? e.message : "Could not load outreach queue")); void refreshActivity(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const pool = useMemo(() => { void version; return CREATORS.filter(inPool).sort((a, b) => a.name.localeCompare(b.name)); }, [version]);
-  const mine = pool.filter((c) => !c.outreachSentAt || sessionSentIds.includes(c.id));
+  const mine = pool.filter((c) => !c.outreachSentAt);
   const pending = mine.filter(c=>!c.outreachSentAt && !c.outreachSecondLookAt);
-  const completedThisSession = mine.filter(c=>Boolean(c.outreachSentAt));
+  const todayLatest = new Map<string,OutreachActivityRow>();
+  for(const entry of activity) if(!todayLatest.has(entry.creator_id)) todayLatest.set(entry.creator_id,entry);
+  const completedToday = [...todayLatest.values()].filter(a=>["sent","rejected","later"].includes(a.action));
   const available = pool.filter((c) => statusOf(c) === "available");
-  const done = completedThisSession.length;
+  const done = completedToday.length;
 
-  const refresh = async () => { try { setLoadError(null); await hydrateCreatorsFromDB(); } catch(e) { setLoadError(e instanceof Error ? e.message : "Could not refresh outreach queue"); } };
+  const refresh = async () => { try { setLoadError(null); await hydrateCreatorsFromDB(); await refreshActivity(); } catch(e) { setLoadError(e instanceof Error ? e.message : "Could not refresh outreach queue"); } };
 
   const run = async (c: CreatorRow, action: "claim" | "release" | "sent" | "undo_sent") => {
     const result = await act({ data: { id: c.id, action } });
@@ -96,7 +102,7 @@ export function DmQueue({ sender = "Rena" }: { sender?: "Rena" | "Seth" }) {
   const simple = async (c: CreatorRow, action: "claim" | "release" | "undo_sent" | "sent", ask?: string) => {
     if (readOnlyPreview || lock.current || (ask && !confirm(ask))) return;
     lock.current = true; setSavingId(c.id);
-    try { await run(c, action); if(action==="sent") setSessionSentIds(ids=>ids.includes(c.id)?ids:[...ids,c.id]); if(action==="undo_sent") setSessionSentIds(ids=>ids.filter(id=>id!==c.id)); setActionsId(null); setNotice({ kind: "ok", text: action === "claim" ? `${c.name} is yours.` : action === "release" ? `${c.name} returned to the pool.` : action === "sent" ? `${c.name} marked sent.` : `${c.name} undone.` }); }
+    try { await run(c, action); setActionsId(null); setNotice({ kind: "ok", text: action === "claim" ? `${c.name} is yours.` : action === "release" ? `${c.name} returned to the pool.` : action === "sent" ? `${c.name} marked sent.` : `${c.name} undone.` }); }
     catch (e) { setNotice({ kind: "err", text: e instanceof Error ? e.message : "Could not save" }); void refresh(); }
     finally { lock.current = false; setSavingId(null); }
   };
@@ -146,7 +152,7 @@ export function DmQueue({ sender = "Rena" }: { sender?: "Rena" | "Seth" }) {
         <div className="mt-2 h-2 overflow-hidden rounded-full bg-secondary">
           <div className="h-full bg-emerald-600 transition-all" style={{ width: `${mine.length ? (done / mine.length) * 100 : 0}%` }} />
         </div>
-        <p className="mt-2 text-[11px] text-muted-foreground">Sent creators move to the completed section. Later moves creators to Seth’s shared Second Look. Not Relevant creators are removed from the queue.</p>
+        <p className="mt-2 text-[11px] text-muted-foreground">Completed creators move to Today’s Activity. Later moves creators to Seth’s shared Second Look. Not Relevant creators are removed from the queue.</p>
       </div>
       {loadError ? <p role="alert" className="rounded border border-red-600 p-3 text-sm">{loadError}</p> : null}
       {notice ? (
@@ -179,7 +185,10 @@ export function DmQueue({ sender = "Rena" }: { sender?: "Rena" | "Seth" }) {
           );
         })}
       </ul>
-      {completedThisSession.length > 0 && <section className="mt-5 space-y-2"><h2 className="text-sm font-semibold text-muted-foreground">Sent this session ({completedThisSession.length})</h2><ul className="space-y-2">{completedThisSession.map(c=><li key={c.id} className="flex items-center justify-between rounded-xl border-2 border-emerald-600 bg-emerald-100 px-4 py-3 text-emerald-950"><div><div className="font-semibold">✓ {c.name}</div><div className="text-xs">{c.followersSignal?.trim()?`${c.followersSignal.trim()} followers`:"Followers not recorded"}</div></div><button disabled={readOnlyPreview || savingId===c.id} onClick={()=>void simple(c,"undo_sent")} className="rounded-lg border border-emerald-700 px-3 py-2 text-sm">Undo</button></li>)}</ul></section>}
+      <section className="mt-5 overflow-hidden rounded-xl border-2 border-emerald-600 bg-emerald-50 text-emerald-950">
+        <button type="button" onClick={()=>setShowActivity(v=>!v)} className="flex w-full items-center justify-between p-4 text-left font-semibold"><span>✓ Today's Activity — {done} completed</span><span>{showActivity?"▲":"▼"}</span></button>
+        {showActivity&&<div className="space-y-2 border-t border-emerald-200 p-3">{activityError&&<p role="alert" className="text-sm text-red-700">{activityError}</p>}{completedToday.length===0?<p className="text-sm">No completed actions today.</p>:completedToday.map(a=><div key={a.creator_id} className="flex items-center justify-between gap-2 rounded-lg border border-emerald-300 bg-white p-3"><div><div className="font-semibold">{a.creator_name??a.creator_id}</div><div className="text-xs">{a.action==="sent"?"✓ Sent":a.action==="rejected"?"✕ Not Relevant":"◷ Later — Seth Review"} · {a.actor} · {new Date(a.created_at).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"})}</div></div>{a.action==="sent"&&!readOnlyPreview&&<button type="button" onClick={()=>{const c=CREATORS.find(x=>x.id===a.creator_id);if(c)void simple(c,"undo_sent");}} className="rounded-lg border px-3 py-2 text-sm">Undo</button>}</div>)}</div>}
+      </section>
 
     </div>
   );
