@@ -2,8 +2,8 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { ChevronDown, ExternalLink } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { manualQualificationOverride, secondLookAction } from "@/lib/creators.functions";
-import { getInfluencerMasterCounts, listBatchOneResults, saveInfluencerDmDraft } from "@/lib/influencer-master.functions";
+import { manualQualificationOverride } from "@/lib/creators.functions";
+import { getInfluencerMasterCounts, listBatchOneResults, moveAiScreenedToSecondLook, saveInfluencerDmDraft } from "@/lib/influencer-master.functions";
 import { CREATORS, hydrateCreatorsFromDB, useCreatorsVersion } from "@/lib/creator-partnerships";
 
 export const Route = createFileRoute("/")({
@@ -14,7 +14,7 @@ export const Route = createFileRoute("/")({
 function InfluencerHome() {
   const saveDraft = useServerFn(saveInfluencerDmDraft);
   const rejectCreator = useServerFn(manualQualificationOverride);
-  const secondLookCreator = useServerFn(secondLookAction);
+  const secondLookCreator = useServerFn(moveAiScreenedToSecondLook);
   const [secondLookIds, setSecondLookIds] = useState<string[]>([]);
   const [rejectBusy, setRejectBusy] = useState<string | null>(null);
   const [draftEdits, setDraftEdits] = useState<Record<string,string>>({});
@@ -26,7 +26,7 @@ function InfluencerHome() {
   const [expanded, setExpanded] = useState<number | null>(null);
   const [platform, setPlatform] = useState("All");
   const [contactFilter, setContactFilter] = useState("All");
-  const [batch, setBatch] = useState<Array<{id:string;name:string;tiktok:string|null;youtube:string|null;instagram:string|null;facebook:string|null;email:string|null;contact_route:string|null;followers_signal:string|null;segment:string|null;target_audience:string|null;other_platform:string|null;personalized_dm:string|null;qualification_status:string|null;seth_approval_status:string|null;verification_evidence:string|null}>>([]);
+  const [batch, setBatch] = useState<Array<{id:string;name:string;tiktok:string|null;youtube:string|null;instagram:string|null;facebook:string|null;email:string|null;contact_route:string|null;followers_signal:string|null;segment:string|null;target_audience:string|null;other_platform:string|null;personalized_dm:string|null;qualification_status:string|null;seth_approval_status:string|null;outreach_second_look_at:string|null;verification_evidence:string|null}>>([]);
   useEffect(() => { void loadBatch().then(setBatch).catch(console.error); }, [loadBatch]);
   const [masterCounts, setMasterCounts] = useState<{ total: number; boboQueueCount: number; sources: Record<string,number>; aiScreenedCount:number; aiRejectedCount:number } | null>(null);
   useEffect(() => { void loadCounts().then(setMasterCounts).catch(console.error); }, [loadCounts]);
@@ -62,7 +62,7 @@ function InfluencerHome() {
     const forNow = rows.filter(c => !rejected(c) && !approved(c) && !secondLook(c) && !moreResearch(c));
     return [
       { name: "For Now", count: forNow.length, to: "/bobo-queue" },
-      { name: "AI Screened", count: batch.filter(c => ["Qualified", "Needs Review"].includes(c.qualification_status || "") && !c.seth_approval_status && !secondLookIds.includes(c.id)).length, to: "/ai-screened" },
+      { name: "AI Screened", count: batch.filter(c => ["Qualified", "Needs Review"].includes(c.qualification_status || "") && !c.seth_approval_status && !c.outreach_second_look_at && !secondLookIds.includes(c.id)).length, to: "/ai-screened" },
       { name: "Complete Manual Review", count: rows.filter(approved).length, to: "/creators" },
       { name: "Take a Second Look", count: rows.filter(secondLook).length, to: "/creators" },
       { name: "Rejected", count: rows.filter(rejected).length + (masterCounts?.aiRejectedCount ?? 0), to: "/creators" },
@@ -133,7 +133,7 @@ function InfluencerHome() {
                 {person.followers && <span className="shrink-0 rounded-full bg-muted px-2 py-1 text-xs font-medium tabular-nums">{person.followers} followers</span>}
                 {normalize(person.tiktok || person.youtube || person.instagram || person.facebook) && <a href={normalize(person.tiktok || person.youtube || person.instagram || person.facebook)!} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs font-medium hover:bg-muted" title="Open social profile">Profile <ExternalLink className="h-3 w-3" /></a>}
                 {person.email && <a href={`mailto:${person.email}`} onClick={e => e.stopPropagation()} className="rounded-md border px-2 py-1 text-xs font-semibold hover:bg-muted" title={person.email}>E</a>}
-                {i === 1 && <button type="button" disabled={rejectBusy === person.id} onClick={async e => { e.preventDefault(); e.stopPropagation(); setRejectBusy(person.id); try { const result = await secondLookCreator({data:{id:person.id,action:"later"}}); if (!result?.ok) throw new Error("Not confirmed"); setSecondLookIds(prev => [...prev,person.id]); await hydrateCreatorsFromDB(); } catch(err) { window.alert("Could not move to Second Look: "+String(err)); } finally { setRejectBusy(null); } }} className="rounded-md border border-amber-300 px-2 py-1 text-xs font-semibold text-amber-800 hover:bg-amber-50 disabled:opacity-50">Second Look</button>}
+                {i === 1 && <button type="button" disabled={rejectBusy === person.id} onClick={async e => { e.preventDefault(); e.stopPropagation(); setRejectBusy(person.id); try { const result = await secondLookCreator({data:{id:person.id}}); if (!result?.ok) throw new Error("Not confirmed"); setSecondLookIds(prev => [...prev,person.id]); await hydrateCreatorsFromDB(); } catch(err) { window.alert("Could not move to Second Look: "+String(err)); } finally { setRejectBusy(null); } }} className="rounded-md border border-amber-300 px-2 py-1 text-xs font-semibold text-amber-800 hover:bg-amber-50 disabled:opacity-50">Second Look</button>}
                 {i === 1 && <button type="button" disabled={rejectBusy === person.id} onClick={async e => { e.preventDefault(); e.stopPropagation(); if (!window.confirm(`Reject ${person.name}? This manual decision overrides AI screening.`)) return; setRejectBusy(person.id); try { const result = await rejectCreator({data:{id:person.id,decision:"rejected",checkedProfile:true,evidence:"Manually rejected in AI Screened"}}); if (!result?.ok) throw new Error("Rejection not confirmed"); setBatch(prev => prev.map(c => c.id === person.id ? {...c,seth_approval_status:"rejected"} : c)); await hydrateCreatorsFromDB(); } catch(err) { window.alert("Could not reject: "+String(err)); } finally { setRejectBusy(null); } }} className="rounded-md border border-red-300 px-2 py-1 text-xs font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50">{rejectBusy === person.id ? "Saving…" : "Reject"}</button>}
                 {person.dm && <button type="button" onClick={e => { e.preventDefault(); e.stopPropagation(); void navigator.clipboard.writeText(draftEdits[person.id] ?? person.dm!); setDraftNotice(prev => ({...prev,[person.id]:"DM copied"})); }} className="rounded-md border border-primary/30 bg-primary/10 px-2 py-1 text-xs font-semibold text-foreground hover:bg-primary/20" title="Copy personalized DM without opening details">Copy DM</button>}
               </summary>
