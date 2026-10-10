@@ -43,9 +43,9 @@ export function DmQueue({ sender = "Rena" }: { sender?: "Rena" | "Seth" }) {
   const [savingId, setSavingId] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
 
-  const [previewSender, setPreviewSender] = useState<string | null>(sender);
-  const viewingSender = previewSender ?? me?.sender ?? null;
-  const readOnlyPreview = Boolean(viewingSender && viewingSender !== me?.sender && !(sender === "Seth" && me?.approver));
+  const [previewSender, setPreviewSender] = useState<string | null>(null);
+  const viewingSender = previewSender ?? me?.sender ?? (me?.approver ? sender : null);
+  const readOnlyPreview = Boolean(viewingSender && viewingSender !== me?.sender && !me?.approver);
   const lock = useRef(false);
   const touchStart = useRef<{id:string;x:number;y:number}|null>(null);
   const [swipingId,setSwipingId] = useState<string|null>(null);
@@ -68,7 +68,8 @@ export function DmQueue({ sender = "Rena" }: { sender?: "Rena" | "Seth" }) {
   const refresh = async () => { try { setLoadError(null); await hydrateCreatorsFromDB(); } catch(e) { setLoadError(e instanceof Error ? e.message : "Could not refresh outreach queue"); } };
 
   const run = async (c: CreatorRow, action: "claim" | "release" | "sent" | "undo_sent") => {
-    await act({ data: { id: c.id, action } });
+    const result = await act({ data: { id: c.id, action } });
+    if (!result?.ok) throw new Error("Server did not confirm this action.");
     await refresh();
   };
 
@@ -105,7 +106,7 @@ export function DmQueue({ sender = "Rena" }: { sender?: "Rena" | "Seth" }) {
     if (!confirm(`Reject ${c.name} as Not Relevant and remove from your queue?`)) return;
     if (!confirm(`Confirm you reviewed the correct TikTok profile for ${c.name} (${c.tiktok}).`)) return;
     lock.current=true;setSavingId(c.id);
-    try { await senderReject({data:{id:c.id,reason:`Rena queue rejection by ${me?.sender ?? "sender"}: Not Relevant after profile review`,checkedProfile:true}}); await refresh(); setActionsId(null); setNotice({kind:"ok",text:`${c.name} rejected as Not Relevant. History kept.`}); }
+    try { const result = await senderReject({data:{id:c.id,reason:`Rena queue rejection by ${me?.sender ?? "sender"}: Not Relevant after profile review`,checkedProfile:true}}); if (!result?.ok) throw new Error("Server did not confirm rejection."); await refresh(); setActionsId(null); setNotice({kind:"ok",text:`${c.name} rejected as Not Relevant. History kept.`}); }
     catch(e){setNotice({kind:"err",text:e instanceof Error?e.message:"Could not reject creator"});}
     finally {lock.current=false;setSavingId(null);}
   };
@@ -113,7 +114,7 @@ export function DmQueue({ sender = "Rena" }: { sender?: "Rena" | "Seth" }) {
   const swipeReject = (c:CreatorRow, x:number, y:number) => {
     const start=touchStart.current; touchStart.current=null;
     if (!start || start.id!==c.id || c.outreachSentAt) return;
-    if (start.x-x>70 && Math.abs(start.y-y)<55) {
+    if (start.x-x>70 && Math.abs(start.y-y)<55 && !lock.current) {
       setSwipingId(c.id); // suppress the synthetic click that would open TikTok
       window.setTimeout(()=>setSwipingId(v=>v===c.id?null:v), 600);
       if (!readOnlyPreview) void reject(c);
@@ -137,10 +138,11 @@ export function DmQueue({ sender = "Rena" }: { sender?: "Rena" | "Seth" }) {
         <div>
           <h1 className="font-display text-2xl text-foreground">{viewingSender === "Rena" ? "Rena’s Outreach Queue" : viewingSender === "Seth" ? "Seth’s Outreach Queue" : `${viewingSender ?? "Team"}’s TikTok DMs`}</h1>
           <p className="text-sm text-muted-foreground">Tap a creator to copy the DM and open TikTok. Tap Sent after sending.</p>
-          {readOnlyPreview ? <p className="text-xs text-muted-foreground">Preview: tap to copy and open TikTok. Only the assigned sender can mark messages done.</p> : null}
+          {readOnlyPreview ? <p className="text-xs text-muted-foreground">Read-only preview: sign in as the assigned sender to use Sent, Reject, and Undo.</p> : null}
         </div>
         <button onClick={() => void refresh()} className="rounded-md border border-input px-3 py-2 text-sm">Refresh</button>
       </div>
+      {readOnlyPreview ? <p role="status" className="rounded border border-amber-500 p-3 text-sm">You are viewing another sender’s queue. Editing actions are disabled.</p> : null}
       <div className="sticky top-0 z-10 rounded-xl border border-border bg-card p-3">
         <div className="flex justify-between text-sm font-semibold"><span>{done} done today</span><span>{pending.length} left</span></div>
         <div className="mt-2 h-2 overflow-hidden rounded-full bg-secondary">
