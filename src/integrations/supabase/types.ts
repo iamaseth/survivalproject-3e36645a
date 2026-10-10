@@ -493,6 +493,7 @@ export type Database = {
           outreach_claimed_at: string | null
           outreach_owner: string | null
           outreach_prev: Json | null
+          outreach_second_look_at: string | null
           outreach_sent_at: string | null
           outreach_sent_by: string | null
           partnership_tier: string | null
@@ -569,6 +570,7 @@ export type Database = {
           outreach_claimed_at?: string | null
           outreach_owner?: string | null
           outreach_prev?: Json | null
+          outreach_second_look_at?: string | null
           outreach_sent_at?: string | null
           outreach_sent_by?: string | null
           partnership_tier?: string | null
@@ -645,6 +647,7 @@ export type Database = {
           outreach_claimed_at?: string | null
           outreach_owner?: string | null
           outreach_prev?: Json | null
+          outreach_second_look_at?: string | null
           outreach_sent_at?: string | null
           outreach_sent_by?: string | null
           partnership_tier?: string | null
@@ -1705,6 +1708,10 @@ export type Database = {
         Returns: Json
       }
       outreach_my_sender: { Args: never; Returns: string }
+      outreach_second_look_action: {
+        Args: { p_action: string; p_id: string }
+        Returns: Json
+      }
       sender_reject_assigned: {
         Args: { p_checked_profile: boolean; p_id: string; p_reason: string }
         Returns: Json
