@@ -176,7 +176,7 @@ export const getBoboResearchQueue = createServerFn({ method: "GET" })
     }
     const seen = new Set<string>();
     return rows.filter(c => {
-      const key = c.tiktok.toLowerCase().trim().replace(/\\/$/, "");
+      const key = c.tiktok.toLowerCase().trim().replace(/\/$/, "");
       if (seen.has(key)) return false;
       seen.add(key);
       return true;
