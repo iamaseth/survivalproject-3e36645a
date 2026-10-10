@@ -9,7 +9,8 @@ type Candidate = {source_table:string;source_id:string;display_name:string;profi
 const keyOf = (r: Candidate) => r.source_table + ":" + r.source_id;
 function BoboQueue() {
   const load = useServerFn(listBoboResearchQueue);
-  const loadBatch = useServerFn(listBatchOneResults);\n  const loadProgress = useServerFn(getBoboProfileTracking);
+  const loadBatch = useServerFn(listBatchOneResults);
+  const loadProgress = useServerFn(getBoboProfileTracking);
   const save = useServerFn(markBoboProfileTracking);
   const [rows,setRows] = useState<Candidate[]>([]);
   const [opened,setOpened] = useState<string[]>([]);
