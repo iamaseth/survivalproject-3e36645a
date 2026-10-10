@@ -99,3 +99,18 @@ export const moveAiScreenedToSecondLook = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return result as { ok: boolean };
   });
+
+/** Page the same master workflow view used for homepage counters. */
+export const listWorkflowSection = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: { status: "research"|"ai_screened"|"approved"|"sent"|"second_look"|"rejected"; page?: number }) => data)
+  .handler(async ({ context, data }) => {
+    const page = Math.max(0, Math.floor(data.page ?? 0));
+    const { data: rows, count, error } = await context.supabase.from("influencer_workflow")
+      .select("source_table,source_id,display_name,tiktok_url,youtube_url,instagram_url,facebook_url,workflow_status", { count: "exact" })
+      .eq("workflow_status", data.status)
+      .order("source_table").order("source_id")
+      .range(page * 100, page * 100 + 99);
+    if (error) throw new Error(error.message);
+    return { rows: rows ?? [], count: count ?? 0, page };
+  });
