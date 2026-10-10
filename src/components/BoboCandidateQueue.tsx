@@ -36,6 +36,7 @@ export function BoboCandidateQueue() {
   const allCreators = useMemo(()=>{
     const byHandle = new Map<string,Candidate>();
     for (const c of CREATORS) {
+      if (c.sethApprovalStatus === "rejected" || c.qualificationStatus === "Not Relevant") continue;
       const match = (c.tiktok || "").match(/(?:tiktok\.com\/)?@([a-zA-Z0-9._]+)/i);
       const handle = normalizeHandle(match?.[1] || "");
       if (handle) byHandle.set(handle,{handle,profile_url:`https://www.tiktok.com/@${handle}`});
