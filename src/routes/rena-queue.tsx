@@ -62,15 +62,15 @@ export function DmQueue({ sender = "Rena" }: { sender?: "Rena" | "Seth" }) {
   useEffect(() => { who().then(setMe).catch(() => setMe({ sender: null, approver: false })); void hydrateCreatorsFromDB().catch(e => setLoadError(e instanceof Error ? e.message : "Could not load outreach queue")); void refreshActivity(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const pool = useMemo(() => { void version; return CREATORS.filter(inPool).sort((a, b) => a.name.localeCompare(b.name)); }, [version]);
-  const mine = pool.filter((c) => !c.outreachSentAt);
-  const pending = mine.filter(c=>!c.outreachSentAt && !c.outreachSecondLookAt);
+  const mine = pool;
+  const pending = mine;
   const todayLatest = new Map<string,OutreachActivityRow>();
   for(const entry of activity) if(!todayLatest.has(entry.creator_id)) todayLatest.set(entry.creator_id,entry);
   const completedToday = [...todayLatest.values()].filter(a=>["sent","rejected","later"].includes(a.action));
   const available = pool.filter((c) => statusOf(c) === "available");
   const done = completedToday.length;
   const completedIds = new Set(completedToday.map(a=>a.creator_id));
-  const tiles = [...pending.filter(c=>!completedIds.has(c.id)), ...completedToday.map(a=>CREATORS.find(c=>c.id===a.creator_id)).filter((c):c is CreatorRow=>Boolean(c))];
+  const tiles = pending.filter(c=>!completedIds.has(c.id));
 
   const refresh = async () => { try { setLoadError(null); await hydrateCreatorsFromDB(); await refreshActivity(); } catch(e) { setLoadError(e instanceof Error ? e.message : "Could not refresh outreach queue"); } };
 
@@ -143,7 +143,7 @@ export function DmQueue({ sender = "Rena" }: { sender?: "Rena" | "Seth" }) {
       <div className="flex items-start justify-between gap-2">
         <div>
           <h1 className="font-display text-2xl text-foreground">{viewingSender === "Rena" ? "Rena’s Outreach Queue" : viewingSender === "Seth" ? "Seth’s Outreach Queue" : `${viewingSender ?? "Team"}’s TikTok DMs`}</h1>
-          <p className="text-sm text-muted-foreground">Tap a creator to copy the DM and open TikTok. Tap Sent after sending.</p>
+          <p className="text-sm text-muted-foreground">This queue mirrors Section 3: Manually Approved. Copy the DM, send it in TikTok, then tap Sent.</p>
           {readOnlyPreview ? <p className="text-xs text-muted-foreground">You must be signed in as an authorized team member to update CRM records.</p> : null}
         </div>
         <button onClick={() => void refresh()} className="rounded-md border border-input px-3 py-2 text-sm">Refresh</button>
