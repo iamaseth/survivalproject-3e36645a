@@ -104,18 +104,7 @@ function InfluencerHome() {
     id:c.id, name:c.name, note:c.verification_evidence, tiktok:c.tiktok, youtube:c.youtube,
     instagram:c.instagram, facebook:c.facebook, email:c.email, contact:c.contact_route, followers:c.followers_signal, segment:c.segment || c.verification_evidence, audience:c.target_audience, geography:null, source:"BoBo Markdown Batch 1", reach:null, confidence:null, researched:"2026-10-10", status:c.qualification_status, priority:null, evidence:c.verification_evidence, offer:null, offerReason:null, owner:null, outreach:null, response:null, next:null, approval:c.seth_approval_status, platforms:"TikTok", contactPage:c.other_platform, dm:c.personalized_dm
   });
-  const groups = categories.map((category, i) => {
-    const rows = i === 0 ? CREATORS.filter(c => !c.sethApprovalStatus && !c.outreachSecondLookAt && !/needs more research/i.test(c.researchStatus || "")).map(fromCreator) : i === 6 ? CREATORS.map(fromCreator) : i === 1
-      ? batch.filter(c => ["Qualified", "Needs Review"].includes(c.qualification_status || "") && !c.seth_approval_status && !c.outreach_second_look_at && !secondLookIds.includes(c.id)).map(fromBatch)
-      : i === 4
-      ? [...CREATORS.filter(c => c.sethApprovalStatus === "rejected").map(fromCreator), ...batch.filter(c => c.qualification_status === "Not Relevant" && !c.seth_approval_status).map(fromBatch)]
-      : i >= 2 && i <= 5
-      ? (i === 3 ? CREATORS.filter(c => Boolean(c.outreachSecondLookAt)).map(fromCreator).concat(batch.filter(c => Boolean(c.outreach_second_look_at)).map(fromBatch)) : i === 2 ? CREATORS.filter(c => c.sethApprovalStatus === "approved" && !c.outreachSecondLookAt).map(fromCreator).concat(batch.filter(c => c.seth_approval_status === "approved" && !c.outreach_second_look_at && !secondLookIds.includes(c.id)).map(fromBatch)) : CREATORS.filter(c => !c.sethApprovalStatus && /needs more research/i.test(c.researchStatus || "")).map(fromCreator))
-      : [];
-    const uniqueRows = (i === 2 || i === 3) ? [...new Map(rows.map(c => { const profile = normalize(c.tiktok || c.youtube || c.instagram || c.facebook); const key = profile ? profile.toLowerCase().replace(/\\/$/, "") : c.id; return [key,c] as const; }).reverse()).values()].reverse() : rows;
-    const filtered = uniqueRows.filter(c => (platform === "All" || Boolean(normalize(c[platform.toLowerCase() as "tiktok" | "youtube" | "instagram" | "facebook"]))) && (contactFilter === "All" || (contactFilter === "Email" ? Boolean(c.email) : contactFilter === "Contact page" ? Boolean(normalize(c.contactPage)) : Boolean(c.contact || c.tiktok || c.instagram))));
-    return { ...category, rows:filtered, visibleCount:filtered.length };
-  });
+  const groups = categories.map(category => ({ ...category, rows: [] as ReturnType<typeof fromCreator>[], visibleCount: 0 }));
   return <main className="mx-auto max-w-3xl space-y-3 p-4 sm:p-8">
     <h1 className="mb-4 text-2xl font-bold">Influencers</h1>
     {masterCounts?.workflowCounts && <div className="rounded-xl border bg-card p-4" aria-label="Workflow progress">
@@ -143,7 +132,7 @@ function InfluencerHome() {
     {groups.filter((_,i) => i < 6).map((c, i) => <section key={c.name} className="overflow-hidden rounded-xl border bg-card">
       <button type="button" aria-expanded={expanded === i} onClick={() => {setWorkflowPage(0);setExpanded(expanded === i ? null : i);}}
         className="flex min-h-20 w-full items-center justify-between px-5 py-4 text-left hover:bg-muted/50">
-        <span className="font-semibold">{i + 1}. {i === 2 ? "Already Manually Approved" : c.name}</span>
+        <span className="font-semibold">{i + 1}. {c.name}</span>
         <span className="flex items-center gap-4">
           <span className="tabular-nums text-muted-foreground">{(platform === "All" && contactFilter === "All" ? (c.count) : c.visibleCount).toLocaleString()}</span>
           <ChevronDown className={`h-5 w-5 transition-transform ${expanded === i ? "rotate-180" : ""}`} />
