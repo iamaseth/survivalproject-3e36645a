@@ -83,18 +83,19 @@ export function BoboCandidateQueue() {
     {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
     <p className="font-semibold">{saved+skipped} / {creators.length} done</p>
     <div className="h-2 rounded-full bg-muted overflow-hidden"><div className="h-full bg-primary" style={{width:`${creators.length?(saved+skipped)/creators.length*100:0}%`}} /></div>
-    <p className="text-xs text-muted-foreground">Click a profile to open TikTok. Save the page to Obsidian, then return and click its circle to cross it off.</p>
+    <p className="text-xs text-muted-foreground">Click a profile. It opens TikTok and is crossed off automatically. Clip it to Obsidian, return, and click the next profile.</p>
     <div className="space-y-1">
       {creators.map((c,i)=>{
         const finished=!!progress[c.handle];
         return <div key={c.handle} className={`flex items-center gap-3 rounded-lg border px-3 py-2 ${finished?"bg-muted opacity-60":""}`}>
-          <button aria-label={finished?"Undo completed":"Mark saved to Obsidian"} className={`h-8 w-8 shrink-0 rounded-full border-2 font-bold ${finished?"bg-primary text-primary-foreground":""}`}
+          <span className={`w-8 shrink-0 text-center font-bold ${finished?"text-primary":""}`}>{finished?"✓":i+1}</span>
+          <a className={`min-w-0 flex-1 py-2 font-medium ${finished?"line-through":""}`} href={c.profile_url} target="_blank" rel="noopener noreferrer"
             onClick={()=>{
-              const next={...progress};if(finished)delete next[c.handle];else next[c.handle]="saved";
+              if(finished)return;
+              const next={...progress,[c.handle]:"saved" as const};
               setProgress(next);localStorage.setItem(PROGRESS_KEY,JSON.stringify(next));
-            }}>{finished?"✓":""}</button>
-          <a className={`min-w-0 flex-1 py-2 font-medium ${finished?"line-through":""}`} href={c.profile_url} target="_blank" rel="noopener noreferrer">
-            {i+1}. @{c.handle} ↗
+            }}>
+            @{c.handle} ↗
           </a>
         </div>;
       })}
