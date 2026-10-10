@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { CREATORS, hydrateCreatorsFromDB, useCreatorsVersion, type CreatorRow } from "@/lib/creator-partnerships";
-import { getMyOutreachSender, outreachPoolAction, updateCreatorWorkflow } from "@/lib/creators.functions";
+import { getMyOutreachSender, outreachPoolAction, manualQualificationOverride } from "@/lib/creators.functions";
 import { TIKTOK_PROFILE_RE } from "@/lib/tiktok-dm-verification";
 
 export const Route = createFileRoute("/rena-queue")({
@@ -28,7 +28,7 @@ const handleOf = (url: string) => url.match(/@([A-Za-z0-9._-]+)/)?.[1] ?? null;
 const blocked = (c: CreatorRow) => /not relevant|dm blocked|do not contact/i.test(c.responseFollowup || "");
 
 function inPool(c: CreatorRow) {
-  return c.sethApprovalStatus === "approved" && Boolean(c.tiktok && TIKTOK_PROFILE_RE.test(c.tiktok)) && Boolean(c.personalizedDm?.trim());
+  return c.sethApprovalStatus === "approved" && !blocked(c) && Boolean(c.tiktok && TIKTOK_PROFILE_RE.test(c.tiktok)) && Boolean(c.personalizedDm?.trim());
 }
 function statusOf(c: CreatorRow): "available" | "assigned" | "contacted" | "blocked" {
   if (c.outreachSentAt || c.contactedDate) return "contacted";
@@ -40,7 +40,7 @@ export function DmQueue({ sender = "Rena" }: { sender?: "Rena" | "Seth" }) {
   const version = useCreatorsVersion();
   const who = useServerFn(getMyOutreachSender);
   const act = useServerFn(outreachPoolAction);
-  const updateWorkflow = useServerFn(updateCreatorWorkflow);
+  const manualReject = useServerFn(manualQualificationOverride);
   const [me, setMe] = useState<{ sender: string | null; approver: boolean } | null>(null);
   const [notice, setNotice] = useState<{ kind: "ok" | "warn" | "err"; text: string; dm?: string } | null>(null);
   const [savingId, setSavingId] = useState<string | null>(null);
@@ -103,11 +103,42 @@ export function DmQueue({ sender = "Rena" }: { sender?: "Rena" | "Seth" }) {
     finally { lock.current = false; setSavingId(null); }
   };
 
-  const reject = async (c:CreatorRow) => { if (readOnlyPreview || lock.current || !confirm(`Mark ${c.name} Not Relevant and remove from the outreach queue?`)) return; lock.current=true;setSavingId(c.id);try { if(c.outreachSentAt) await act({data:{id:c.id,action:"undo_sent"}}); await updateWorkflow({data:{id:c.id,response_followup:"Not Relevant"}}); await refresh(); setActionsId(null);setNotice({kind:"ok",text:`${c.name} marked Not Relevant. CRM record retained.`}); } catch(e){setNotice({kind:"err",text:e instanceof Error?e.message:"Could not reject creator"});} finally {lock.current=false;setSavingId(null);} };
+  const reject = async (c: CreatorRow) => {
+    if (readOnlyPreview || lock.current || c.outreachSentAt) return;
+    if (!confirm(`Reject ${c.name} as Not Relevant? This manual decision overrides AI qualification and removes them from Rena's queue.`)) return;
+    if (!confirm(`Confirm you reviewed the correct TikTok profile for ${c.name}.`)) return;
+    lock.current = true;
+    setSavingId(c.id);
+    try {
+      const result = await manualReject({ data: {
+        id: c.id, decision: "rejected", checkedProfile: true,
+        evidence: "Manual Not Relevant rejection from Rena outreach queue",
+        assignee: "Rena",
+      } });
+      if (!result?.ok) throw new Error("Manual rejection was not confirmed.");
+      await refresh();
+      setActionsId(null);
+      setNotice({ kind: "ok", text: `${c.name} manually rejected as Not Relevant. CRM record retained.` });
+    } catch (e) {
+      setNotice({ kind: "err", text: e instanceof Error ? e.message : "Could not reject creator" });
+      void refresh();
+    } finally {
+      lock.current = false;
+      setSavingId(null);
+    }
+  };
 
-  const swipeUndo = (c:CreatorRow, x:number, y:number) => { const start=touchStart.current; touchStart.current=null; if (!start || start.id!==c.id) return; if (start.x-x>70 && Math.abs(start.y-y)<55) { setSwipingId(c.id); setActionsId(c.id); } };
+  const swipeUndo = (c: CreatorRow, x: number, y: number) => {
+    const start = touchStart.current;
+    touchStart.current = null;
+    if (!start || start.id !== c.id) return;
+    if (start.x - x > 70 && Math.abs(start.y - y) < 55) {
+      setSwipingId(c.id);
+      if (!readOnlyPreview && !c.outreachSentAt) void reject(c);
+    }
+  };
 
-  const tone = { ok: "border-emerald-600 bg-emerald-50 text-emerald-950", warn: "border-amber-500 bg-amber-50 text-amber-950", err: "border-red-600 bg-red-50 text-red-950" };
+    const tone = { ok: "border-emerald-600 bg-emerald-50 text-emerald-950", warn: "border-amber-500 bg-amber-50 text-amber-950", err: "border-red-600 bg-red-50 text-red-950" };
 
   if (me === null) return <div className="p-8 text-sm text-muted-foreground">Loading…</div>;
   if (!me.sender && !me.approver) return (
