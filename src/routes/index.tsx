@@ -13,7 +13,7 @@ export const Route = createFileRoute("/")({
 function InfluencerHome() {
   const useCreatorsVersionValue = useCreatorsVersion();
   const loadCounts = useServerFn(getInfluencerMasterCounts);
-  const [masterCounts, setMasterCounts] = useState<{ total: number; boboQueueCount: number; sources: Record<string,number> } | null>(null);
+  const [masterCounts, setMasterCounts] = useState<{ total: number; boboQueueCount: number; sources: Record<string,number>; aiScreenedCount:number; aiRejectedCount:number } | null>(null);
   useEffect(() => { void loadCounts().then(setMasterCounts).catch(console.error); }, [loadCounts]);
   useEffect(() => { void hydrateCreatorsFromDB(); }, []);
   const categories = useMemo(() => {
@@ -47,14 +47,14 @@ function InfluencerHome() {
     const forNow = rows.filter(c => !rejected(c) && !approved(c) && !secondLook(c) && !moreResearch(c));
     return [
       { name: "For Now", count: forNow.length, to: "/bobo-queue" },
-      { name: "AI Screened", count: 0, to: "/creators" },
+      { name: "AI Screened", count: masterCounts?.aiScreenedCount ?? 0, to: "/ai-screened" },
       { name: "Complete Manual Review", count: rows.filter(approved).length, to: "/creators" },
       { name: "Take a Second Look", count: rows.filter(secondLook).length, to: "/creators" },
-      { name: "Rejected", count: rows.filter(rejected).length, to: "/creators" },
+      { name: "Rejected", count: rows.filter(rejected).length + (masterCounts?.aiRejectedCount ?? 0), to: "/creators" },
       { name: "Needs More Research", count: rows.filter(moreResearch).length, to: "/creators" },
       { name: "Original List", count: CREATORS.length, to: "/influencer-original" },
     ] as const;
-  }, [useCreatorsVersionValue]);
+  }, [useCreatorsVersionValue, masterCounts]);
   return <main className="mx-auto max-w-3xl space-y-3 p-4 sm:p-8">
     <h1 className="mb-6 text-2xl font-bold">Influencers</h1>
     {categories.map((c, i) => <Link key={c.name} to={c.to} className="flex min-h-20 items-center justify-between rounded-xl border bg-card px-5 py-4 hover:border-primary/50">
