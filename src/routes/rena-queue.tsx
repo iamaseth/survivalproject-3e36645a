@@ -45,7 +45,7 @@ export function DmQueue({ sender = "Rena" }: { sender?: "Rena" | "Seth" }) {
 
   const [previewSender, setPreviewSender] = useState<string | null>(sender);
   const viewingSender = previewSender ?? me?.sender ?? null;
-  const readOnlyPreview = Boolean(viewingSender && viewingSender !== me?.sender && !(sender === "Seth" && me?.approver));
+  const readOnlyPreview = !Boolean(me?.sender || me?.approver);
   const lock = useRef(false);
   const touchStart = useRef<{id:string;x:number;y:number}|null>(null);
   const [swipingId,setSwipingId] = useState<string|null>(null);
@@ -57,9 +57,7 @@ export function DmQueue({ sender = "Rena" }: { sender?: "Rena" | "Seth" }) {
   useEffect(() => { who().then(setMe).catch(() => setMe({ sender: null, approver: false })); void hydrateCreatorsFromDB().catch(e => setLoadError(e instanceof Error ? e.message : "Could not load outreach queue")); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const pool = useMemo(() => { void version; return CREATORS.filter(inPool).sort((a, b) => a.name.localeCompare(b.name)); }, [version]);
-  const mine = pool.filter((c) => viewingSender && (
-    (c.outreachAssignee === viewingSender && statusOf(c) === "assigned") ||
-    (c.outreachSentBy === viewingSender && Boolean(c.outreachSentAt) && sessionSentIds.includes(c.id)))).sort((a,b)=>Number(laterIds.includes(a.id))-Number(laterIds.includes(b.id)));
+  const mine = pool.filter((c) => !c.outreachSentAt || sessionSentIds.includes(c.id)).sort((a,b)=>Number(laterIds.includes(a.id))-Number(laterIds.includes(b.id)));
   const pending = mine.filter(c=>!c.outreachSentAt);
   const completedThisSession = mine.filter(c=>Boolean(c.outreachSentAt));
   const available = pool.filter((c) => statusOf(c) === "available");
@@ -68,7 +66,8 @@ export function DmQueue({ sender = "Rena" }: { sender?: "Rena" | "Seth" }) {
   const refresh = async () => { try { setLoadError(null); await hydrateCreatorsFromDB(); } catch(e) { setLoadError(e instanceof Error ? e.message : "Could not refresh outreach queue"); } };
 
   const run = async (c: CreatorRow, action: "claim" | "release" | "sent" | "undo_sent") => {
-    await act({ data: { id: c.id, action } });
+    const result = await act({ data: { id: c.id, action } });
+    if (!result?.ok) throw new Error("Server did not confirm the action.");
     await refresh();
   };
 
@@ -105,7 +104,7 @@ export function DmQueue({ sender = "Rena" }: { sender?: "Rena" | "Seth" }) {
     if (!confirm(`Reject ${c.name} as Not Relevant and remove from your queue?`)) return;
     if (!confirm(`Confirm you reviewed the correct TikTok profile for ${c.name} (${c.tiktok}).`)) return;
     lock.current=true;setSavingId(c.id);
-    try { await senderReject({data:{id:c.id,reason:`Rena queue rejection by ${me?.sender ?? "sender"}: Not Relevant after profile review`,checkedProfile:true}}); await refresh(); setActionsId(null); setNotice({kind:"ok",text:`${c.name} rejected as Not Relevant. History kept.`}); }
+    try { const result = await senderReject({data:{id:c.id,reason:`Rena queue rejection by ${me?.sender ?? "sender"}: Not Relevant after profile review`,checkedProfile:true}}); if (!result?.ok) throw new Error("Server did not confirm rejection."); await refresh(); setActionsId(null); setNotice({kind:"ok",text:`${c.name} rejected as Not Relevant. History kept.`}); }
     catch(e){setNotice({kind:"err",text:e instanceof Error?e.message:"Could not reject creator"});}
     finally {lock.current=false;setSavingId(null);}
   };
@@ -113,7 +112,7 @@ export function DmQueue({ sender = "Rena" }: { sender?: "Rena" | "Seth" }) {
   const swipeReject = (c:CreatorRow, x:number, y:number) => {
     const start=touchStart.current; touchStart.current=null;
     if (!start || start.id!==c.id || c.outreachSentAt) return;
-    if (start.x-x>70 && Math.abs(start.y-y)<55) {
+    if (start.x-x>70 && Math.abs(start.y-y)<55 && !lock.current) {
       setSwipingId(c.id); // suppress the synthetic click that would open TikTok
       window.setTimeout(()=>setSwipingId(v=>v===c.id?null:v), 600);
       if (!readOnlyPreview) void reject(c);
@@ -137,7 +136,7 @@ export function DmQueue({ sender = "Rena" }: { sender?: "Rena" | "Seth" }) {
         <div>
           <h1 className="font-display text-2xl text-foreground">{viewingSender === "Rena" ? "Rena’s Outreach Queue" : viewingSender === "Seth" ? "Seth’s Outreach Queue" : `${viewingSender ?? "Team"}’s TikTok DMs`}</h1>
           <p className="text-sm text-muted-foreground">Tap a creator to copy the DM and open TikTok. Tap Sent after sending.</p>
-          {readOnlyPreview ? <p className="text-xs text-muted-foreground">Preview: tap to copy and open TikTok. Only the assigned sender can mark messages done.</p> : null}
+          {readOnlyPreview ? <p className="text-xs text-muted-foreground">You must be signed in as an authorized team member to update CRM records.</p> : null}
         </div>
         <button onClick={() => void refresh()} className="rounded-md border border-input px-3 py-2 text-sm">Refresh</button>
       </div>
@@ -155,7 +154,7 @@ export function DmQueue({ sender = "Rena" }: { sender?: "Rena" | "Seth" }) {
           {notice.dm ? <textarea readOnly value={notice.dm} rows={4} onFocus={(e) => e.currentTarget.select()} className="mt-2 w-full rounded border border-input bg-background p-2 text-sm text-foreground" /> : null}
         </div>
       ) : null}
-      {pending.length === 0 ? <div className="py-8 text-center text-sm text-muted-foreground"><div className="text-base font-semibold text-foreground">No pending creators</div>New assignments will appear here.</div> : null}
+      {pending.length === 0 ? <div className="py-8 text-center text-sm text-muted-foreground"><div className="text-base font-semibold text-foreground">No pending creators</div>Approved creators will appear here.</div> : null}
       <ul className="space-y-2">
         {pending.map((c) => {
           const sent = Boolean(c.outreachSentAt);
