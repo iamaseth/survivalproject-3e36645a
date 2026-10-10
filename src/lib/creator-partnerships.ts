@@ -95,6 +95,7 @@ export interface CreatorRow {
   outreachSentBy?: string | null;
   outreachSentAt?: string | null;
   outreachSecondLookAt?: string | null;
+  workflowStatus?: string | null;
 
   // Derived / workflow additions
   supervisor: "RENA";
@@ -436,6 +437,7 @@ function rowToCreator(r: Record<string, unknown>): CreatorRow {
     outreachSentBy: (r.outreach_sent_by as string | null) ?? null,
     outreachSentAt: (r.outreach_sent_at as string | null) ?? null,
     outreachSecondLookAt: (r.outreach_second_look_at as string | null) ?? null,
+    workflowStatus: (r.workflow_status as string | null) ?? null,
     verificationDate: (r.verification_date as string | null) ?? null,
     followersSignal: (r.followers_signal as string | null) ?? null,
     targetAudience: (r.target_audience as string | null) ?? null,
