@@ -14,7 +14,20 @@ export const getInfluencerMasterCounts = createServerFn({ method: "GET" })
     const sources = Object.fromEntries(entries) as Record<string, number>;
     const { count: boboQueueCount, error: queueError } = await context.supabase.from("influencer_bobo_research_queue").select("*", { count: "exact", head: true });
     if (queueError) throw new Error(queueError.message);
-    return { sources, total: Object.values(sources).reduce((a, b) => a + b, 0), boboQueueCount: boboQueueCount ?? 0 };
+    // Count the newly researched Batch 1 by its stable import ID, without touching source rows.
+    const { data: batch, error: batchError } = await context.supabase.from("creators")
+      .select("id,tiktok,qualification_status,seth_approval_status")
+      .like("id", "bobo-md-20261010-%");
+    if (batchError) throw new Error(batchError.message);
+    const completedUrls = new Set((batch ?? []).map(c => (c.tiktok || "").trim().toLowerCase().replace(/\\/$/, "")).filter(Boolean));
+    const { data: queueMatches, error: matchError } = await context.supabase.from("influencer_bobo_research_queue")
+      .select("profile_url").in("profile_url", (batch ?? []).map(c => c.tiktok).filter(Boolean));
+    if (matchError) throw new Error(matchError.message);
+    const completedInQueue = (queueMatches ?? []).filter(r => completedUrls.has((r.profile_url || "").trim().toLowerCase().replace(/\\/$/, ""))).length;
+    return { sources, total: Object.values(sources).reduce((a, b) => a + b, 0),
+      boboQueueCount: Math.max(0, (boboQueueCount ?? 0) - completedInQueue),
+      aiScreenedCount: (batch ?? []).filter(c => c.qualification_status === "Qualified" && !c.seth_approval_status).length,
+      aiRejectedCount: (batch ?? []).filter(c => c.qualification_status === "Not Relevant" && !c.seth_approval_status).length };
   });
 
 export const listInfluencerOriginals = createServerFn({ method: "GET" })
