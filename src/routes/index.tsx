@@ -30,7 +30,7 @@ function InfluencerHome() {
   const [contactFilter, setContactFilter] = useState("All");
   const [batch, setBatch] = useState<Array<{id:string;name:string;tiktok:string|null;youtube:string|null;instagram:string|null;facebook:string|null;email:string|null;contact_route:string|null;followers_signal:string|null;segment:string|null;target_audience:string|null;other_platform:string|null;personalized_dm:string|null;qualification_status:string|null;seth_approval_status:string|null;outreach_second_look_at:string|null;verification_evidence:string|null}>>([]);
   useEffect(() => { void loadBatch().then(setBatch).catch(console.error); }, [loadBatch]);
-  const [masterCounts, setMasterCounts] = useState<{ total: number; boboQueueCount: number; sources: Record<string,number>; aiScreenedCount:number; aiRejectedCount:number } | null>(null);
+  const [masterCounts, setMasterCounts] = useState<{ total: number; boboQueueCount: number; sources: Record<string,number>; aiScreenedCount:number; aiRejectedCount:number; workflowCounts:Record<"research"|"ai_screened"|"approved"|"sent"|"second_look"|"rejected",number> } | null>(null);
   useEffect(() => { void loadCounts().then(setMasterCounts).catch(console.error); }, [loadCounts]);
   useEffect(() => { void hydrateCreatorsFromDB(); }, []);
   const categories = useMemo(() => {
@@ -63,12 +63,12 @@ function InfluencerHome() {
     // Old AI qualification statuses are intentionally ignored until a fresh-screening stage is persisted.
     const forNow = rows.filter(c => !rejected(c) && !approved(c) && !secondLook(c) && !moreResearch(c));
     return [
-      { name: "For Now", count: forNow.length, to: "/bobo-queue" },
-      { name: "AI Screened", count: batch.filter(c => ["Qualified", "Needs Review"].includes(c.qualification_status || "") && !c.seth_approval_status && !c.outreach_second_look_at && !secondLookIds.includes(c.id)).length, to: "/ai-screened" },
-      { name: "Complete Manual Review", count: rows.filter(approved).length, to: "/creators" },
-      { name: "Take a Second Look", count: rows.filter(secondLook).length, to: "/creators" },
-      { name: "Rejected", count: rows.filter(rejected).length + (masterCounts?.aiRejectedCount ?? 0), to: "/creators" },
-      { name: "Needs More Research", count: rows.filter(moreResearch).length, to: "/creators" },
+      { name: "For Now", count: masterCounts?.workflowCounts?.research ?? forNow.length, to: "/bobo-queue" },
+      { name: "AI Screened", count: masterCounts?.workflowCounts?.ai_screened ?? 0, to: "/ai-screened" },
+      { name: "Manually Approved", count: masterCounts?.workflowCounts?.approved ?? 0, to: "/creators" },
+      { name: "Sent", count: masterCounts?.workflowCounts?.sent ?? 0, to: "/creators" },
+      { name: "Second Look", count: masterCounts?.workflowCounts?.second_look ?? 0, to: "/creators" },
+      { name: "Rejected", count: masterCounts?.workflowCounts?.rejected ?? 0, to: "/creators" },
       { name: "Original List", count: CREATORS.length, to: "/influencer-original" },
     ] as const;
   }, [useCreatorsVersionValue, masterCounts, batch, secondLookIds]);
