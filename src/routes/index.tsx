@@ -82,7 +82,7 @@ function InfluencerHome() {
   });
   const groups = categories.map((category, i) => {
     const rows = i === 0 ? CREATORS.filter(c => !c.sethApprovalStatus && !c.outreachSecondLookAt && !/needs more research/i.test(c.researchStatus || "")).map(fromCreator) : i === 6 ? CREATORS.map(fromCreator) : i === 1
-      ? batch.filter(c => c.qualification_status === "Qualified" && !c.seth_approval_status).map(fromBatch)
+      ? batch.filter(c => ["Qualified", "Needs Review"].includes(c.qualification_status || "") && !c.seth_approval_status).map(fromBatch)
       : i === 4
       ? [...CREATORS.filter(c => c.sethApprovalStatus === "rejected").map(fromCreator), ...batch.filter(c => c.qualification_status === "Not Relevant" && !c.seth_approval_status).map(fromBatch)]
       : i >= 2 && i <= 5
