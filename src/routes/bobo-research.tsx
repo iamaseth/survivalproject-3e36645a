@@ -1,31 +1,22 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { useEffect, useMemo, useState } from "react";
-import { CREATORS, useCreatorsVersion } from "@/lib/creator-partnerships";
-import { getBoboProfileTracking, markBoboProfileTracking } from "@/lib/bobo-tiktok.functions";
+import { useEffect, useState } from "react";
+
+import { getBoboProfileTracking, getBoboResearchQueue, markBoboProfileTracking } from "@/lib/bobo-tiktok.functions";
 
 export const Route = createFileRoute("/bobo-research")({ component: BoboResearch });
 
 function BoboResearch() {
-  useCreatorsVersion();
+  const loadQueue = useServerFn(getBoboResearchQueue);
+  const [candidates, setCandidates] = useState<Array<{id:string;name:string;tiktok:string}>>([]);
   const load = useServerFn(getBoboProfileTracking);
   const mark = useServerFn(markBoboProfileTracking);
   const [opened, setOpened] = useState<string[]>([]);
   const [ready, setReady] = useState(false);
   const [error, setError] = useState("");
-  const candidates = useMemo(() => {
-    const seen = new Set<string>();
-    return CREATORS.filter(c => {
-      if (!c.tiktok || c.sethApprovalStatus === "rejected" || c.sethApprovalStatus === "approved") return false;
-      const key = c.tiktok.toLowerCase().replace(/\/$/, "").trim();
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    }).sort((a, b) => (a.tiktok ?? "").localeCompare(b.tiktok ?? ""));
-  }, [CREATORS]);
   useEffect(() => {
     let active = true;
-    void load().then(r => { if (active) { setOpened(r.opened); setReady(true); } })
+    Promise.all([load(), loadQueue()]).then(([r, queue]) => { if (active) { setOpened(r.opened); setCandidates(queue); setReady(true); } })
       .catch(e => { if (active) setError("Could not load saved progress: " + String(e)); });
     return () => { active = false; };
   }, []);
