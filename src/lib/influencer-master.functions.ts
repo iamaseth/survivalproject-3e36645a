@@ -54,3 +54,13 @@ export const listBoboResearchQueue = createServerFn({ method: "GET" })
     if (error) throw new Error(error.message);
     return { rows: rows ?? [], total: count ?? 0, page };
   });
+
+export const listBatchOneResults = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { data, error } = await context.supabase.from("creators")
+      .select("id,name,tiktok,qualification_status,seth_approval_status,verification_evidence")
+      .like("id", "bobo-md-20261010-%").order("name");
+    if (error) throw new Error(error.message);
+    return data ?? [];
+  });
