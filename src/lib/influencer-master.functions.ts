@@ -33,9 +33,9 @@ export const listBoboResearchQueue = createServerFn({ method: "GET" })
   .inputValidator((data: { page?: number }) => data ?? {})
   .handler(async ({ context, data }) => {
     const page = Math.max(0, Math.floor(data.page ?? 0));
-    const { data: rows, count, error } = await context.supabase.from("influencer_research_staging")
-      .select("id,handle,profile_url,research_stage,md_content", { count: "exact" })
-      .eq("research_stage", "for_now").order("id").range(page * 100, page * 100 + 99);
+    const { data: rows, count, error } = await context.supabase.from("influencer_bobo_research_queue")
+      .select("source_table,source_id,display_name,profile_url,stage", { count: "exact" })
+      .order("source_table").order("source_id").range(page * 100, page * 100 + 99);
     if (error) throw new Error(error.message);
     return { rows: rows ?? [], total: count ?? 0, page };
   });
