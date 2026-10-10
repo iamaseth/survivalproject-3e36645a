@@ -59,7 +59,7 @@ export const listBatchOneResults = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const { data, error } = await context.supabase.from("creators")
-      .select("id,name,tiktok,youtube,instagram,facebook,email,contact_route,followers_signal,segment,target_audience,other_platform,personalized_dm,qualification_status,seth_approval_status,verification_evidence")
+      .select("id,name,tiktok,youtube,instagram,facebook,email,contact_route,followers_signal,segment,target_audience,other_platform,personalized_dm,qualification_status,seth_approval_status,outreach_second_look_at,verification_evidence")
       .like("id", "bobo-md-20261010-%").order("name");
     if (error) throw new Error(error.message);
     return data ?? [];
@@ -78,4 +78,15 @@ export const saveInfluencerDmDraft = createServerFn({ method: "POST" })
       .select("id,personalized_dm").single();
     if (error) throw new Error(error.message);
     return saved;
+  });
+
+
+/** Move an unapproved AI-screened creator to manual Second Look. */
+export const moveAiScreenedToSecondLook = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: { id: string }) => { if (!data?.id) throw new Error("Missing creator ID"); return data; })
+  .handler(async ({ context, data }) => {
+    const { data: result, error } = await context.supabase.rpc("ai_screened_second_look" as never, { p_id: data.id } as never);
+    if (error) throw new Error(error.message);
+    return result as { ok: boolean };
   });
