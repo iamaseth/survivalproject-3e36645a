@@ -1705,6 +1705,10 @@ export type Database = {
         Returns: Json
       }
       outreach_my_sender: { Args: never; Returns: string }
+      sender_reject_assigned: {
+        Args: { p_checked_profile: boolean; p_id: string; p_reason: string }
+        Returns: Json
+      }
       seth_review_creator: {
         Args: {
           p_checked_profile: boolean
