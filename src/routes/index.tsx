@@ -13,7 +13,7 @@ export const Route = createFileRoute("/")({
 function InfluencerHome() {
   const useCreatorsVersionValue = useCreatorsVersion();
   const loadCounts = useServerFn(getInfluencerMasterCounts);
-  const [masterCounts, setMasterCounts] = useState<{ total: number; sources: Record<string,number> } | null>(null);
+  const [masterCounts, setMasterCounts] = useState<{ total: number; boboQueueCount: number; sources: Record<string,number> } | null>(null);
   useEffect(() => { void loadCounts().then(setMasterCounts).catch(console.error); }, [loadCounts]);
   useEffect(() => { void hydrateCreatorsFromDB(); }, []);
   const categories = useMemo(() => {
@@ -59,7 +59,7 @@ function InfluencerHome() {
     <h1 className="mb-6 text-2xl font-bold">Influencers</h1>
     {categories.map((c, i) => <Link key={c.name} to={c.to} className="flex min-h-20 items-center justify-between rounded-xl border bg-card px-5 py-4 hover:border-primary/50">
       <span className="font-semibold">{i + 1}. {c.name}</span>
-      <span className="flex items-center gap-4"><span className="tabular-nums text-muted-foreground">{c.name === "Original List" && masterCounts ? masterCounts.total.toLocaleString() : c.name === "For Now" && masterCounts ? `${masterCounts.sources.influencer_research_staging.toLocaleString()} new + existing` : c.count}</span><ArrowRight className="h-5 w-5" /></span>
+      <span className="flex items-center gap-4"><span className="tabular-nums text-muted-foreground">{c.name === "Original List" && masterCounts ? masterCounts.total.toLocaleString() : c.name === "For Now" && masterCounts ? masterCounts.boboQueueCount.toLocaleString() : c.count}</span><ArrowRight className="h-5 w-5" /></span>
     </Link>)}
   </main>;
 }
