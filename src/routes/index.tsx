@@ -145,7 +145,7 @@ function InfluencerHome() {
         className="flex min-h-20 w-full items-center justify-between px-5 py-4 text-left hover:bg-muted/50">
         <span className="font-semibold">{i + 1}. {i === 2 ? "Already Manually Approved" : c.name}</span>
         <span className="flex items-center gap-4">
-          <span className="tabular-nums text-muted-foreground">{(platform === "All" && contactFilter === "All" ? (i === 6 && masterCounts ? masterCounts.total : c.count) : c.visibleCount).toLocaleString()}</span>
+          <span className="tabular-nums text-muted-foreground">{(platform === "All" && contactFilter === "All" ? (c.count) : c.visibleCount).toLocaleString()}</span>
           <ChevronDown className={`h-5 w-5 transition-transform ${expanded === i ? "rotate-180" : ""}`} />
         </span>
       </button>
@@ -213,7 +213,8 @@ function InfluencerHome() {
                 })}</div>
                 <p className="text-xs text-muted-foreground">Existing manual decisions are preserved. Approval changes are not made from this view.</p>
               </div>
-            </details>})}
+            </details>;
+            })}
           </div>
           <div className="mt-3 flex items-center justify-between gap-2">
             <button type="button" disabled={workflowPage === 0 || workflowLoading} className="rounded-md border px-3 py-2 disabled:opacity-40" onClick={() => setWorkflowPage(p=>Math.max(0,p-1))}>Previous</button>
