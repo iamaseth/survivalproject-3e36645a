@@ -1,4 +1,5 @@
 import { SecondLookPanel } from "@/components/SecondLookPanel";
+import { AI_SCREENED_131_IDS } from "@/lib/ai-screened-131";
 import { SethReviewPanel } from "@/components/SethReviewPanel";
 import { createFileRoute, Link, Outlet, useRouterState } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
@@ -107,6 +108,7 @@ function CreatorPipeline() {
   const [personalizedOpen,setPersonalizedOpen]=useState(false);
   const [reviewOpen,setReviewOpen]=useState(false);
   const [rejectedOpen,setRejectedOpen]=useState(false);
+  const [researchOpen,setResearchOpen]=useState(false);
   const [personalizationImporting,setPersonalizationImporting]=useState(false);
   const [qualificationImporting,setQualificationImporting]=useState(false);
   const importPersonalization=useServerFn(importCreatorPersonalization);
@@ -133,6 +135,8 @@ function CreatorPipeline() {
   const filtersActive = Boolean(query || platformFilter !== "all" || contactFilter !== "all" || nicheFilter !== "all");
   const grouped = useMemo(() => { const out: Record<StageKey, CreatorRow[]> = { not_contacted: [], contacted: [], follow_up: [], responded: [], sample: [] }; creators.forEach((c) => { if (c.qualificationStatus !== "Not Relevant") out[stageFor(c)].push(c); }); return out; }, [creators]);
   const rejectedCreators = useMemo(() => creators.filter(c => c.qualificationStatus === "Not Relevant" || c.sethApprovalStatus === "rejected"), [creators]);
+  const manualRejectedCreators = useMemo(() => creators.filter(c => c.sethApprovalStatus === "rejected"), [creators]);
+  const researchBacklog = useMemo(() => creators.filter(c => c.sethApprovalStatus !== "approved" && c.sethApprovalStatus !== "rejected" && !c.outreachSecondLookAt && !AI_SCREENED_131_IDS.has(c.id)), [creators]);
   const needsReview = useMemo(() => creators.filter((c) => stageFor(c) === "not_contacted" && c.qualificationStatus !== "Qualified" && c.qualificationStatus !== "Not Relevant"), [creators]);
   const needsPersonalization = useMemo(() => creators.filter((c) => stageFor(c) === "not_contacted" && !personalizationReady(c) && c.personalizationStatus?.toLowerCase() !== "needs review"), [creators]);
   const readyToContact = useMemo(() => creators.filter((c) => stageFor(c) === "not_contacted" && personalizationReady(c) && c.qualificationStatus !== "Not Relevant"), [creators]);
@@ -266,7 +270,29 @@ function CreatorPipeline() {
       </div>
       <div className="mt-2 text-xs text-muted-foreground">Showing {creators.length} of {CREATORS.length} creators. Platform describes where they publish; contact method describes how Rena can reach them.</div><div className="mt-3 flex flex-wrap items-center gap-2"><label className={`inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-input bg-background px-3 py-2 text-sm font-medium hover:bg-secondary ${qualificationImporting ? "pointer-events-none opacity-50" : ""}`}><Upload className="h-4 w-4"/>{qualificationImporting ? "Importing qualification…" : "Import Qualification CSV"}<input type="file" accept=".csv,text/csv" className="hidden" disabled={qualificationImporting} onChange={(e)=>{const file=e.target.files?.[0]; if(file) void importQualificationCsv(file); e.currentTarget.value="";}}/></label><button type="button" onClick={exportFilteredCreators} className="inline-flex items-center gap-1.5 rounded-md border border-input bg-background px-3 py-2 text-sm font-medium hover:bg-secondary"><Download className="h-4 w-4"/>Export Filtered Creators CSV ({creators.length})</button><span className="text-xs text-muted-foreground">Updates only Creator ID + Qualification Status.</span></div>
     </div>
-    <div className="space-y-3"><SecondLookPanel/><SethReviewPanel/><section className="overflow-hidden rounded-xl border border-border bg-card"><button onClick={()=>setReviewOpen(v=>!v)} aria-expanded={reviewOpen} className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-secondary/40">{reviewOpen?<ChevronDown className="h-4 w-4"/>:<ChevronRight className="h-4 w-4"/>}<div className="grid h-7 w-7 place-items-center rounded-full bg-amber-600 text-xs font-semibold text-white">?</div><div className="min-w-0 flex-1"><div className="font-semibold">Needs Manual Review <span className="ml-1 text-sm font-normal text-muted-foreground">({needsReview.length})</span></div><div className="text-xs text-muted-foreground">Research and personalize before final approval.</div></div><span className="rounded-md border border-input bg-background px-2.5 py-1 text-xs font-medium">{reviewOpen?"Close":"Open"}</span></button>{reviewOpen?<div className="border-t border-border">{needsReview.length===0?<div className="px-4 py-5 text-sm text-muted-foreground">Nothing here.</div>:needsReview.map((creator)=><CreatorLine key={creator.id} creator={creator}/>)}</div>:null}</section><section className="overflow-hidden rounded-xl border border-border bg-card"><button type="button" onClick={()=>setRejectedOpen(v=>!v)} aria-expanded={rejectedOpen} className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-secondary/40">{rejectedOpen?<ChevronDown className="h-4 w-4"/>:<ChevronRight className="h-4 w-4"/>}<div className="grid h-7 w-7 place-items-center rounded-full bg-muted text-muted-foreground">3</div><div className="min-w-0 flex-1 font-semibold">Rejected <span className="text-sm font-normal text-muted-foreground">({rejectedCreators.length})</span></div><span className="text-xs text-muted-foreground">{rejectedOpen?"Close":"Open"}</span></button>{rejectedOpen&&<div className="border-t border-border">{rejectedCreators.map(c=><CreatorLine key={c.id} creator={c}/>)}</div>}</section>{STAGES.filter((stage)=>stage.key!=="not_contacted").map((stage)=><StageSection key={stage.key} stage={stage} rows={grouped[stage.key]} open={openStages[stage.key]} toggle={()=>setOpenStages((s)=>({...s,[stage.key]:!s[stage.key]}))}/>)} <YouTubeCandidatesSection rows={ytRows} refresh={refreshYT}/></div>
+    <div className="space-y-3">
+      <SethReviewPanel />
+      <SecondLookPanel />
+      <section className="overflow-hidden rounded-xl border border-border bg-card">
+        <button type="button" onClick={() => setRejectedOpen(v => !v)} aria-expanded={rejectedOpen} className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-secondary/40">
+          {rejectedOpen ? <ChevronDown className="h-4 w-4"/> : <ChevronRight className="h-4 w-4"/>}
+          <span className="flex-1 font-semibold">Rejected — Manual Decisions ({manualRejectedCreators.length})</span>
+          <span className="text-xs text-muted-foreground">{rejectedOpen ? "Close" : "Open"}</span>
+        </button>
+        {rejectedOpen && <div className="border-t border-border">{manualRejectedCreators.map(c => <div key={c.id} className="flex items-center justify-between gap-3 border-b p-3 text-sm"><span>{c.name}</span>{c.tiktok && <a href={c.tiktok} target="_blank" rel="noopener noreferrer" className="underline">Profile</a>}</div>)}</div>}
+      </section>
+      <section className="overflow-hidden rounded-xl border border-border bg-card">
+        <button type="button" onClick={() => setResearchOpen(v => !v)} aria-expanded={researchOpen} className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-secondary/40">
+          {researchOpen ? <ChevronDown className="h-4 w-4"/> : <ChevronRight className="h-4 w-4"/>}
+          <span className="flex-1"><span className="font-semibold">Needs More Research ({researchBacklog.length})</span><span className="block text-xs text-muted-foreground">Not approved. Video research is paused. Existing qualification labels are not proof of review.</span></span>
+          <span className="text-xs text-muted-foreground">{researchOpen ? "Close" : "Open"}</span>
+        </button>
+        {researchOpen && <div className="border-t border-border">
+          {researchBacklog.slice(0,100).map(c => <div key={c.id} className="flex items-center justify-between gap-3 border-b px-4 py-2 text-sm"><span>{c.name}</span>{c.tiktok && <a href={c.tiktok} target="_blank" rel="noopener noreferrer" className="underline">Profile</a>}</div>)}
+          {researchBacklog.length > 100 && <p className="p-3 text-xs text-muted-foreground">Showing first 100. Use the creator search above to narrow the list.</p>}
+        </div>}
+      </section>
+    </div>
     <div className="mt-8"><PipelineCounters counts={totals}/></div>
   </div>;
 }
