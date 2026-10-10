@@ -56,7 +56,6 @@ export function DmQueue({ sender = "Rena" }: { sender?: "Rena" | "Seth" }) {
   const activityFn = useServerFn(getOutreachTodayActivity);
   const [activity,setActivity] = useState<OutreachActivityRow[]>([]);
   const [activityError,setActivityError] = useState<string|null>(null);
-  const [showActivity,setShowActivity] = useState(true);
   const refreshActivity = async () => { try { setActivity(await activityFn());setActivityError(null); } catch(e) { setActivityError(e instanceof Error?e.message:"Could not load activity"); } };
 
   useEffect(() => { if ("serviceWorker" in navigator) navigator.serviceWorker.register("/rena-sw.js").catch(() => {}); }, []);
@@ -70,6 +69,8 @@ export function DmQueue({ sender = "Rena" }: { sender?: "Rena" | "Seth" }) {
   const completedToday = [...todayLatest.values()].filter(a=>["sent","rejected","later"].includes(a.action));
   const available = pool.filter((c) => statusOf(c) === "available");
   const done = completedToday.length;
+  const completedIds = new Set(completedToday.map(a=>a.creator_id));
+  const tiles = [...pending.filter(c=>!completedIds.has(c.id)), ...completedToday.map(a=>CREATORS.find(c=>c.id===a.creator_id)).filter((c):c is CreatorRow=>Boolean(c))];
 
   const refresh = async () => { try { setLoadError(null); await hydrateCreatorsFromDB(); await refreshActivity(); } catch(e) { setLoadError(e instanceof Error ? e.message : "Could not refresh outreach queue"); } };
 
@@ -148,11 +149,11 @@ export function DmQueue({ sender = "Rena" }: { sender?: "Rena" | "Seth" }) {
         <button onClick={() => void refresh()} className="rounded-md border border-input px-3 py-2 text-sm">Refresh</button>
       </div>
       <div className="sticky top-0 z-10 rounded-xl border border-border bg-card p-3">
-        <div className="flex justify-between text-sm font-semibold"><span>{done} done today</span><span>{pending.length} left</span></div>
+        <div className="flex justify-between text-sm font-semibold"><span>{done} done today</span><span>{pending.filter(c=>!completedIds.has(c.id)).length} left</span></div>
         <div className="mt-2 h-2 overflow-hidden rounded-full bg-secondary">
           <div className="h-full bg-emerald-600 transition-all" style={{ width: `${mine.length ? (done / mine.length) * 100 : 0}%` }} />
         </div>
-        <p className="mt-2 text-[11px] text-muted-foreground">Completed creators move to Today’s Activity. Later moves creators to Seth’s shared Second Look. Not Relevant creators are removed from the queue.</p>
+        <p className="mt-2 text-[11px] text-muted-foreground">Finished tiles turn green (Sent), red (Rejected), or amber (Later). Completed work remains visible until tomorrow.</p>
       </div>
       {loadError ? <p role="alert" className="rounded border border-red-600 p-3 text-sm">{loadError}</p> : null}
       {notice ? (
@@ -161,20 +162,22 @@ export function DmQueue({ sender = "Rena" }: { sender?: "Rena" | "Seth" }) {
           {notice.dm ? <textarea readOnly value={notice.dm} rows={4} onFocus={(e) => e.currentTarget.select()} className="mt-2 w-full rounded border border-input bg-background p-2 text-sm text-foreground" /> : null}
         </div>
       ) : null}
-      {pending.length === 0 ? <div className="py-8 text-center text-sm text-muted-foreground"><div className="text-base font-semibold text-foreground">No pending creators</div>Approved creators will appear here.</div> : null}
+      {tiles.length === 0 ? <div className="py-8 text-center text-sm text-muted-foreground"><div className="text-base font-semibold text-foreground">No pending creators</div>Approved creators will appear here.</div> : null}
       <ul className="space-y-2">
-        {pending.map((c) => {
+        {tiles.map((c) => {
+          const completedAction = completedIds.has(c.id) ? todayLatest.get(c.id)?.action : undefined;
+          const finished = Boolean(completedAction);
           const sent = Boolean(c.outreachSentAt);
           return (
-            <li key={c.id} className="flex flex-wrap items-stretch gap-2" onTouchStart={e=>{const t=e.touches[0];touchStart.current={id:c.id,x:t.clientX,y:t.clientY};}} onTouchEnd={e=>{const t=e.changedTouches[0];swipeReject(c,t.clientX,t.clientY);}}>
-              <a href={sent ? undefined : c.tiktok!} target="_blank" rel="noopener noreferrer" aria-disabled={sent || savingId === c.id}
-                onClick={(e) => { if (sent || lock.current || swipingId===c.id) { e.preventDefault(); return; } onTap(c); }}
-                className={`flex min-h-[76px] flex-1 flex-col justify-center rounded-xl border-2 px-4 py-3 ${sent ? "border-emerald-600 bg-emerald-100 text-emerald-950" : "border-border bg-card text-foreground active:bg-secondary"}`}>
-                <span className="text-base font-semibold">{sent ? "✓ " : ""}{c.name}</span>
-                <span className="text-xs opacity-75">{c.followersSignal?.trim() ? `${c.followersSignal.trim()} followers` : "Followers not recorded"}{savingId === c.id ? " · saving…" : sent ? " · done" : ""}</span>
+            <li key={c.id} className="flex flex-wrap items-stretch gap-2" onTouchStart={e=>{if(finished)return;const t=e.touches[0];touchStart.current={id:c.id,x:t.clientX,y:t.clientY};}} onTouchEnd={e=>{if(finished)return;const t=e.changedTouches[0];swipeReject(c,t.clientX,t.clientY);}}>
+              <a href={finished ? undefined : c.tiktok!} target="_blank" rel="noopener noreferrer" aria-disabled={finished || savingId === c.id}
+                onClick={(e) => { if (finished || lock.current || swipingId===c.id) { e.preventDefault(); return; } onTap(c); }}
+                className={`flex min-h-[76px] flex-1 flex-col justify-center rounded-xl border-2 px-4 py-3 ${completedAction==="sent" ? "border-emerald-600 bg-emerald-100 text-emerald-950" : completedAction==="rejected" ? "border-red-600 bg-red-100 text-red-950" : completedAction==="later" ? "border-amber-600 bg-amber-100 text-amber-950" : "border-border bg-card text-foreground active:bg-secondary"}`}>
+                <span className="text-base font-semibold">{finished ? "✓ " : ""}{c.name}</span>
+                <span className="text-xs opacity-75">{c.followersSignal?.trim() ? `${c.followersSignal.trim()} followers` : "Followers not recorded"}{savingId === c.id ? " · saving…" : finished ? ` · ${completedAction==="sent"?"Sent":completedAction==="rejected"?"Rejected — Not Relevant":"Later — Seth Review"}` : ""}</span>
               </a>
-              {!sent && !readOnlyPreview && <button type="button" disabled={savingId===c.id} onClick={()=>void simple(c,"sent")} className="rounded-xl bg-emerald-700 px-3 text-sm font-semibold text-white">Sent</button>}
-              <button type="button" onClick={()=>setActionsId(v=>v===c.id?null:c.id)} className="rounded-xl border border-border px-3 text-sm" aria-label={`Actions for ${c.name}`}>•••</button>
+              {!finished && !readOnlyPreview && <button type="button" disabled={savingId===c.id} onClick={()=>void simple(c,"sent")} className="rounded-xl bg-emerald-700 px-3 text-sm font-semibold text-white">Sent</button>}
+              {!finished && <button type="button" onClick={()=>setActionsId(v=>v===c.id?null:c.id)} className="rounded-xl border border-border px-3 text-sm" aria-label={`Actions for ${c.name}`}>•••</button>}
               {actionsId===c.id && <div className="basis-full grid w-full grid-cols-4 gap-1 rounded-xl border p-2 text-xs font-medium">
                 <button type="button" disabled={readOnlyPreview || !sent} onClick={()=>{setActionsId(null);void simple(c,"undo_sent");}} className="flex min-h-14 flex-col items-center justify-center rounded-lg bg-blue-100 text-blue-900 disabled:opacity-40"><span className="text-xl">↶</span>Undo</button>
                 <button type="button" disabled={readOnlyPreview || sent} onClick={()=>void reject(c)} className="flex min-h-14 flex-col items-center justify-center rounded-lg bg-red-100 text-red-900 disabled:opacity-40"><span className="text-xl">✕</span>Reject</button>
@@ -185,10 +188,7 @@ export function DmQueue({ sender = "Rena" }: { sender?: "Rena" | "Seth" }) {
           );
         })}
       </ul>
-      <section className="mt-5 overflow-hidden rounded-xl border-2 border-emerald-600 bg-emerald-50 text-emerald-950">
-        <button type="button" onClick={()=>setShowActivity(v=>!v)} className="flex w-full items-center justify-between p-4 text-left font-semibold"><span>✓ Today's Activity — {done} completed</span><span>{showActivity?"▲":"▼"}</span></button>
-        {showActivity&&<div className="space-y-2 border-t border-emerald-200 p-3">{activityError&&<p role="alert" className="text-sm text-red-700">{activityError}</p>}{completedToday.length===0?<p className="text-sm">No completed actions today.</p>:completedToday.map(a=><div key={a.creator_id} className="flex items-center justify-between gap-2 rounded-lg border border-emerald-300 bg-white p-3"><div><div className="font-semibold">{a.creator_name??a.creator_id}</div><div className="text-xs">{a.action==="sent"?"✓ Sent":a.action==="rejected"?"✕ Not Relevant":"◷ Later — Seth Review"} · {a.actor} · {new Date(a.created_at).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"})}</div></div>{a.action==="sent"&&!readOnlyPreview&&<button type="button" onClick={()=>{const c=CREATORS.find(x=>x.id===a.creator_id);if(c)void simple(c,"undo_sent");}} className="rounded-lg border px-3 py-2 text-sm">Undo</button>}</div>)}</div>}
-      </section>
+
 
     </div>
   );
