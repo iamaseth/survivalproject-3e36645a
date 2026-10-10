@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { ChevronDown, ExternalLink } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { getInfluencerMasterCounts, listBatchOneResults } from "@/lib/influencer-master.functions";
+import { getInfluencerMasterCounts, listBatchOneResults, saveInfluencerDmDraft } from "@/lib/influencer-master.functions";
 import { CREATORS, hydrateCreatorsFromDB, useCreatorsVersion } from "@/lib/creator-partnerships";
 
 export const Route = createFileRoute("/")({
@@ -11,6 +11,10 @@ export const Route = createFileRoute("/")({
 });
 
 function InfluencerHome() {
+  const saveDraft = useServerFn(saveInfluencerDmDraft);
+  const [draftEdits, setDraftEdits] = useState<Record<string,string>>({});
+  const [draftBusy, setDraftBusy] = useState<string | null>(null);
+  const [draftNotice, setDraftNotice] = useState<Record<string,string>>({});
   const useCreatorsVersionValue = useCreatorsVersion();
   const loadCounts = useServerFn(getInfluencerMasterCounts);
   const loadBatch = useServerFn(listBatchOneResults);
@@ -134,7 +138,23 @@ function InfluencerHome() {
                 {person.evidence && <p><strong>Evidence:</strong> {person.evidence}</p>}
                 {person.email && <p className="text-sm"><strong>Email:</strong> <a className="underline" href={`mailto:${person.email}`}>{person.email}</a></p>}
                 {normalize(person.contactPage) && <a className="inline-flex items-center gap-1 underline" href={normalize(person.contactPage)!} target="_blank" rel="noopener noreferrer">Contact page <ExternalLink className="h-4 w-4" /></a>}
-                {person.dm && <div className="rounded-lg border bg-muted/30 p-3"><strong>Personalized DM draft:</strong><p className="mt-1 whitespace-pre-wrap">{person.dm}</p><button type="button" className="mt-2 rounded border px-3 py-1" onClick={() => void navigator.clipboard.writeText(person.dm!)}>Copy DM</button></div>}
+                {person.dm && <div className="rounded-lg border bg-muted/30 p-3">
+                  <label htmlFor={`dm-${person.id}`} className="block font-semibold">Rena's personalized DM draft</label>
+                  <textarea id={`dm-${person.id}`} rows={5} className="mt-2 w-full resize-y rounded-lg border bg-background p-3 text-sm" value={draftEdits[person.id] ?? person.dm} onChange={e => setDraftEdits(prev => ({...prev,[person.id]:e.target.value}))} />
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <button type="button" disabled={draftBusy === person.id || !(draftEdits[person.id] ?? person.dm).trim()} className="rounded-lg bg-primary px-3 py-2 font-semibold text-primary-foreground disabled:opacity-50" onClick={async () => {
+                      setDraftBusy(person.id); setDraftNotice(prev => ({...prev,[person.id]:""}));
+                      try {
+                        const saved = await saveDraft({data:{id:person.id,dm:draftEdits[person.id] ?? person.dm!}});
+                        setBatch(prev => prev.map(c => c.id === person.id ? {...c,personalized_dm:saved.personalized_dm} : c));
+                        setDraftNotice(prev => ({...prev,[person.id]:"Saved to CRM"}));
+                      } catch (e) {setDraftNotice(prev => ({...prev,[person.id]:"Save failed: "+String(e)}));}
+                      finally {setDraftBusy(null);}
+                    }}>{draftBusy === person.id ? "Saving…" : "Save DM"}</button>
+                    <button type="button" className="rounded-lg border px-3 py-2" onClick={() => void navigator.clipboard.writeText(draftEdits[person.id] ?? person.dm!)}>Copy DM</button>
+                  </div>
+                  {draftNotice[person.id] && <p role="status" className="mt-2 text-xs">{draftNotice[person.id]}</p>}
+                </div>}
                 {person.note && person.note !== person.evidence && <p className="whitespace-pre-wrap text-sm text-muted-foreground">{person.note}</p>}
                 <div className="flex flex-wrap gap-3">{(["tiktok","youtube","instagram","facebook"] as const).map(p => {
                   const url = normalize(person[p]);
