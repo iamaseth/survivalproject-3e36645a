@@ -75,29 +75,33 @@ export function BoboCandidateQueue() {
     const a=document.createElement("a");const url=URL.createObjectURL(new Blob([csv],{type:"text/csv"}));
     a.href=url;a.download="bobo-creator-md-progress.csv";a.click();URL.revokeObjectURL(url);
   }
-  return <section className="space-y-4 rounded-xl border-2 border-primary p-4">
-    <h2 className="text-xl font-bold">New Creator Research / ស្រាវជ្រាវអ្នកបង្កើតថ្មី</h2>
-    <p className="text-sm">Load the creator list once. Open TikTok, save the page in Obsidian, return and click Saved MD → Next. No typing or pasting required.</p>
-    <label className="block rounded-lg border p-3 font-semibold">Load creator CSV / ផ្ទុក CSV
-      <input type="file" accept=".csv,text/csv" className="mt-2 block w-full text-sm" onChange={e=>void upload(e.target.files?.[0])}/>
-    </label>
-    {error&&<p role="alert" className="text-red-600">{error}</p>}
-    <div className="grid grid-cols-3 gap-2 text-center">
-      <div className="rounded-lg bg-muted p-3"><strong className="block text-2xl">{saved}</strong>Saved MD</div>
-      <div className="rounded-lg bg-muted p-3"><strong className="block text-2xl">{remaining.length}</strong>Remaining</div>
-      <div className="rounded-lg bg-muted p-3"><strong className="block text-2xl">{skipped}</strong>Skipped</div>
+  return <section className="space-y-3">
+    <h1 className="text-2xl font-bold">BoBo · TikTok Profiles</h1>
+    {!creators.length && <label className="block rounded-lg border p-3 text-sm">Load the 1,534 profiles once
+      <input type="file" accept=".csv,text/csv" className="mt-2 block w-full" onChange={e=>void upload(e.target.files?.[0])}/>
+    </label>}
+    {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
+    <p className="font-semibold">{saved+skipped} / {creators.length} done</p>
+    <div className="h-2 rounded-full bg-muted overflow-hidden"><div className="h-full bg-primary" style={{width:`${creators.length?(saved+skipped)/creators.length*100:0}%`}} /></div>
+    <p className="text-xs text-muted-foreground">Click a profile to open TikTok. Save the page to Obsidian, then return and click its circle to cross it off.</p>
+    <div className="space-y-1">
+      {creators.map((c,i)=>{
+        const finished=!!progress[c.handle];
+        return <div key={c.handle} className={`flex items-center gap-3 rounded-lg border px-3 py-2 ${finished?"bg-muted opacity-60":""}`}>
+          <button aria-label={finished?"Undo completed":"Mark saved to Obsidian"} className={`h-8 w-8 shrink-0 rounded-full border-2 font-bold ${finished?"bg-primary text-primary-foreground":""}`}
+            onClick={()=>{
+              const next={...progress};if(finished)delete next[c.handle];else next[c.handle]="saved";
+              setProgress(next);localStorage.setItem(PROGRESS_KEY,JSON.stringify(next));
+            }}>{finished?"✓":""}</button>
+          <a className={`min-w-0 flex-1 py-2 font-medium ${finished?"line-through":""}`} href={c.profile_url} target="_blank" rel="noopener noreferrer">
+            {i+1}. @{c.handle} ↗
+          </a>
+        </div>;
+      })}
     </div>
-    {current?<div className="space-y-3 rounded-lg border p-4">
-      <strong className="block text-xl">@{current.handle}</strong>
-      <a className="block rounded-lg bg-primary px-4 py-4 text-center text-lg font-bold text-primary-foreground" href={current.profile_url} target="_blank" rel="noopener noreferrer">Open TikTok Profile ↗ / បើក TikTok</a>
-      <p className="text-sm">Copy real profile details into the Markdown template, save it in Obsidian, then press Next. Downloading a blank template is not research.</p>\n      <button className="w-full rounded-lg border px-4 py-3 font-semibold" onClick={downloadMd}>Download .md template / ទាញយកឯកសារ .md</button>
-      <button className="w-full rounded-lg bg-emerald-700 px-4 py-4 text-lg font-bold text-white" onClick={()=>mark("saved")}>Saved MD → Next / រក្សាទុក → បន្ទាប់</button>
-      <button className="w-full rounded-lg border px-4 py-3" onClick={()=>mark("skipped")}>Skip → Next / រំលង</button>
-    </div>:creators.length?<p className="font-bold">All candidate profiles accounted for.</p>:<p>Load the CSV to begin.</p>}
-    <div className="flex flex-wrap gap-3">
-      <button className="rounded-lg border px-4 py-3" onClick={undo} disabled={!history.length}>Undo last</button>
-      <button className="rounded-lg border px-4 py-3" onClick={exportProgress} disabled={!creators.length}>Export progress CSV</button>
-    </div>
-    <p className="text-xs text-muted-foreground">Progress is saved only in this browser. Export the progress CSV regularly. Importing this list does NOT add rows to the CRM database.</p>
+    {!!creators.length && <div className="flex gap-3 pt-3">
+      <button className="rounded-lg border px-3 py-2 text-sm" onClick={exportProgress}>Export progress</button>
+      <label className="rounded-lg border px-3 py-2 text-sm">Replace list<input type="file" accept=".csv,text/csv" className="sr-only" onChange={e=>void upload(e.target.files?.[0])}/></label>
+    </div>}
   </section>;
 }
