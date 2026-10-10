@@ -117,8 +117,15 @@ function InfluencerHome() {
         {<>
           {c.rows.length === 0 && <p className="text-sm text-muted-foreground">No profiles in this section.</p>}
           <div className="max-h-[520px] space-y-2 overflow-y-auto">
-            {c.rows.map(person => <details key={person.id} className="rounded-lg border px-3 py-2">
-              <summary className="cursor-pointer font-medium">{person.name || person.id}</summary>
+            {c.rows.map(person => <details key={person.id} className="rounded-xl border bg-card px-3 py-2 shadow-sm transition-colors hover:border-primary/30">
+              <summary className="group flex cursor-pointer list-none flex-wrap items-center gap-x-3 gap-y-2 rounded-lg py-1 [&::-webkit-details-marker]:hidden">
+                <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
+                <span className="min-w-0 flex-1 truncate font-semibold">{person.name || person.id}</span>
+                {person.followers && <span className="shrink-0 rounded-full bg-muted px-2 py-1 text-xs font-medium tabular-nums">{person.followers} followers</span>}
+                {normalize(person.tiktok || person.youtube || person.instagram || person.facebook) && <a href={normalize(person.tiktok || person.youtube || person.instagram || person.facebook)!} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs font-medium hover:bg-muted" title="Open social profile">Profile <ExternalLink className="h-3 w-3" /></a>}
+                {person.email && <a href={`mailto:${person.email}`} onClick={e => e.stopPropagation()} className="rounded-md border px-2 py-1 text-xs font-semibold hover:bg-muted" title={person.email}>E</a>}
+                {(normalize(person.contactPage) || person.contact) && <a href={normalize(person.contactPage) || (person.email ? `mailto:${person.email}` : normalize(person.tiktok || person.instagram || person.facebook) || "#")} target={normalize(person.contactPage) ? "_blank" : undefined} rel="noopener noreferrer" onClick={e => e.stopPropagation()} className="rounded-md bg-primary px-2 py-1 text-xs font-semibold text-primary-foreground" title={person.contact || "Contact page"}>Contact</a>}
+              </summary>
               <div className="space-y-2 pt-2 text-sm">
                 <div className="grid grid-cols-1 gap-x-6 gap-y-2 sm:grid-cols-2">
                   {([
