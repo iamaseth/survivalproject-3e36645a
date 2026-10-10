@@ -20,7 +20,7 @@ export function SethReviewPanel() {
   useEffect(() => { check().then(r => setAllowed(r.approver)).catch(() => setAllowed(false)); }, []);
   useEffect(() => { if (allowed) refreshCreatorsFromDB().catch(() => setError("Could not load creators. Reload to retry.")).finally(() => setLoaded(true)); }, [allowed]);
   const rows = useMemo(() => CREATORS.filter(c => AI_SCREENED_131_IDS.has(c.id) && c.tiktok && !c.contactedDate && !c.outreachSentAt && !c.sethApprovalStatus).sort((a,b) => a.name.localeCompare(b.name)), [version, revision]);
-  const approved = useMemo(() => CREATORS.filter(c => c.sethApprovalStatus === "approved" && !c.outreachSecondLookAt && !c.outreachSentAt && !c.contactedDate), [version, revision]);
+  const approved = useMemo(() => CREATORS.filter(c => c.sethApprovalStatus === "approved" && !c.outreachSecondLookAt), [version, revision]);
   const [q,setQ] = useState("");
   const others = useMemo(() => CREATORS.filter(c => c.tiktok && !rows.includes(c) && !approved.includes(c)).filter(c => !q || (c.name+" "+c.tiktok).toLowerCase().includes(q.toLowerCase())).slice(0,100), [rows, approved, q]);
   const assignApproved = useServerFn(outreachPoolAction);
