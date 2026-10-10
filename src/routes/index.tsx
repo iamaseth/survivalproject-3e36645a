@@ -126,22 +126,16 @@ function InfluencerHome() {
                 {person.email && <a href={`mailto:${person.email}`} onClick={e => e.stopPropagation()} className="rounded-md border px-2 py-1 text-xs font-semibold hover:bg-muted" title={person.email}>E</a>}
               </summary>
               <div className="space-y-2 pt-2 text-sm">
-                <div className="grid grid-cols-1 gap-x-6 gap-y-2 sm:grid-cols-2">
-                  {([
-                    ["Followers",person.followers],["Reach",person.reach],["Niche",person.segment],["Audience",person.audience],
-                    ["Location",person.geography],["Platforms",person.platforms],["Contact method",person.contact],
-                    ["Contact confidence",person.confidence],["Source",person.source],["Last researched",person.researched],
-                    ["Research status",person.status],["Priority",person.priority],["Approval",person.approval],
-                    ["Assigned to",person.owner],["Contacted",person.outreach],["Response",person.response],
-                    ["Next action",person.next],["Recommended offer",person.offer]
-                  ] as const).map(([label,value]) => <div key={label}><strong>{label}:</strong> <span className="text-muted-foreground">{value || "Not recorded"}</span></div>)}
+                <div className="flex flex-wrap gap-x-5 gap-y-1 text-sm">
+                  {person.segment && <p><strong>Focus:</strong> {person.segment}</p>}
+                  {person.geography && <p><strong>Location:</strong> {person.geography}</p>}
+                  {person.approval && <p><strong>Decision:</strong> {person.approval}</p>}
                 </div>
                 {person.evidence && <p><strong>Evidence:</strong> {person.evidence}</p>}
-                {person.offerReason && <p><strong>Offer reasoning:</strong> {person.offerReason}</p>}
-                {person.email && <a className="block underline" href={`mailto:${person.email}`}>Email: {person.email}</a>}
+                {person.email && <p className="text-sm"><strong>Email:</strong> <a className="underline" href={`mailto:${person.email}`}>{person.email}</a></p>}
                 {normalize(person.contactPage) && <a className="inline-flex items-center gap-1 underline" href={normalize(person.contactPage)!} target="_blank" rel="noopener noreferrer">Contact page <ExternalLink className="h-4 w-4" /></a>}
                 {person.dm && <div className="rounded-lg border bg-muted/30 p-3"><strong>Personalized DM draft:</strong><p className="mt-1 whitespace-pre-wrap">{person.dm}</p><button type="button" className="mt-2 rounded border px-3 py-1" onClick={() => void navigator.clipboard.writeText(person.dm!)}>Copy DM</button></div>}
-                {person.note && <p className="whitespace-pre-wrap text-muted-foreground">{person.note}</p>}
+                {person.note && person.note !== person.evidence && <p className="whitespace-pre-wrap text-sm text-muted-foreground">{person.note}</p>}
                 <div className="flex flex-wrap gap-3">{(["tiktok","youtube","instagram","facebook"] as const).map(p => {
                   const url = normalize(person[p]);
                   return url ? <a key={p} href={url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 underline">{p[0].toUpperCase()+p.slice(1)} <ExternalLink className="h-4 w-4" /></a> : null;
