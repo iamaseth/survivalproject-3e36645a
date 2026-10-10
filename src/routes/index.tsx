@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { ChevronDown, ExternalLink } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
+import { manualQualificationOverride } from "@/lib/creators.functions";
 import { getInfluencerMasterCounts, listBatchOneResults, saveInfluencerDmDraft } from "@/lib/influencer-master.functions";
 import { CREATORS, hydrateCreatorsFromDB, useCreatorsVersion } from "@/lib/creator-partnerships";
 
@@ -12,6 +13,8 @@ export const Route = createFileRoute("/")({
 
 function InfluencerHome() {
   const saveDraft = useServerFn(saveInfluencerDmDraft);
+  const rejectCreator = useServerFn(manualQualificationOverride);
+  const [rejectBusy, setRejectBusy] = useState<string | null>(null);
   const [draftEdits, setDraftEdits] = useState<Record<string,string>>({});
   const [draftBusy, setDraftBusy] = useState<string | null>(null);
   const [draftNotice, setDraftNotice] = useState<Record<string,string>>({});
@@ -57,14 +60,14 @@ function InfluencerHome() {
     const forNow = rows.filter(c => !rejected(c) && !approved(c) && !secondLook(c) && !moreResearch(c));
     return [
       { name: "For Now", count: forNow.length, to: "/bobo-queue" },
-      { name: "AI Screened", count: masterCounts?.aiScreenedCount ?? 0, to: "/ai-screened" },
+      { name: "AI Screened", count: batch.filter(c => ["Qualified", "Needs Review"].includes(c.qualification_status || "") && !c.seth_approval_status).length, to: "/ai-screened" },
       { name: "Complete Manual Review", count: rows.filter(approved).length, to: "/creators" },
       { name: "Take a Second Look", count: rows.filter(secondLook).length, to: "/creators" },
       { name: "Rejected", count: rows.filter(rejected).length + (masterCounts?.aiRejectedCount ?? 0), to: "/creators" },
       { name: "Needs More Research", count: rows.filter(moreResearch).length, to: "/creators" },
       { name: "Original List", count: CREATORS.length, to: "/influencer-original" },
     ] as const;
-  }, [useCreatorsVersionValue, masterCounts]);
+  }, [useCreatorsVersionValue, masterCounts, batch]);
   const normalize = (value?: string | null) => {
     if (!value) return null;
     if (/^https?:\/\//i.test(value)) return value;
@@ -128,6 +131,7 @@ function InfluencerHome() {
                 {person.followers && <span className="shrink-0 rounded-full bg-muted px-2 py-1 text-xs font-medium tabular-nums">{person.followers} followers</span>}
                 {normalize(person.tiktok || person.youtube || person.instagram || person.facebook) && <a href={normalize(person.tiktok || person.youtube || person.instagram || person.facebook)!} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs font-medium hover:bg-muted" title="Open social profile">Profile <ExternalLink className="h-3 w-3" /></a>}
                 {person.email && <a href={`mailto:${person.email}`} onClick={e => e.stopPropagation()} className="rounded-md border px-2 py-1 text-xs font-semibold hover:bg-muted" title={person.email}>E</a>}
+                {i === 1 && <button type="button" disabled={rejectBusy === person.id} onClick={async e => { e.preventDefault(); e.stopPropagation(); if (!window.confirm(`Reject ${person.name}? This manual decision overrides AI screening.`)) return; setRejectBusy(person.id); try { const result = await rejectCreator({data:{id:person.id,decision:"rejected",checkedProfile:true,evidence:"Manually rejected in AI Screened"}}); if (!result?.ok) throw new Error("Rejection not confirmed"); setBatch(prev => prev.map(c => c.id === person.id ? {...c,seth_approval_status:"rejected"} : c)); await hydrateCreatorsFromDB(); } catch(err) { window.alert("Could not reject: "+String(err)); } finally { setRejectBusy(null); } }} className="rounded-md border border-red-300 px-2 py-1 text-xs font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50">{rejectBusy === person.id ? "Saving…" : "Reject"}</button>}
                 {person.dm && <button type="button" onClick={e => { e.preventDefault(); e.stopPropagation(); void navigator.clipboard.writeText(draftEdits[person.id] ?? person.dm!); setDraftNotice(prev => ({...prev,[person.id]:"DM copied"})); }} className="rounded-md border border-primary/30 bg-primary/10 px-2 py-1 text-xs font-semibold text-foreground hover:bg-primary/20" title="Copy personalized DM without opening details">Copy DM</button>}
               </summary>
               <div className="space-y-2 pt-2 text-sm">
