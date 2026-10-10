@@ -12,7 +12,9 @@ export const getInfluencerMasterCounts = createServerFn({ method: "GET" })
       return [table, count ?? 0] as const;
     }));
     const sources = Object.fromEntries(entries) as Record<string, number>;
-    return { sources, total: Object.values(sources).reduce((a, b) => a + b, 0) };
+    const { count: boboQueueCount, error: queueError } = await context.supabase.from("influencer_bobo_research_queue").select("*", { count: "exact", head: true });
+    if (queueError) throw new Error(queueError.message);
+    return { sources, total: Object.values(sources).reduce((a, b) => a + b, 0), boboQueueCount: boboQueueCount ?? 0 };
   });
 
 export const listInfluencerOriginals = createServerFn({ method: "GET" })
