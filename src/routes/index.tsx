@@ -17,7 +17,7 @@ function InfluencerHome() {
   const [expanded, setExpanded] = useState<number | null>(null);
   const [platform, setPlatform] = useState("All");
   const [contactFilter, setContactFilter] = useState("All");
-  const [batch, setBatch] = useState<Array<{id:string;name:string;tiktok:string|null;youtube:string|null;instagram:string|null;facebook:string|null;email:string|null;contact_route:string|null;followers_signal:string|null;segment:string|null;target_audience:string|null;other_platform:string|null;qualification_status:string|null;seth_approval_status:string|null;verification_evidence:string|null}>>([]);
+  const [batch, setBatch] = useState<Array<{id:string;name:string;tiktok:string|null;youtube:string|null;instagram:string|null;facebook:string|null;email:string|null;contact_route:string|null;followers_signal:string|null;segment:string|null;target_audience:string|null;other_platform:string|null;personalized_dm:string|null;qualification_status:string|null;seth_approval_status:string|null;verification_evidence:string|null}>>([]);
   useEffect(() => { void loadBatch().then(setBatch).catch(console.error); }, [loadBatch]);
   const [masterCounts, setMasterCounts] = useState<{ total: number; boboQueueCount: number; sources: Record<string,number>; aiScreenedCount:number; aiRejectedCount:number } | null>(null);
   useEffect(() => { void loadCounts().then(setMasterCounts).catch(console.error); }, [loadCounts]);
@@ -70,11 +70,11 @@ function InfluencerHome() {
   const fromCreator = (c: (typeof CREATORS)[number]) => ({
     id:c.id, name:c.name, note:c.sethApprovalNote || c.researchNotes || c.verificationEvidence,
     tiktok:c.tiktok, youtube:c.youtube, instagram:c.instagram, facebook:c.facebook,
-    email:c.email, contact:c.contactRoute, followers:c.followersSignal, segment:c.segment, audience:c.targetAudience, geography:c.geography, source:c.primarySource, reach:c.reachSignal, confidence:c.contactConfidence, researched:c.lastResearched, status:c.researchStatus, priority:c.priority, evidence:c.verificationEvidence, offer:c.recommendedOffer, offerReason:c.offerReasoning, owner:c.outreachAssignee || c.outreachOwner, outreach:c.contactedDate, response:c.responseFollowup, next:c.sethNextAction, approval:c.sethApprovalStatus, platforms:c.primaryPlatforms, contactPage:c.otherPlatform
+    email:c.email, contact:c.contactRoute, followers:c.followersSignal, segment:c.segment, audience:c.targetAudience, geography:c.geography, source:c.primarySource, reach:c.reachSignal, confidence:c.contactConfidence, researched:c.lastResearched, status:c.researchStatus, priority:c.priority, evidence:c.verificationEvidence, offer:c.recommendedOffer, offerReason:c.offerReasoning, owner:c.outreachAssignee || c.outreachOwner, outreach:c.contactedDate, response:c.responseFollowup, next:c.sethNextAction, approval:c.sethApprovalStatus, platforms:c.primaryPlatforms, contactPage:c.otherPlatform, dm:c.personalizedDm
   });
   const fromBatch = (c: (typeof batch)[number]) => ({
     id:c.id, name:c.name, note:c.verification_evidence, tiktok:c.tiktok, youtube:c.youtube,
-    instagram:c.instagram, facebook:c.facebook, email:c.email, contact:c.contact_route, followers:c.followers_signal, segment:c.segment || c.verification_evidence, audience:c.target_audience, geography:null, source:"BoBo Markdown Batch 1", reach:null, confidence:null, researched:"2026-10-10", status:c.qualification_status, priority:null, evidence:c.verification_evidence, offer:null, offerReason:null, owner:null, outreach:null, response:null, next:null, approval:c.seth_approval_status, platforms:"TikTok", contactPage:c.other_platform
+    instagram:c.instagram, facebook:c.facebook, email:c.email, contact:c.contact_route, followers:c.followers_signal, segment:c.segment || c.verification_evidence, audience:c.target_audience, geography:null, source:"BoBo Markdown Batch 1", reach:null, confidence:null, researched:"2026-10-10", status:c.qualification_status, priority:null, evidence:c.verification_evidence, offer:null, offerReason:null, owner:null, outreach:null, response:null, next:null, approval:c.seth_approval_status, platforms:"TikTok", contactPage:c.other_platform, dm:c.personalized_dm
   });
   const groups = categories.map((category, i) => {
     const rows = i === 0 ? CREATORS.filter(c => !c.sethApprovalStatus && !c.outreachSecondLookAt && !/needs more research/i.test(c.researchStatus || "")).map(fromCreator) : i === 6 ? CREATORS.map(fromCreator) : i === 1
@@ -89,11 +89,15 @@ function InfluencerHome() {
   });
   return <main className="mx-auto max-w-3xl space-y-3 p-4 sm:p-8">
     <h1 className="mb-4 text-2xl font-bold">Influencers</h1>
-    <label className="mb-5 flex items-center gap-3 font-medium">Platform <select value={platform} onChange={e => setPlatform(e.target.value)} className="min-h-11 flex-1 rounded-lg border bg-background px-3 py-2">{["All","TikTok","YouTube","Instagram","Facebook"].map(p => <option key={p} value={p}>{p === "All" ? "All platforms" : p}</option>)}</select></label>
-    <div className="mb-5">
-      <label className="flex flex-col gap-1 text-sm font-medium">Contact available
-        <select value={contactFilter} onChange={e => setContactFilter(e.target.value)} className="min-h-11 rounded-lg border bg-background px-3">
-          {["All","Email","Contact page","DM"].map(v => <option key={v} value={v}>{v === "All" ? "Any contact method" : v}</option>)}
+    <div className="mb-4 flex flex-wrap items-end gap-3">
+      <label className="flex min-w-0 flex-1 flex-col gap-1 text-sm font-medium">Platform
+        <select value={platform} onChange={e => setPlatform(e.target.value)} className="min-h-11 w-full rounded-lg border bg-background px-2">
+          {["All","TikTok","YouTube","Instagram","Facebook"].map(p => <option key={p} value={p}>{p === "All" ? "All platforms" : p}</option>)}
+        </select>
+      </label>
+      <label className="flex min-w-0 flex-1 flex-col gap-1 text-sm font-medium">Contact
+        <select value={contactFilter} onChange={e => setContactFilter(e.target.value)} className="min-h-11 w-full rounded-lg border bg-background px-2">
+          {["All","Email","Contact page","DM"].map(v => <option key={v} value={v}>{v === "All" ? "All contacts" : v}</option>)}
         </select>
       </label>
     </div>
@@ -130,6 +134,7 @@ function InfluencerHome() {
                 {person.offerReason && <p><strong>Offer reasoning:</strong> {person.offerReason}</p>}
                 {person.email && <a className="block underline" href={`mailto:${person.email}`}>Email: {person.email}</a>}
                 {normalize(person.contactPage) && <a className="inline-flex items-center gap-1 underline" href={normalize(person.contactPage)!} target="_blank" rel="noopener noreferrer">Contact page <ExternalLink className="h-4 w-4" /></a>}
+                {person.dm && <div className="rounded-lg border bg-muted/30 p-3"><strong>Personalized DM draft:</strong><p className="mt-1 whitespace-pre-wrap">{person.dm}</p><button type="button" className="mt-2 rounded border px-3 py-1" onClick={() => void navigator.clipboard.writeText(person.dm!)}>Copy DM</button></div>}
                 {person.note && <p className="whitespace-pre-wrap text-muted-foreground">{person.note}</p>}
                 <div className="flex flex-wrap gap-3">{(["tiktok","youtube","instagram","facebook"] as const).map(p => {
                   const url = normalize(person[p]);
