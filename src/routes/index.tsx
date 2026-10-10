@@ -93,7 +93,8 @@ function InfluencerHome() {
       : i >= 2 && i <= 5
       ? (i === 3 ? CREATORS.filter(c => Boolean(c.outreachSecondLookAt) && !c.sethApprovalStatus).map(fromCreator).concat(batch.filter(c => Boolean(c.outreach_second_look_at) && !c.seth_approval_status).map(fromBatch)) : CREATORS.filter(c => i === 2 ? c.sethApprovalStatus === "approved" : !c.sethApprovalStatus && /needs more research/i.test(c.researchStatus || "")).map(fromCreator))
       : [];
-    const filtered = rows.filter(c => (platform === "All" || Boolean(normalize(c[platform.toLowerCase() as "tiktok" | "youtube" | "instagram" | "facebook"]))) && (contactFilter === "All" || (contactFilter === "Email" ? Boolean(c.email) : contactFilter === "Contact page" ? Boolean(normalize(c.contactPage)) : Boolean(c.contact || c.tiktok || c.instagram))));
+    const uniqueRows = i === 3 ? [...new Map(rows.map(c => { const profile = normalize(c.tiktok || c.youtube || c.instagram || c.facebook); const key = profile ? profile.toLowerCase().replace(/\\/$/, "") : c.id; return [key,c] as const; }).reverse()).values()].reverse() : rows;
+    const filtered = uniqueRows.filter(c => (platform === "All" || Boolean(normalize(c[platform.toLowerCase() as "tiktok" | "youtube" | "instagram" | "facebook"]))) && (contactFilter === "All" || (contactFilter === "Email" ? Boolean(c.email) : contactFilter === "Contact page" ? Boolean(normalize(c.contactPage)) : Boolean(c.contact || c.tiktok || c.instagram))));
     return { ...category, rows:filtered, visibleCount:filtered.length };
   });
   return <main className="mx-auto max-w-3xl space-y-3 p-4 sm:p-8">
