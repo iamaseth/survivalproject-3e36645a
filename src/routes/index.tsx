@@ -273,14 +273,15 @@ function InfluencerHome() {
             if (file.size > 15 * 1024 * 1024) throw new Error("File exceeds 15 MB");
             const rows = parseResearchCsv(await file.text());
             if (!rows.length || rows.length > 500) throw new Error("Select 1–500 creators per CSV");
-            const result = await runResearchImport({ data: { rows, confirm: false } });
-            if (!result || typeof result.failed !== "number" || typeof result.total !== "number") {
-              throw new Error("Import preview service returned no valid result. No database changes were made. Check server logs and authentication.");
-            }
+            const handles = rows.map(row => (row.tiktok_handle || row.match_tiktok_handle || "").trim().toLowerCase().replace(/^@/, ""));
+            const valid = handles.every(handle => /^[a-z0-9._]{2,30}$/.test(handle));
+            const unique = new Set(handles);
+            if (!valid) throw new Error("Some rows have missing or invalid TikTok handles");
+            if (unique.size !== handles.length) throw new Error("Duplicate TikTok handles in the CSV");
             setResearchRows(rows);
-            setImportReady(result.failed === 0);
-            setImportPreview("Preview: " + result.total + " creators, " + result.new + " new, " + result.existing + " existing, " + result.failed + " invalid. " +
-              (result.errors.length ? result.errors.join("; ") : "No database records changed."));
+            setImportReady(true);
+            setImportPreview("CSV validated locally: " + rows.length + " creator records, " + Object.keys(rows[0]).length + " columns, " + unique.size + " unique TikTok handles. No database records changed. Existing/new matching happens during confirmed import.");
+
           } catch (error) {
             setImportPreview("Cannot import: " + String(error));
           } finally { setImportBusy(false); event.currentTarget.value = ""; }
