@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { listBoboResearchQueue, listBatchOneResults } from "@/lib/influencer-master.functions";
 import { getBoboProfileTracking, markBoboProfileTracking } from "@/lib/bobo-tiktok.functions";
 import { ResearchFileUpload } from "@/components/ResearchFileUpload";
@@ -17,6 +17,7 @@ function BoboQueue() {
   const [opened,setOpened] = useState<string[]>([]);
   const [ready,setReady] = useState(false);
   const [error,setError] = useState("");
+  const opening = useRef(new Set<string>());
   useEffect(() => {
     let active = true;
     void (async () => {
@@ -58,11 +59,22 @@ function BoboQueue() {
     const w = window.open(url, "_blank");
     if (!w) return false;
     try { w.opener = null; } catch { /* cross-origin already */ }
+    // Best effort: retain focus on the queue. Chrome may still activate the new tab.
+    window.focus();
     return true;
   }
   async function open(r: Candidate) {
-    if (!tryOpen(r.profile_url)) { setError("Browser blocked the tab. Allow pop-ups and retry."); return; }
-    if (!done.has(keyOf(r))) await persist(r);
+    const id = keyOf(r);
+    if (opening.current.has(id)) return;
+    opening.current.add(id);
+    if (!tryOpen(r.profile_url)) {
+      opening.current.delete(id);
+      setError("Browser blocked the tab. Allow pop-ups and retry.");
+      return;
+    }
+    // Update the queue immediately so repeated clicks advance without waiting for the server.
+    if (!done.has(id)) await persist(r);
+    opening.current.delete(id);
   }
   return <main className="mx-auto max-w-3xl space-y-4 p-4 sm:p-8">
     <Link to="/" className="text-sm underline">← Influencers</Link>
