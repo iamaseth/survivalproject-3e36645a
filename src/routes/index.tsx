@@ -116,7 +116,7 @@ function InfluencerHome() {
         <div className="h-full bg-primary" style={{width: `${masterCounts.total ? 100*(masterCounts.workflowCounts.sent + masterCounts.workflowCounts.second_look + masterCounts.workflowCounts.rejected)/masterCounts.total : 0}%`}} />
       </div>
       <p className="mt-2 text-xs text-muted-foreground">Sections 1–3 are work in progress. Sections 4–6 are sent, second look, and rejected. Second Look may be reviewed again. Nothing moves automatically without a recorded review or outreach action.</p>
-    </div>
+    </div>}
     <div className="mb-4 flex flex-wrap items-end gap-3">
       <label className="flex min-w-0 flex-1 flex-col gap-1 text-sm font-medium">Platform
         <select value={platform} onChange={e => setPlatform(e.target.value)} className="min-h-11 w-full rounded-lg border bg-background px-2">
