@@ -73,6 +73,16 @@ export const importCreatorResearch = createServerFn({ method: "POST" })
     return input;
   })
   .handler(async ({ context, data }) => {
+    // Preflight: check every incoming research column exists in the live table.
+    // A missing column stops the entire batch before any inserts or updates.
+    const incomingColumns = [...new Set(data.rows.flatMap(row => Object.keys(row)))]
+      .filter(key => /^[a-z][a-z0-9_]*$/.test(key) && !NON_RESEARCH.has(key));
+    if (!incomingColumns.includes("tiktok_handle")) {
+      throw new Error("The CSV must include tiktok_handle");
+    }
+    const { error: schemaError } = await context.supabase.from("creators")
+      .select(incomingColumns.join(",")).limit(0);
+    if (schemaError) throw new Error("Import blocked: live creators schema does not match CSV: " + schemaError.message);
     const seen = new Set<string>();
     const prepared = data.rows.map((row, index) => {
       try {
@@ -84,8 +94,8 @@ export const importCreatorResearch = createServerFn({ method: "POST" })
         return { handle: "", safe: {}, index, error: String(error) };
       }
     });
-    // Read-only lookup before every write. Never update status or approval fields.
-    const handles = prepared.filter(row => row.handle).map(row => row.handle);
+    // Read-only lookup before every write. Preserve the one status field.
+    const handles = [...new Set(prepared.filter(row => row.handle).map(row => row.handle))];
     const existing = new Map<string, Record<string, unknown>>();
     for (let i = 0; i < handles.length; i += 50) {
       const slice = handles.slice(i, i + 50);
@@ -108,6 +118,9 @@ export const importCreatorResearch = createServerFn({ method: "POST" })
         if (handle) existing.set(handle, record as Record<string, unknown>);
       }
     }
+    // Stop before any writes if an invalid row would otherwise cause a partial import.
+    const invalid = prepared.filter(row => !row.handle);
+    if (data.confirm && invalid.length) throw new Error("Import blocked: " + invalid.length + " invalid or duplicate handles in CSV");
     const summary = { total: prepared.length, new: 0, existing: 0, inserted: 0, updated: 0, skipped: 0, failed: 0, errors: [] as string[] };
     for (const row of prepared) {
       if (!row.handle) { summary.failed++; summary.errors.push("Row " + (row.index + 2) + ": " + ("error" in row ? row.error : "Invalid handle")); continue; }
