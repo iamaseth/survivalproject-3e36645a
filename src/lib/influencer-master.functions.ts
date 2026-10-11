@@ -114,3 +114,20 @@ export const listWorkflowSection = createServerFn({ method: "GET" })
     if (error) throw new Error(error.message);
     return { rows: rows ?? [], count: count ?? 0, page };
   });
+
+/** Set the single authoritative workflow status after an explicit manual review. */
+export const setInfluencerWorkflowStatus = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: { id: string; status: "approved"|"second_look"|"rejected" }) => {
+    if (!data?.id || !["approved","second_look","rejected"].includes(data.status)) throw new Error("Invalid decision");
+    return data;
+  })
+  .handler(async ({ context, data }) => {
+    const approval = data.status === "approved" ? "approved" : data.status === "rejected" ? "rejected" : null;
+    const update = approval ? { workflow_status: data.status, seth_approval_status: approval } : { workflow_status: data.status };
+    const { data: saved, error } = await context.supabase.from("creators")
+      .update(update).eq("id", data.id).select("id,workflow_status").single();
+    if (error) throw new Error(error.message);
+    if (saved.workflow_status !== data.status) throw new Error("Decision was not saved");
+    return { ok: true, status: saved.workflow_status };
+  });
