@@ -72,29 +72,31 @@ function InfluencerHome() {
   const runStagingMigration = useServerFn(migrateStagedResearch);
   const [migrationOutput, setMigrationOutput] = useState("");
   const [migrationBusy, setMigrationBusy] = useState(false);
+  // Each click runs one small server batch. Progress survives Lovable preview reloads.
+  const [migrationOffset, setMigrationOffset] = useState(() => {
+    try { return Number(window.localStorage.getItem("staging-migration-offset") || "0") || 0; }
+    catch { return 0; }
+  });
   const runMigration = async (confirm: boolean) => {
-    if (confirm && !window.confirm("Import staged research into the creators master? Existing data and statuses will be preserved. Source tables will not be deleted.")) return;
+    if (confirm && !window.confirm("Import ONE batch of up to 50 staging records? Existing creators and statuses are preserved.")) return;
     setMigrationBusy(true);
-    const totals = { scanned: 0, new: 0, existing: 0, inserted: 0, updated: 0, skipped: 0, errors: [] as string[] };
     try {
-      for (let offset = 0; offset < 20000; offset += 50) {
-        const result = await runStagingMigration({ data: { confirm, offset, limit: 50 } });
-        if (!result || typeof result.scanned !== "number") throw new Error("Migration service returned no result at offset " + offset);
-        totals.scanned += result.scanned;
-        totals.new += result.new;
-        totals.existing += result.existing;
-        totals.inserted += result.inserted;
-        totals.updated += result.updated;
-        totals.skipped += result.skipped;
-        totals.errors.push(...result.errors);
-        setMigrationOutput((confirm ? "IMPORT" : "DRY RUN") + ": scanned " + totals.scanned + ", new " + totals.new + ", existing " + totals.existing +
-          ", inserted " + totals.inserted + ", updated " + totals.updated +
-          ", skipped " + totals.skipped + ", errors " + totals.errors.length);
-        if (totals.errors.length) throw new Error(totals.errors.slice(0, 5).join("; "));
-        if (result.scanned < 50) break;
+      const offset = migrationOffset;
+      const result = await runStagingMigration({ data: { confirm, offset, limit: 50 } });
+      if (!result || typeof result.scanned !== "number") throw new Error("Migration service returned no result");
+      setMigrationOutput((confirm ? "IMPORTED BATCH" : "PREVIEW BATCH") + " at offset " + offset +
+        ": scanned " + result.scanned + ", new " + result.new + ", existing " + result.existing +
+        ", inserted " + result.inserted + ", updated " + result.updated +
+        ", skipped " + result.skipped + ", errors " + result.errors.length +
+        (result.errors.length ? "\\n" + result.errors.join("; ") : ""));
+      if (result.errors.length) return;
+      if (confirm && result.scanned > 0) {
+        const next = offset + result.scanned;
+        setMigrationOffset(next);
+        try { window.localStorage.setItem("staging-migration-offset", String(next)); } catch {}
+        void loadCounts().then(setMasterCounts);
       }
-      if (confirm) void loadCounts().then(setMasterCounts);
-    } catch (error) { setMigrationOutput("Stopped: " + String(error) + "\n" + JSON.stringify(totals)); }
+    } catch (error) { setMigrationOutput("Stopped: " + String(error)); }
     finally { setMigrationBusy(false); }
   };
   const [auditResult, setAuditResult] = useState("");
@@ -305,8 +307,8 @@ function InfluencerHome() {
       </button>
       {auditResult && <pre className="mt-3 whitespace-pre-wrap break-words text-sm">{auditResult}</pre>}
       <div className="mt-3 flex flex-wrap gap-2">
-        <button type="button" disabled={migrationBusy} onClick={() => void runMigration(false)} className="rounded-lg border px-4 py-3 font-semibold disabled:opacity-50">Preview Staging Merge</button>
-        <button type="button" disabled={migrationBusy} onClick={() => void runMigration(true)} className="rounded-lg border px-4 py-3 font-semibold disabled:opacity-50">Confirm Staging Merge</button>
+        <button type="button" disabled={migrationBusy} onClick={() => void runMigration(false)} className="rounded-lg border px-4 py-3 font-semibold disabled:opacity-50">Preview Next 50</button>
+        <button type="button" disabled={migrationBusy} onClick={() => void runMigration(true)} className="rounded-lg border px-4 py-3 font-semibold disabled:opacity-50">Import Next 50</button>
       </div>
       {migrationOutput && <pre className="mt-3 whitespace-pre-wrap break-words text-sm">{migrationOutput}</pre>}
     </section>
