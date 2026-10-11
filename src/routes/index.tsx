@@ -278,9 +278,16 @@ function InfluencerHome() {
             const unique = new Set(handles);
             if (!valid) throw new Error("Some rows have missing or invalid TikTok handles");
             if (unique.size !== handles.length) throw new Error("Duplicate TikTok handles in the CSV");
+            const result = await runResearchImport({ data: { rows, confirm: false } });
+            if (!result || typeof result.total !== "number" || typeof result.failed !== "number") {
+              throw new Error("Database preflight did not return a valid response. Import remains disabled.");
+            }
             setResearchRows(rows);
-            setImportReady(true);
-            setImportPreview("CSV validated locally: " + rows.length + " creator records, " + Object.keys(rows[0]).length + " columns, " + unique.size + " unique TikTok handles. No database records changed. Existing/new matching happens during confirmed import.");
+            setImportReady(result.failed === 0);
+            setImportPreview("Database preflight passed: " + result.total + " creators, " +
+              Object.keys(rows[0]).length + " CSV columns, " + result.new + " new, " +
+              result.existing + " existing, " + result.failed + " invalid. " +
+              (result.errors.length ? result.errors.join("; ") : "No database records changed."));
 
           } catch (error) {
             setImportPreview("Cannot import: " + String(error));
