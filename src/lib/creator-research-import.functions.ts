@@ -6,7 +6,13 @@ const HANDLE = /^[a-z0-9._]{2,30}$/;
 // One authoritative status field. Never overwrite an existing status on import.
 const NON_RESEARCH = new Set([
   "id", "workflow_status", "created_at", "updated_at", "imported_by",
-  "match_tiktok_handle", "match_tiktok_url", "upload_action"
+  "match_tiktok_handle", "match_tiktok_url", "upload_action",
+  "seth_approval_status", "seth_approved_by", "seth_approved_at", "seth_approval_note",
+  "seth_approval_history", "qualification_status", "outreach_owner", "outreach_assignee",
+  "outreach_claimed_at", "outreach_sent_by", "outreach_sent_at", "outreach_prev",
+  "outreach_second_look_at", "contacted_date", "contact_method", "response_followup",
+  "sample_status", "rena_notes", "personalized_dm", "personalized_email_subject",
+  "personalized_email_body", "personalization_status", "seth_next_action", "perry_comments"
 ]);
 const JSON_FIELDS = new Set([
   "platform_profiles","platform_metrics","audience_demographics","content_categories",
