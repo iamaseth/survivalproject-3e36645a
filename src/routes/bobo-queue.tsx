@@ -3,6 +3,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useMemo, useState } from "react";
 import { listBoboResearchQueue, listBatchOneResults } from "@/lib/influencer-master.functions";
 import { getBoboProfileTracking, markBoboProfileTracking } from "@/lib/bobo-tiktok.functions";
+import { ResearchFileUpload } from "@/components/ResearchFileUpload";
 
 export const Route = createFileRoute("/bobo-queue")({ component: BoboQueue });
 type Candidate = {source_table:string;source_id:string;display_name:string;profile_url:string;stage:string};
@@ -80,5 +81,6 @@ function BoboQueue() {
         </span>
       </button>)}
     </div>
+    <ResearchFileUpload />
   </main>;
 }
