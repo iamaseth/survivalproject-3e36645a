@@ -274,6 +274,9 @@ function InfluencerHome() {
             const rows = parseResearchCsv(await file.text());
             if (!rows.length || rows.length > 500) throw new Error("Select 1–500 creators per CSV");
             const result = await runResearchImport({ data: { rows, confirm: false } });
+            if (!result || typeof result.failed !== "number" || typeof result.total !== "number") {
+              throw new Error("Import preview service returned no valid result. No database changes were made. Check server logs and authentication.");
+            }
             setResearchRows(rows);
             setImportReady(result.failed === 0);
             setImportPreview("Preview: " + result.total + " creators, " + result.new + " new, " + result.existing + " existing, " + result.failed + " invalid. " +
@@ -289,6 +292,7 @@ function InfluencerHome() {
         setImportBusy(true); setImportReady(false);
         try {
           const result = await runResearchImport({ data: { rows: researchRows, confirm: true } });
+          if (!result || typeof result.inserted !== "number") throw new Error("Import service returned no confirmation. Check database before retrying.");
           setImportPreview("Import complete: " + result.inserted + " inserted, " + result.updated + " enriched, " + result.skipped + " unchanged, " + result.failed + " failed." +
             (result.errors.length ? "\\n" + result.errors.join("\\n") : ""));
           void loadCounts().then(setMasterCounts);
