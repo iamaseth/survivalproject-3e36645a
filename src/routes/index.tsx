@@ -33,6 +33,7 @@ function InfluencerHome() {
   const [workflowLoading,setWorkflowLoading] = useState(false);
   const [workflowError,setWorkflowError] = useState("");
   const [expanded, setExpanded] = useState<number | null>(null);
+  const [importPreview, setImportPreview] = useState("");
   useEffect(() => {
     if (expanded === null || expanded > 5) return;
     let active = true;
@@ -216,5 +217,44 @@ function InfluencerHome() {
         </>}
       </div>}
     </section>)}
+    <section className="rounded-xl border bg-card p-5" aria-labelledby="import-research-heading">
+      <h2 id="import-research-heading" className="text-lg font-semibold">Import Research</h2>
+      <p className="mt-1 text-sm text-muted-foreground">
+        Stage 2 — Select BoBo's extracted creator CSV to check the file before importing.
+        This preview does not change creator records, approvals, or outreach history.
+      </p>
+      <label htmlFor="creator-research-csv" className="mt-4 inline-flex min-h-11 cursor-pointer items-center rounded-lg bg-primary px-4 py-3 font-semibold text-primary-foreground">
+        Import Research CSV
+      </label>
+      <input
+        id="creator-research-csv"
+        type="file"
+        accept=".csv,text/csv"
+        className="sr-only"
+        onChange={async event => {
+          const file = event.currentTarget.files?.[0];
+          if (!file) return;
+          setImportPreview("Checking " + file.name + "…");
+          try {
+            const content = await file.text();
+            const header = content.replace(/^\uFEFF/, "").split(/\r?\n/, 1)[0] || "";
+            const fields = header.split(",").map(field => field.trim().replace(/^"|"$/g, ""));
+            if (!fields.includes("tiktok_handle")) {
+              setImportPreview("Cannot import: CSV is missing the canonical tiktok_handle column.");
+            } else {
+              const count = (content.match(/\r?\n/g) || []).length;
+              setImportPreview(file.name + " selected. TikTok handle column found. Approximate data lines: " + count + ". Database import is not enabled yet; no records have been changed.");
+            }
+          } catch (error) {
+            setImportPreview("Unable to read file: " + String(error));
+          }
+          event.currentTarget.value = "";
+        }}
+      />
+      {importPreview && <p role="status" className="mt-3 whitespace-pre-wrap text-sm">{importPreview}</p>}
+      <p className="mt-2 text-xs text-muted-foreground">
+        Safe preview only. ZIP/Markdown parsing, duplicate detection, and database upsert must be connected and verified before live importing.
+      </p>
+    </section>
   </main>;
 }
