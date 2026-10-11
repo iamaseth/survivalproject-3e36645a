@@ -3,13 +3,41 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 type ResearchRow = Record<string, string>;
 const HANDLE = /^[a-z0-9._]{2,30}$/;
-const PROTECTED = new Set([
-  "id","code","creator_code","workflow_status","seth_approval_status","seth_approval_note",
-  "outreach_owner","outreach_assignee","outreach_second_look_at","personalized_dm",
-  "contacted_date","contact_method","response_followup","sample_status","rena_notes",
-  "perry_comments","seth_next_action","imported_by","created_at","updated_at",
-  "qualification_status","priority","recommended_offer","offer_reasoning"
+// One authoritative status field. Never overwrite an existing status on import.
+const NON_RESEARCH = new Set([
+  "id", "workflow_status", "created_at", "updated_at", "imported_by",
+  "match_tiktok_handle", "match_tiktok_url", "upload_action"
 ]);
+const JSON_FIELDS = new Set([
+  "platform_profiles","platform_metrics","audience_demographics","content_categories",
+  "recent_videos","recent_posts","hashtags","brand_mentions","sponsorship_evidence",
+  "affiliate_links","content_samples","research_sources","raw_capture_history",
+  "ai_evidence","ai_review_history","record_provenance","custom_attributes",
+  "legacy_status_archive","qualification_reset_history","public_emails_detected",
+  "tagged_accounts","possible_commercial_signals","video_captions_full",
+  "video_thumbnails","video_raw_labels","content_links","seth_approval_history"
+]);
+const INTEGER_FIELDS = new Set([
+  "subscriber_count","tiktok_followers","tiktok_following","tiktok_likes",
+  "tiktok_video_count","tiktok_caption_count","tiktok_caption_only_count"
+]);
+const BOOLEAN_FIELDS = new Set(["amazon_reviewed_survival_tabs","amazon_shoppable_video"]);
+function convertField(key: string, value: string): unknown {
+  if (JSON_FIELDS.has(key)) {
+    try { return JSON.parse(value); } catch { throw new Error("Invalid JSON in " + key); }
+  }
+  if (INTEGER_FIELDS.has(key)) {
+    const n = Number(value.replace(/,/g, ""));
+    if (!Number.isSafeInteger(n)) throw new Error("Invalid integer in " + key);
+    return n;
+  }
+  if (BOOLEAN_FIELDS.has(key)) {
+    if (/^(true|1|yes)$/i.test(value)) return true;
+    if (/^(false|0|no)$/i.test(value)) return false;
+    throw new Error("Invalid boolean in " + key);
+  }
+  return value;
+}
 const normalizeHandle = (raw: string) => {
   const text = (raw || "").trim().toLowerCase();
   const handle = text.includes("tiktok.com/") ? text.match(/tiktok\.com\/@([a-z0-9._]+)/)?.[1] : text.replace(/^@/, "");
@@ -20,10 +48,10 @@ function prepare(input: ResearchRow) {
   const handle = normalizeHandle(input.tiktok_handle || input.match_tiktok_handle || input.match_tiktok_url || input.tiktok);
   if (!handle) throw new Error("Invalid TikTok handle");
   const profile = "https://www.tiktok.com/@" + handle;
-  const safe: Record<string, string> = {};
+  const safe: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(input)) {
-    if (!/^[a-z][a-z0-9_]*$/.test(key) || PROTECTED.has(key) || key.startsWith("match_")) continue;
-    if (typeof value === "string" && value.trim() !== "") safe[key] = value;
+    if (!/^[a-z][a-z0-9_]*$/.test(key) || NON_RESEARCH.has(key)) continue;
+    if (typeof value === "string" && value.trim() !== "") safe[key] = convertField(key, value);
   }
   safe.tiktok_handle = handle;
   safe.tiktok = profile;
