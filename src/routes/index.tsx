@@ -7,6 +7,7 @@ import { getInfluencerMasterCounts, listWorkflowSection, listBatchOneResults, mo
 import { CREATORS, hydrateCreatorsFromDB, useCreatorsVersion } from "@/lib/creator-partnerships";
 import { importCreatorResearch } from "@/lib/creator-research-import.functions";
 import { auditCreatorConsolidation } from "@/lib/creator-consolidation-audit.functions";
+import { migrateStagedResearch } from "@/lib/creator-consolidation-migrate.functions";
 
 
 function parseResearchCsv(text: string): Array<Record<string, string>> {
@@ -68,6 +69,32 @@ function InfluencerHome() {
   const [importReady, setImportReady] = useState(false);
   const runResearchImport = useServerFn(importCreatorResearch);
   const runConsolidationAudit = useServerFn(auditCreatorConsolidation);
+  const runStagingMigration = useServerFn(migrateStagedResearch);
+  const [migrationOutput, setMigrationOutput] = useState("");
+  const [migrationBusy, setMigrationBusy] = useState(false);
+  const runMigration = async (confirm: boolean) => {
+    if (confirm && !window.confirm("Import staged research into the creators master? Existing data and statuses will be preserved. Source tables will not be deleted.")) return;
+    setMigrationBusy(true);
+    const totals = { scanned: 0, inserted: 0, updated: 0, skipped: 0, errors: [] as string[] };
+    try {
+      for (let offset = 0; offset < 20000; offset += 50) {
+        const result = await runStagingMigration({ data: { confirm, offset, limit: 50 } });
+        if (!result || typeof result.scanned !== "number") throw new Error("Migration service returned no result at offset " + offset);
+        totals.scanned += result.scanned;
+        totals.inserted += result.inserted;
+        totals.updated += result.updated;
+        totals.skipped += result.skipped;
+        totals.errors.push(...result.errors);
+        setMigrationOutput((confirm ? "IMPORT" : "DRY RUN") + ": scanned " + totals.scanned +
+          ", inserted " + totals.inserted + ", updated " + totals.updated +
+          ", skipped " + totals.skipped + ", errors " + totals.errors.length);
+        if (totals.errors.length) throw new Error(totals.errors.slice(0, 5).join("; "));
+        if (result.scanned < 50) break;
+      }
+      if (confirm) void loadCounts().then(setMasterCounts);
+    } catch (error) { setMigrationOutput("Stopped: " + String(error) + "\n" + JSON.stringify(totals)); }
+    finally { setMigrationBusy(false); }
+  };
   const [auditResult, setAuditResult] = useState("");
   const [auditBusy, setAuditBusy] = useState(false);
   const runAudit = async () => {
@@ -275,6 +302,11 @@ function InfluencerHome() {
         {auditBusy ? "Auditing..." : "Run Safe Audit"}
       </button>
       {auditResult && <pre className="mt-3 whitespace-pre-wrap break-words text-sm">{auditResult}</pre>}
+      <div className="mt-3 flex flex-wrap gap-2">
+        <button type="button" disabled={migrationBusy} onClick={() => void runMigration(false)} className="rounded-lg border px-4 py-3 font-semibold disabled:opacity-50">Preview Staging Merge</button>
+        <button type="button" disabled={migrationBusy} onClick={() => void runMigration(true)} className="rounded-lg border px-4 py-3 font-semibold disabled:opacity-50">Confirm Staging Merge</button>
+      </div>
+      {migrationOutput && <pre className="mt-3 whitespace-pre-wrap break-words text-sm">{migrationOutput}</pre>}
     </section>
     <section className="rounded-xl border bg-card p-5" aria-labelledby="import-research-heading">
       <h2 id="import-research-heading" className="text-lg font-semibold">Import Research</h2>
