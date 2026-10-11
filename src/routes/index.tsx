@@ -5,6 +5,34 @@ import { useServerFn } from "@tanstack/react-start";
 import { manualQualificationOverride, secondLookAction } from "@/lib/creators.functions";
 import { getInfluencerMasterCounts, listWorkflowSection, listBatchOneResults, moveAiScreenedToSecondLook, saveInfluencerDmDraft, setInfluencerWorkflowStatus } from "@/lib/influencer-master.functions";
 import { CREATORS, hydrateCreatorsFromDB, useCreatorsVersion } from "@/lib/creator-partnerships";
+import { importCreatorResearch } from "@/lib/creator-research-import.functions";
+
+
+function parseResearchCsv(text: string): Array<Record<string, string>> {
+  const records: string[][] = [];
+  let row: string[] = [], cell = "", quoted = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (ch === '"') {
+      if (quoted && text[i + 1] === '"') { cell += '"'; i++; }
+      else quoted = !quoted;
+    } else if (ch === "," && !quoted) { row.push(cell); cell = ""; }
+    else if ((ch === "\\n" || ch === "\\r") && !quoted) {
+      if (ch === "\\r" && text[i + 1] === "\\n") i++;
+      row.push(cell); records.push(row); row = []; cell = "";
+    } else cell += ch;
+  }
+  if (quoted) throw new Error("Unclosed quoted CSV field");
+  if (cell || row.length) { row.push(cell); records.push(row); }
+  const headers = (records.shift() || []).map(v => v.replace(/^\uFEFF/, "").trim());
+  if (!headers.includes("tiktok_handle") && !headers.includes("match_tiktok_handle"))
+    throw new Error("Missing TikTok handle column");
+  if (new Set(headers).size !== headers.length) throw new Error("Duplicate CSV column names");
+  return records.filter(fields => fields.some(v => v.trim())).map((fields, index) => {
+    if (fields.length !== headers.length) throw new Error("CSV row " + (index + 2) + " has incorrect column count");
+    return Object.fromEntries(headers.map((name, i) => [name, fields[i]]));
+  });
+}
 
 export const Route = createFileRoute("/")({
   component: InfluencerHome,
@@ -34,6 +62,10 @@ function InfluencerHome() {
   const [workflowError,setWorkflowError] = useState("");
   const [expanded, setExpanded] = useState<number | null>(null);
   const [importPreview, setImportPreview] = useState("");
+  const [researchRows, setResearchRows] = useState<Array<Record<string,string>>>([]);
+  const [importBusy, setImportBusy] = useState(false);
+  const [importReady, setImportReady] = useState(false);
+  const runResearchImport = useServerFn(importCreatorResearch);
   useEffect(() => {
     if (expanded === null || expanded > 5) return;
     let active = true;
@@ -233,27 +265,39 @@ function InfluencerHome() {
         className="sr-only"
         onChange={async event => {
           const file = event.currentTarget.files?.[0];
+          setImportReady(false); setResearchRows([]);
           if (!file) return;
+          setImportBusy(true);
           setImportPreview("Checking " + file.name + "…");
           try {
-            const content = await file.text();
-            const header = content.replace(/^\uFEFF/, "").split(/\r?\n/, 1)[0] || "";
-            const fields = header.split(",").map(field => field.trim().replace(/^"|"$/g, ""));
-            if (!fields.includes("tiktok_handle")) {
-              setImportPreview("Cannot import: CSV is missing the canonical tiktok_handle column.");
-            } else {
-              const count = (content.match(/\r?\n/g) || []).length;
-              setImportPreview(file.name + " selected. TikTok handle column found. Approximate data lines: " + count + ". Database import is not enabled yet; no records have been changed.");
-            }
+            if (file.size > 15 * 1024 * 1024) throw new Error("File exceeds 15 MB");
+            const rows = parseResearchCsv(await file.text());
+            if (!rows.length || rows.length > 500) throw new Error("Select 1–500 creators per CSV");
+            const result = await runResearchImport({ data: { rows, confirm: false } });
+            setResearchRows(rows);
+            setImportReady(result.failed === 0);
+            setImportPreview("Preview: " + result.total + " creators, " + result.new + " new, " + result.existing + " existing, " + result.failed + " invalid. " +
+              (result.errors.length ? result.errors.join("; ") : "No database records changed."));
           } catch (error) {
-            setImportPreview("Unable to read file: " + String(error));
-          }
-          event.currentTarget.value = "";
+            setImportPreview("Cannot import: " + String(error));
+          } finally { setImportBusy(false); event.currentTarget.value = ""; }
         }}
       />
       {importPreview && <p role="status" className="mt-3 whitespace-pre-wrap text-sm">{importPreview}</p>}
+      {importReady && <button type="button" disabled={importBusy} className="mt-3 ml-2 rounded-lg border border-primary px-4 py-3 font-semibold disabled:opacity-50" onClick={async () => {
+        if (!window.confirm("Import " + researchRows.length + " research profiles? This adds new creators and fills empty research fields; manual decisions are preserved.")) return;
+        setImportBusy(true); setImportReady(false);
+        try {
+          const result = await runResearchImport({ data: { rows: researchRows, confirm: true } });
+          setImportPreview("Import complete: " + result.inserted + " inserted, " + result.updated + " enriched, " + result.skipped + " unchanged, " + result.failed + " failed." +
+            (result.errors.length ? "\\n" + result.errors.join("\\n") : ""));
+          void loadCounts().then(setMasterCounts);
+          void hydrateCreatorsFromDB();
+        } catch (error) { setImportPreview("Import failed: " + String(error)); }
+        finally { setImportBusy(false); }
+      }}>{importBusy ? "Importing…" : "Confirm Import to CRM"}</button>}
       <p className="mt-2 text-xs text-muted-foreground">
-        Safe preview only. ZIP/Markdown parsing, duplicate detection, and database upsert must be connected and verified before live importing.
+        CSV upload supports up to 500 creators per batch. Preview first, then confirm. Existing nonempty fields and manual decisions are preserved. ZIP and raw Markdown uploads are not yet supported.
       </p>
     </section>
   </main>;
