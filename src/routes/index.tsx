@@ -38,7 +38,7 @@ function InfluencerHome() {
     let active = true;
     setWorkflowLoading(true); setWorkflowError(""); setWorkflowRows([]);
     void fetchSection({data:{status:workflowStatuses[expanded],page:workflowPage}})
-      .then(result => { if(active) setWorkflowRows(result.rows); })
+      .then(result => { if(active) setWorkflowRows(result.rows as Parameters<typeof setWorkflowRows>[0] & unknown[]); })
       .catch(error => { if(active) setWorkflowError(String(error)); })
       .finally(() => { if(active) setWorkflowLoading(false); });
     return () => {active=false;};
