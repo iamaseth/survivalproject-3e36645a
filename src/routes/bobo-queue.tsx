@@ -27,7 +27,7 @@ function BoboQueue() {
           all.push(...next.rows);
         }
         const completed = new Set(batch.map(c => (c.tiktok || "").trim().toLowerCase().replace(/\/$/, "")));
-        if (active) {setRows(all.filter(r => !completed.has((r.profile_url || "").trim().toLowerCase().replace(/\/$/, ""))));setOpened(progress.opened);setReady(true);}
+        if (active) {setRows((all as Candidate[]).filter(r => !completed.has((r.profile_url || "").trim().toLowerCase().replace(/\/$/, ""))));setOpened(progress.opened);setReady(true);}
       } catch(e) { if(active) setError("Unable to load queue: " + String(e)); }
     })();
     return () => {active=false;};
