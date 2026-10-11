@@ -81,13 +81,13 @@ function InfluencerHome() {
     // Old AI qualification statuses are intentionally ignored until a fresh-screening stage is persisted.
     const forNow = rows.filter(c => !rejected(c) && !approved(c) && !secondLook(c) && !moreResearch(c));
     return [
-      { name: "After First Screening", count: masterCounts?.workflowCounts?.research ?? forNow.length, to: "/bobo-queue" },
-      { name: "AI Screened", count: masterCounts?.workflowCounts?.ai_screened ?? 0, to: "/ai-screened" },
-      { name: "Manually Approved", count: masterCounts?.workflowCounts?.approved ?? 0, to: "/creators" },
+      { name: "Keyword Search", count: masterCounts?.workflowCounts?.research ?? forNow.length, to: "/bobo-queue" },
+      { name: "Profile Research", count: masterCounts?.workflowCounts?.ai_screened ?? 0, to: "/ai-screened" },
+      { name: "Ready to Contact", count: masterCounts?.workflowCounts?.approved ?? 0, to: "/creators" },
       { name: "Sent", count: masterCounts?.workflowCounts?.sent ?? 0, to: "/creators" },
       { name: "Second Look", count: masterCounts?.workflowCounts?.second_look ?? 0, to: "/creators" },
       { name: "Rejected", count: masterCounts?.workflowCounts?.rejected ?? 0, to: "/creators" },
-      { name: "Original List", count: CREATORS.length, to: "/influencer-original" },
+      { name: "Backup", count: CREATORS.length, to: "/influencer-original" },
     ] as const;
   }, [useCreatorsVersionValue, masterCounts, batch, secondLookIds]);
   const normalize = (value?: string | null) => {
@@ -140,8 +140,10 @@ function InfluencerHome() {
         </span>
       </button>
       {expanded === i && <div className="border-t px-4 py-3">
-        {i === 0 && <p className="mb-3 text-sm text-muted-foreground">BoBo's full research queue, progress counter, and next-profile button.</p>}
+        {i === 0 && <p className="mb-3 text-sm text-muted-foreground">BoBo's collected TikTok handles and research queue. The count reflects creators awaiting screening, not the number of keywords.</p>}
 
+        {i === 1 && <p className="mb-3 text-sm text-muted-foreground">Profile Markdown research and AI screening. The count reflects AI-screened creators.</p>}
+        {i === 2 && <p className="mb-3 text-sm text-muted-foreground">Manually approved creators ready for personalized outreach.</p>}
         {i === 0 && <Link to={c.to} className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-3 font-semibold text-primary-foreground">Open full list <ExternalLink className="h-4 w-4" /></Link>}
         {<>
           {workflowLoading && <p className="text-sm">Loading…</p>}
