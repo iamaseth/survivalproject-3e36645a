@@ -6,6 +6,7 @@ import { manualQualificationOverride, secondLookAction } from "@/lib/creators.fu
 import { getInfluencerMasterCounts, listWorkflowSection, listBatchOneResults, moveAiScreenedToSecondLook, saveInfluencerDmDraft, setInfluencerWorkflowStatus } from "@/lib/influencer-master.functions";
 import { CREATORS, hydrateCreatorsFromDB, useCreatorsVersion } from "@/lib/creator-partnerships";
 import { importCreatorResearch } from "@/lib/creator-research-import.functions";
+import { auditCreatorConsolidation } from "@/lib/creator-consolidation-audit.functions";
 
 
 function parseResearchCsv(text: string): Array<Record<string, string>> {
@@ -66,6 +67,24 @@ function InfluencerHome() {
   const [importBusy, setImportBusy] = useState(false);
   const [importReady, setImportReady] = useState(false);
   const runResearchImport = useServerFn(importCreatorResearch);
+  const runConsolidationAudit = useServerFn(auditCreatorConsolidation);
+  const [auditResult, setAuditResult] = useState("");
+  const [auditBusy, setAuditBusy] = useState(false);
+  const runAudit = async () => {
+    setAuditBusy(true);
+    try {
+      const result = await runConsolidationAudit();
+      if (!result?.readOnly) throw new Error("Audit service did not respond");
+      setAuditResult("READ-ONLY AUDIT — no records changed\n" +
+        "Master unique TikTok handles: " + result.masterUniqueHandles + "\n" +
+        result.report.map(r => r.table + ": " + r.rows + " rows; " + r.handles +
+          " TikTok handles; " + r.newHandles + " not in master; " + r.missingHandle +
+          " missing handles; " + r.duplicateWithin + " duplicates" +
+          (r.incomplete ? " — INCOMPLETE: " + (r.error || "scan limit") : "")).join("\n"));
+    } catch (error) { setAuditResult("Audit failed: " + String(error)); }
+    finally { setAuditBusy(false); }
+  };
+
   useEffect(() => {
     if (expanded === null || expanded > 5) return;
     let active = true;
@@ -249,6 +268,14 @@ function InfluencerHome() {
         </>}
       </div>}
     </section>)}
+    <section className="rounded-xl border bg-card p-5">
+      <h2 className="text-lg font-semibold">Database Consolidation Audit</h2>
+      <p className="mt-1 text-sm">Read-only inventory of old creator tables. No merge or deletion.</p>
+      <button type="button" disabled={auditBusy} onClick={() => void runAudit()} className="mt-3 rounded-lg border px-4 py-3 font-semibold disabled:opacity-50">
+        {auditBusy ? "Auditing..." : "Run Safe Audit"}
+      </button>
+      {auditResult && <pre className="mt-3 whitespace-pre-wrap break-words text-sm">{auditResult}</pre>}
+    </section>
     <section className="rounded-xl border bg-card p-5" aria-labelledby="import-research-heading">
       <h2 id="import-research-heading" className="text-lg font-semibold">Import Research</h2>
       <p className="mt-1 text-sm text-muted-foreground">
