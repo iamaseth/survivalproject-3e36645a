@@ -27,8 +27,8 @@ export const getInfluencerMasterCounts = createServerFn({ method: "GET" })
     // A single mutually-exclusive workflow count from the full master inventory.
     const workflowStatuses = ["research", "ai_screened", "approved", "sent", "second_look", "rejected"] as const;
     const workflowPairs = await Promise.all(workflowStatuses.map(async status => {
-      const { count, error } = await context.supabase.from("influencer_workflow")
-        .select("source_id", { count: "exact", head: true }).eq("workflow_status", status);
+      const { count, error } = await context.supabase.from("creators")
+        .select("id", { count: "exact", head: true }).eq("workflow_status", status);
       if (error) throw new Error(error.message);
       return [status, count ?? 0] as const;
     }));
@@ -106,12 +106,17 @@ export const listWorkflowSection = createServerFn({ method: "GET" })
   .inputValidator((data: { status: "research"|"ai_screened"|"approved"|"sent"|"second_look"|"rejected"; page?: number }) => data)
   .handler(async ({ context, data }) => {
     const page = Math.max(0, Math.floor(data.page ?? 0));
-    const { data: rows, count, error } = await context.supabase.from("influencer_workflow")
-      .select("source_table,source_id,display_name,tiktok_url,youtube_url,instagram_url,facebook_url,workflow_status", { count: "exact" })
-      .eq("workflow_status", data.status)
-      .order("source_table").order("source_id")
+    const { data: creators, count, error } = await context.supabase.from("creators")
+      .select("id,name,tiktok,youtube,instagram,facebook,workflow_status", { count: "exact" })
+      .eq("workflow_status", data.status).order("id")
       .range(page * 100, page * 100 + 99);
     if (error) throw new Error(error.message);
+    const rows = (creators ?? []).map(c => ({
+      source_table: "creators", source_id: c.id, display_name: c.name,
+      tiktok_url: c.tiktok, youtube_url: c.youtube,
+      instagram_url: c.instagram, facebook_url: c.facebook,
+      workflow_status: c.workflow_status
+    }));
     return { rows: rows ?? [], count: count ?? 0, page };
   });
 
@@ -123,8 +128,7 @@ export const setInfluencerWorkflowStatus = createServerFn({ method: "POST" })
     return data;
   })
   .handler(async ({ context, data }) => {
-    const approval = data.status === "approved" ? "approved" : data.status === "rejected" ? "rejected" : null;
-    const update = approval ? { workflow_status: data.status, seth_approval_status: approval } : { workflow_status: data.status };
+    const update = { workflow_status: data.status };
     const { data: saved, error } = await context.supabase.from("creators")
       .update(update).eq("id", data.id).select("id,workflow_status").single();
     if (error) throw new Error(error.message);
