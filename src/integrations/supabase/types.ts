@@ -530,6 +530,7 @@ export type Database = {
           updated_at: string
           verification_date: string | null
           verification_evidence: string | null
+          workflow_status: string | null
           youtube: string | null
           youtube_channel_id: string | null
         }
@@ -607,6 +608,7 @@ export type Database = {
           updated_at?: string
           verification_date?: string | null
           verification_evidence?: string | null
+          workflow_status?: string | null
           youtube?: string | null
           youtube_channel_id?: string | null
         }
@@ -684,6 +686,7 @@ export type Database = {
           updated_at?: string
           verification_date?: string | null
           verification_evidence?: string | null
+          workflow_status?: string | null
           youtube?: string | null
           youtube_channel_id?: string | null
         }
@@ -1034,6 +1037,60 @@ export type Database = {
         }
         Relationships: []
       }
+      influencer_research_queue_selection: {
+        Row: {
+          creator_id: string
+          selected_at: string
+          selection_reason: string
+        }
+        Insert: {
+          creator_id: string
+          selected_at?: string
+          selection_reason: string
+        }
+        Update: {
+          creator_id?: string
+          selected_at?: string
+          selection_reason?: string
+        }
+        Relationships: []
+      }
+      influencer_research_staging: {
+        Row: {
+          created_at: string
+          evidence: Json
+          handle: string
+          id: number
+          md_content: string | null
+          profile_url: string
+          research_stage: string
+          source: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          evidence?: Json
+          handle: string
+          id?: never
+          md_content?: string | null
+          profile_url: string
+          research_stage?: string
+          source?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          evidence?: Json
+          handle?: string
+          id?: never
+          md_content?: string | null
+          profile_url?: string
+          research_stage?: string
+          source?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       ingest_tokens: {
         Row: {
           created_at: string
@@ -1049,6 +1106,30 @@ export type Database = {
           created_at?: string
           name?: string
           token_sha256?: string
+        }
+        Relationships: []
+      }
+      outreach_activity: {
+        Row: {
+          action: string
+          actor: string
+          created_at: string
+          creator_id: string
+          id: number
+        }
+        Insert: {
+          action: string
+          actor: string
+          created_at?: string
+          creator_id: string
+          id?: never
+        }
+        Update: {
+          action?: string
+          actor?: string
+          created_at?: string
+          creator_id?: string
+          id?: never
         }
         Relationships: []
       }
@@ -1674,9 +1755,45 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      influencer_bobo_research_queue: {
+        Row: {
+          display_name: string | null
+          profile_url: string | null
+          source_id: string | null
+          source_table: string | null
+          stage: string | null
+        }
+        Relationships: []
+      }
+      influencer_original_master: {
+        Row: {
+          display_name: string | null
+          facebook_url: string | null
+          instagram_url: string | null
+          original_data: Json | null
+          source_id: string | null
+          source_table: string | null
+          tiktok_url: string | null
+          youtube_url: string | null
+        }
+        Relationships: []
+      }
+      influencer_workflow: {
+        Row: {
+          display_name: string | null
+          facebook_url: string | null
+          instagram_url: string | null
+          source_id: string | null
+          source_table: string | null
+          tiktok_url: string | null
+          workflow_status: string | null
+          youtube_url: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
+      ai_screened_second_look: { Args: { p_id: string }; Returns: Json }
       creator_final_research_valid: {
         Args: {
           p_date: string
@@ -1711,6 +1828,16 @@ export type Database = {
       outreach_second_look_action: {
         Args: { p_action: string; p_id: string }
         Returns: Json
+      }
+      outreach_today_activity: {
+        Args: never
+        Returns: {
+          action: string
+          actor: string
+          created_at: string
+          creator_id: string
+          creator_name: string
+        }[]
       }
       sender_reject_assigned: {
         Args: { p_checked_profile: boolean; p_id: string; p_reason: string }

@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AdminRouteImport } from './routes/admin'
+import { Route as AiScreenedRouteImport } from './routes/ai-screened'
 import { Route as AmazonCreatorsRouteImport } from './routes/amazon-creators'
 import { Route as AmazonDiscoveryRouteImport } from './routes/amazon-discovery'
 import { Route as AnalyticsRouteImport } from './routes/analytics'
@@ -18,6 +19,8 @@ import { Route as ArchiveRouteImport } from './routes/archive'
 import { Route as AssetsRouteImport } from './routes/assets'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as BoboRouteImport } from './routes/bobo'
+import { Route as BoboQueueRouteImport } from './routes/bobo-queue'
+import { Route as BoboResearchRouteImport } from './routes/bobo-research'
 import { Route as BoboSearchRouteImport } from './routes/bobo-search'
 import { Route as CampaignsRouteImport } from './routes/campaigns'
 import { Route as ClassificationImportRouteImport } from './routes/classification-import'
@@ -27,6 +30,7 @@ import { Route as ContentRouteImport } from './routes/content'
 import { Route as CreatorsRouteImport } from './routes/creators'
 import { Route as DecisionsRouteImport } from './routes/decisions'
 import { Route as EmailRouteImport } from './routes/email'
+import { Route as InfluencerOriginalRouteImport } from './routes/influencer-original'
 import { Route as KnowledgeRouteImport } from './routes/knowledge'
 import { Route as LeadsRouteImport } from './routes/leads'
 import { Route as OutreachRunnerRouteImport } from './routes/outreach-runner'
@@ -65,6 +69,11 @@ const AdminRoute = AdminRouteImport.update({
   path: '/admin',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AiScreenedRoute = AiScreenedRouteImport.update({
+  id: '/ai-screened',
+  path: '/ai-screened',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AmazonCreatorsRoute = AmazonCreatorsRouteImport.update({
   id: '/amazon-creators',
   path: '/amazon-creators',
@@ -98,6 +107,16 @@ const AuthRoute = AuthRouteImport.update({
 const BoboRoute = BoboRouteImport.update({
   id: '/bobo',
   path: '/bobo',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const BoboQueueRoute = BoboQueueRouteImport.update({
+  id: '/bobo-queue',
+  path: '/bobo-queue',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const BoboResearchRoute = BoboResearchRouteImport.update({
+  id: '/bobo-research',
+  path: '/bobo-research',
   getParentRoute: () => rootRouteImport,
 } as any)
 const BoboSearchRoute = BoboSearchRouteImport.update({
@@ -143,6 +162,11 @@ const DecisionsRoute = DecisionsRouteImport.update({
 const EmailRoute = EmailRouteImport.update({
   id: '/email',
   path: '/email',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const InfluencerOriginalRoute = InfluencerOriginalRouteImport.update({
+  id: '/influencer-original',
+  path: '/influencer-original',
   getParentRoute: () => rootRouteImport,
 } as any)
 const KnowledgeRoute = KnowledgeRouteImport.update({
@@ -289,6 +313,7 @@ const ApiPublicYoutubeVerificationRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
+  '/ai-screened': typeof AiScreenedRoute
   '/amazon-creators': typeof AmazonCreatorsRoute
   '/amazon-discovery': typeof AmazonDiscoveryRoute
   '/analytics': typeof AnalyticsRoute
@@ -296,6 +321,8 @@ export interface FileRoutesByFullPath {
   '/assets': typeof AssetsRouteWithChildren
   '/auth': typeof AuthRoute
   '/bobo': typeof BoboRoute
+  '/bobo-queue': typeof BoboQueueRoute
+  '/bobo-research': typeof BoboResearchRoute
   '/bobo-search': typeof BoboSearchRoute
   '/campaigns': typeof CampaignsRoute
   '/classification-import': typeof ClassificationImportRoute
@@ -305,6 +332,7 @@ export interface FileRoutesByFullPath {
   '/creators': typeof CreatorsRouteWithChildren
   '/decisions': typeof DecisionsRoute
   '/email': typeof EmailRoute
+  '/influencer-original': typeof InfluencerOriginalRoute
   '/knowledge': typeof KnowledgeRouteWithChildren
   '/leads': typeof LeadsRoute
   '/outreach-runner': typeof OutreachRunnerRoute
@@ -336,6 +364,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
+  '/ai-screened': typeof AiScreenedRoute
   '/amazon-creators': typeof AmazonCreatorsRoute
   '/amazon-discovery': typeof AmazonDiscoveryRoute
   '/analytics': typeof AnalyticsRoute
@@ -343,6 +372,8 @@ export interface FileRoutesByTo {
   '/assets': typeof AssetsRouteWithChildren
   '/auth': typeof AuthRoute
   '/bobo': typeof BoboRoute
+  '/bobo-queue': typeof BoboQueueRoute
+  '/bobo-research': typeof BoboResearchRoute
   '/bobo-search': typeof BoboSearchRoute
   '/campaigns': typeof CampaignsRoute
   '/classification-import': typeof ClassificationImportRoute
@@ -352,6 +383,7 @@ export interface FileRoutesByTo {
   '/creators': typeof CreatorsRouteWithChildren
   '/decisions': typeof DecisionsRoute
   '/email': typeof EmailRoute
+  '/influencer-original': typeof InfluencerOriginalRoute
   '/knowledge': typeof KnowledgeRouteWithChildren
   '/leads': typeof LeadsRoute
   '/outreach-runner': typeof OutreachRunnerRoute
@@ -384,6 +416,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
+  '/ai-screened': typeof AiScreenedRoute
   '/amazon-creators': typeof AmazonCreatorsRoute
   '/amazon-discovery': typeof AmazonDiscoveryRoute
   '/analytics': typeof AnalyticsRoute
@@ -391,6 +424,8 @@ export interface FileRoutesById {
   '/assets': typeof AssetsRouteWithChildren
   '/auth': typeof AuthRoute
   '/bobo': typeof BoboRoute
+  '/bobo-queue': typeof BoboQueueRoute
+  '/bobo-research': typeof BoboResearchRoute
   '/bobo-search': typeof BoboSearchRoute
   '/campaigns': typeof CampaignsRoute
   '/classification-import': typeof ClassificationImportRoute
@@ -400,6 +435,7 @@ export interface FileRoutesById {
   '/creators': typeof CreatorsRouteWithChildren
   '/decisions': typeof DecisionsRoute
   '/email': typeof EmailRoute
+  '/influencer-original': typeof InfluencerOriginalRoute
   '/knowledge': typeof KnowledgeRouteWithChildren
   '/leads': typeof LeadsRoute
   '/outreach-runner': typeof OutreachRunnerRoute
@@ -433,6 +469,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/admin'
+    | '/ai-screened'
     | '/amazon-creators'
     | '/amazon-discovery'
     | '/analytics'
@@ -440,6 +477,8 @@ export interface FileRouteTypes {
     | '/assets'
     | '/auth'
     | '/bobo'
+    | '/bobo-queue'
+    | '/bobo-research'
     | '/bobo-search'
     | '/campaigns'
     | '/classification-import'
@@ -449,6 +488,7 @@ export interface FileRouteTypes {
     | '/creators'
     | '/decisions'
     | '/email'
+    | '/influencer-original'
     | '/knowledge'
     | '/leads'
     | '/outreach-runner'
@@ -480,6 +520,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/admin'
+    | '/ai-screened'
     | '/amazon-creators'
     | '/amazon-discovery'
     | '/analytics'
@@ -487,6 +528,8 @@ export interface FileRouteTypes {
     | '/assets'
     | '/auth'
     | '/bobo'
+    | '/bobo-queue'
+    | '/bobo-research'
     | '/bobo-search'
     | '/campaigns'
     | '/classification-import'
@@ -496,6 +539,7 @@ export interface FileRouteTypes {
     | '/creators'
     | '/decisions'
     | '/email'
+    | '/influencer-original'
     | '/knowledge'
     | '/leads'
     | '/outreach-runner'
@@ -527,6 +571,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/admin'
+    | '/ai-screened'
     | '/amazon-creators'
     | '/amazon-discovery'
     | '/analytics'
@@ -534,6 +579,8 @@ export interface FileRouteTypes {
     | '/assets'
     | '/auth'
     | '/bobo'
+    | '/bobo-queue'
+    | '/bobo-research'
     | '/bobo-search'
     | '/campaigns'
     | '/classification-import'
@@ -543,6 +590,7 @@ export interface FileRouteTypes {
     | '/creators'
     | '/decisions'
     | '/email'
+    | '/influencer-original'
     | '/knowledge'
     | '/leads'
     | '/outreach-runner'
@@ -575,6 +623,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AdminRoute: typeof AdminRoute
+  AiScreenedRoute: typeof AiScreenedRoute
   AmazonCreatorsRoute: typeof AmazonCreatorsRoute
   AmazonDiscoveryRoute: typeof AmazonDiscoveryRoute
   AnalyticsRoute: typeof AnalyticsRoute
@@ -582,6 +631,8 @@ export interface RootRouteChildren {
   AssetsRoute: typeof AssetsRouteWithChildren
   AuthRoute: typeof AuthRoute
   BoboRoute: typeof BoboRoute
+  BoboQueueRoute: typeof BoboQueueRoute
+  BoboResearchRoute: typeof BoboResearchRoute
   BoboSearchRoute: typeof BoboSearchRoute
   CampaignsRoute: typeof CampaignsRoute
   ClassificationImportRoute: typeof ClassificationImportRoute
@@ -591,6 +642,7 @@ export interface RootRouteChildren {
   CreatorsRoute: typeof CreatorsRouteWithChildren
   DecisionsRoute: typeof DecisionsRoute
   EmailRoute: typeof EmailRoute
+  InfluencerOriginalRoute: typeof InfluencerOriginalRoute
   KnowledgeRoute: typeof KnowledgeRouteWithChildren
   LeadsRoute: typeof LeadsRoute
   OutreachRunnerRoute: typeof OutreachRunnerRoute
@@ -630,6 +682,13 @@ declare module '@tanstack/react-router' {
       path: '/admin'
       fullPath: '/admin'
       preLoaderRoute: typeof AdminRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/ai-screened': {
+      id: '/ai-screened'
+      path: '/ai-screened'
+      fullPath: '/ai-screened'
+      preLoaderRoute: typeof AiScreenedRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/amazon-creators': {
@@ -679,6 +738,20 @@ declare module '@tanstack/react-router' {
       path: '/bobo'
       fullPath: '/bobo'
       preLoaderRoute: typeof BoboRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/bobo-queue': {
+      id: '/bobo-queue'
+      path: '/bobo-queue'
+      fullPath: '/bobo-queue'
+      preLoaderRoute: typeof BoboQueueRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/bobo-research': {
+      id: '/bobo-research'
+      path: '/bobo-research'
+      fullPath: '/bobo-research'
+      preLoaderRoute: typeof BoboResearchRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/bobo-search': {
@@ -742,6 +815,13 @@ declare module '@tanstack/react-router' {
       path: '/email'
       fullPath: '/email'
       preLoaderRoute: typeof EmailRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/influencer-original': {
+      id: '/influencer-original'
+      path: '/influencer-original'
+      fullPath: '/influencer-original'
+      preLoaderRoute: typeof InfluencerOriginalRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/knowledge': {
@@ -976,6 +1056,7 @@ const KnowledgeRouteWithChildren = KnowledgeRoute._addFileChildren(
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRoute,
+  AiScreenedRoute: AiScreenedRoute,
   AmazonCreatorsRoute: AmazonCreatorsRoute,
   AmazonDiscoveryRoute: AmazonDiscoveryRoute,
   AnalyticsRoute: AnalyticsRoute,
@@ -983,6 +1064,8 @@ const rootRouteChildren: RootRouteChildren = {
   AssetsRoute: AssetsRouteWithChildren,
   AuthRoute: AuthRoute,
   BoboRoute: BoboRoute,
+  BoboQueueRoute: BoboQueueRoute,
+  BoboResearchRoute: BoboResearchRoute,
   BoboSearchRoute: BoboSearchRoute,
   CampaignsRoute: CampaignsRoute,
   ClassificationImportRoute: ClassificationImportRoute,
@@ -992,6 +1075,7 @@ const rootRouteChildren: RootRouteChildren = {
   CreatorsRoute: CreatorsRouteWithChildren,
   DecisionsRoute: DecisionsRoute,
   EmailRoute: EmailRoute,
+  InfluencerOriginalRoute: InfluencerOriginalRoute,
   KnowledgeRoute: KnowledgeRouteWithChildren,
   LeadsRoute: LeadsRoute,
   OutreachRunnerRoute: OutreachRunnerRoute,
