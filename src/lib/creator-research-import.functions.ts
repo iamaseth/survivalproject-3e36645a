@@ -13,8 +13,8 @@ const JSON_FIELDS = new Set([
   "recent_videos","recent_posts","hashtags","brand_mentions","sponsorship_evidence",
   "affiliate_links","content_samples","research_sources","raw_capture_history",
   "ai_evidence","ai_review_history","record_provenance","custom_attributes",
-  "legacy_status_archive","qualification_reset_history","public_emails_detected",
-  "tagged_accounts","possible_commercial_signals","video_captions_full",
+  "legacy_status_archive","qualification_reset_history" ,
+  "tagged_accounts","video_captions_full",
   "video_thumbnails","video_raw_labels","content_links","seth_approval_history"
 ]);
 const INTEGER_FIELDS = new Set([
