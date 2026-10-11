@@ -75,17 +75,19 @@ function InfluencerHome() {
   const runMigration = async (confirm: boolean) => {
     if (confirm && !window.confirm("Import staged research into the creators master? Existing data and statuses will be preserved. Source tables will not be deleted.")) return;
     setMigrationBusy(true);
-    const totals = { scanned: 0, inserted: 0, updated: 0, skipped: 0, errors: [] as string[] };
+    const totals = { scanned: 0, new: 0, existing: 0, inserted: 0, updated: 0, skipped: 0, errors: [] as string[] };
     try {
       for (let offset = 0; offset < 20000; offset += 50) {
         const result = await runStagingMigration({ data: { confirm, offset, limit: 50 } });
         if (!result || typeof result.scanned !== "number") throw new Error("Migration service returned no result at offset " + offset);
         totals.scanned += result.scanned;
+        totals.new += result.new;
+        totals.existing += result.existing;
         totals.inserted += result.inserted;
         totals.updated += result.updated;
         totals.skipped += result.skipped;
         totals.errors.push(...result.errors);
-        setMigrationOutput((confirm ? "IMPORT" : "DRY RUN") + ": scanned " + totals.scanned +
+        setMigrationOutput((confirm ? "IMPORT" : "DRY RUN") + ": scanned " + totals.scanned + ", new " + totals.new + ", existing " + totals.existing +
           ", inserted " + totals.inserted + ", updated " + totals.updated +
           ", skipped " + totals.skipped + ", errors " + totals.errors.length);
         if (totals.errors.length) throw new Error(totals.errors.slice(0, 5).join("; "));
