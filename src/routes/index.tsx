@@ -36,6 +36,13 @@ function parseResearchCsv(text: string): Array<Record<string, string>> {
   });
 }
 
+function influencerFacingDm(raw: string): string {
+  const cleaned = raw.split(/\r?\n/).filter(line => !/^\s*(?:Outreach Status|Draft Status)\s*:/i.test(line)).join("\n").trim();
+  if (!cleaned) return "";
+  if (/\bno obligation\b|\bno requirement to (?:post|review)\b|\bnot required to (?:post|review)\b/i.test(cleaned)) return cleaned;
+  return cleaned + "\n\nThere's no obligation to post or review anything.";
+}
+
 export const Route = createFileRoute("/")({
   component: InfluencerHome,
   head: () => ({ meta: [{ title: "Influencer Research — Survival Tabs" }, { name: "robots", content: "noindex" }] }),
@@ -253,7 +260,7 @@ function InfluencerHome() {
                 {i === 1 && <button type="button" disabled={rejectBusy !== null} onClick={async e => { e.preventDefault(); e.stopPropagation(); if (rejectBusy !== null) return; setRejectBusy(person.id); try { const result = await setWorkflowStatus({data:{id:person.id,status:"rejected"}}); if (!result?.ok) throw new Error("Rejection not saved"); setWorkflowRows(prev => prev.filter(row => row.source_id !== person.id)); setBatch(prev => prev.map(c => c.id === person.id ? {...c,seth_approval_status:"rejected"} : c)); const fresh = await fetchSection({data:{status:"ai_screened",page:workflowPage}}); setWorkflowRows(fresh.rows as Parameters<typeof setWorkflowRows>[0] & unknown[]); void loadCounts().then(setMasterCounts); } catch(err) { window.alert("Could not reject: "+String(err)); } finally { setRejectBusy(null); } }} className="rounded-md border border-red-300 px-2 py-1 text-xs font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50">{rejectBusy === person.id ? "Saving…" : "Reject"}</button>}
                 {i === 2 && w.source_table === "creators" && <button type="button" disabled={rejectBusy !== null} onClick={async e => { e.preventDefault(); e.stopPropagation(); if (rejectBusy !== null) return; setRejectBusy(person.id); try { const result = await approvedSecondLook({data:{id:person.id,action:"later"}}); if (!result?.ok) throw new Error("Move not confirmed"); setSecondLookIds(prev => [...prev,person.id]); setBatch(prev => prev.map(c => c.id === person.id ? {...c,outreach_second_look_at:new Date().toISOString()} : c)); await hydrateCreatorsFromDB(); } catch(err) { window.alert("Could not move to Second Look: "+String(err)); } finally { setRejectBusy(null); } }} className="rounded-md border border-amber-300 px-2 py-1 text-xs font-semibold text-amber-800 hover:bg-amber-50 disabled:opacity-50">Second Look</button>}
                 {i === 2 && <button type="button" disabled={rejectBusy !== null} onClick={async e => { e.preventDefault(); e.stopPropagation(); if (rejectBusy !== null) return; if (!window.confirm(`Reject approved creator ${person.name}?`)) return; setRejectBusy(person.id); try { const result = await rejectCreator({data:{id:person.id,decision:"rejected",checkedProfile:true,evidence:"Manual rejection from Already Manually Approved"}}); if (!result?.ok) throw new Error("Rejection not confirmed"); setBatch(prev => prev.map(c => c.id === person.id ? {...c,seth_approval_status:"rejected"} : c)); await hydrateCreatorsFromDB(); } catch(err) { window.alert("Could not reject: "+String(err)); } finally { setRejectBusy(null); } }} className="rounded-md border border-red-300 px-2 py-1 text-xs font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50">Reject</button>}
-                {i !== 1 && person.dm && <button type="button" onClick={e => { e.preventDefault(); e.stopPropagation(); void navigator.clipboard.writeText(draftEdits[person.id] ?? person.dm!); setDraftNotice(prev => ({...prev,[person.id]:"DM copied"})); }} className="rounded-md border border-primary/30 bg-primary/10 px-2 py-1 text-xs font-semibold text-foreground hover:bg-primary/20" title="Copy personalized DM without opening details">Copy DM</button>}
+                {i !== 1 && person.dm && <button type="button" onClick={e => { e.preventDefault(); e.stopPropagation(); void navigator.clipboard.writeText(influencerFacingDm(draftEdits[person.id] ?? person.dm!)); setDraftNotice(prev => ({...prev,[person.id]:"DM copied"})); }} className="rounded-md border border-primary/30 bg-primary/10 px-2 py-1 text-xs font-semibold text-foreground hover:bg-primary/20" title="Copy personalized DM without opening details">Copy DM</button>}
               </summary>
               <div className="space-y-2 pt-2 text-sm">
                 <div className="flex flex-wrap gap-x-5 gap-y-1 text-sm">
@@ -266,18 +273,18 @@ function InfluencerHome() {
                 {normalize(person.contactPage) && <a className="inline-flex items-center gap-1 underline" href={normalize(person.contactPage)!} target="_blank" rel="noopener noreferrer">Contact page <ExternalLink className="h-4 w-4" /></a>}
                 {i !== 1 && person.dm && <div className="rounded-lg border bg-muted/30 p-3">
                   <label htmlFor={`dm-${person.id}`} className="block font-semibold">Rena's personalized DM draft</label>
-                  <textarea id={`dm-${person.id}`} rows={5} className="mt-2 w-full resize-y rounded-lg border bg-background p-3 text-sm" value={draftEdits[person.id] ?? person.dm} onChange={e => setDraftEdits(prev => ({...prev,[person.id]:e.target.value}))} />
+                  <textarea id={`dm-${person.id}`} rows={5} className="mt-2 w-full resize-y rounded-lg border bg-background p-3 text-sm" value={draftEdits[person.id] ?? influencerFacingDm(person.dm ?? "")} onChange={e => setDraftEdits(prev => ({...prev,[person.id]:e.target.value}))} />
                   <div className="mt-2 flex flex-wrap gap-2">
                     <button type="button" disabled={draftBusy === person.id || !(draftEdits[person.id] ?? person.dm).trim()} className="rounded-lg bg-primary px-3 py-2 font-semibold text-primary-foreground disabled:opacity-50" onClick={async () => {
                       setDraftBusy(person.id); setDraftNotice(prev => ({...prev,[person.id]:""}));
                       try {
-                        const saved = await saveDraft({data:{id:person.id,dm:draftEdits[person.id] ?? person.dm!}});
+                        const saved = await saveDraft({data:{id:person.id,dm:influencerFacingDm(draftEdits[person.id] ?? person.dm!)}});
                         setBatch(prev => prev.map(c => c.id === person.id ? {...c,personalized_dm:saved.personalized_dm} : c));
                         setDraftNotice(prev => ({...prev,[person.id]:"Saved to CRM"}));
                       } catch (e) {setDraftNotice(prev => ({...prev,[person.id]:"Save failed: "+String(e)}));}
                       finally {setDraftBusy(null);}
                     }}>{draftBusy === person.id ? "Saving…" : "Save DM"}</button>
-                    <button type="button" className="rounded-lg border px-3 py-2" onClick={() => void navigator.clipboard.writeText(draftEdits[person.id] ?? person.dm!)}>Copy DM</button>
+                    <button type="button" className="rounded-lg border px-3 py-2" onClick={() => void navigator.clipboard.writeText(influencerFacingDm(draftEdits[person.id] ?? person.dm!))}>Copy DM</button>
                   </div>
                   {draftNotice[person.id] && <p role="status" className="mt-2 text-xs">{draftNotice[person.id]}</p>}
                 </div>}
