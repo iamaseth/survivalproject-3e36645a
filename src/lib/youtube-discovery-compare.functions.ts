@@ -11,12 +11,20 @@ export const compareYoutubeDiscovery=createServerFn({method:"POST"})
  return d;
 })
 .handler(async ({context,data})=>{
- const {data:master,error}=await context.supabase.from("creators").select("id,name,youtube").order("id").limit(20000);
- if(error)throw new Error(error.message);
- const exact=new Set((master||[]).map(x=>idFrom(x.youtube||"")).filter(Boolean));
- const names=new Set((master||[]).map(x=>norm(x.name||"")).filter(Boolean));
+ // PostgREST often caps a response at 1,000 rows even when .limit(20000) is requested.
+ // Read every page: newly imported YT-API IDs sort after the first page.
+ const master: Array<{id:string;name:string|null;youtube:string|null}> = [];
+ for(let start=0;start<50000;start+=500){
+  const {data:page,error}=await context.supabase.from("creators")
+    .select("id,name,youtube").order("id").range(start,start+499);
+  if(error)throw new Error("Master lookup failed at "+start+": "+error.message);
+  master.push(...(page||[]));
+  if((page||[]).length<500)break;
+ }
+ const exact=new Set(master.map(x=>idFrom(x.youtube||"")).filter(Boolean));
+ const names=new Set(master.map(x=>norm(x.name||"")).filter(Boolean));
  const slice=youtubeDiscoveryRows.slice(data.offset,data.offset+50);
- const result={total:youtubeDiscoveryRows.length,offset:data.offset,scanned:slice.length,existing:0,possibleNameMatches:0,missing:0,inserted:0,errors:[] as string[],dryRun:!data.confirm};
+ const result={total:youtubeDiscoveryRows.length,offset:data.offset,scanned:slice.length,existing:0,possibleNameMatches:0,missing:0,inserted:0,errors:[] as string[],dryRun:!data.confirm,masterRowsChecked:master.length};
  for(const r of slice){
   const id=r.channelId.toLowerCase(), name=norm(r.name);
   if(exact.has(id)){result.existing++;continue;}
