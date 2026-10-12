@@ -9,6 +9,7 @@ import { importCreatorResearch } from "@/lib/creator-research-import.functions";
 import { auditCreatorConsolidation } from "@/lib/creator-consolidation-audit.functions";
 import { migrateStagedResearch } from "@/lib/creator-consolidation-migrate.functions";
 import { previewHistoricalMerge } from "@/lib/creator-historical-preview.functions";
+import { migrateHistoricalBatch } from "@/lib/creator-historical-migrate.functions";
 
 
 function parseResearchCsv(text: string): Array<Record<string, string>> {
@@ -122,6 +123,32 @@ function InfluencerHome() {
     finally { setMigrationBusy(false); }
   };
   const historicalPreview = useServerFn(previewHistoricalMerge);
+  const historicalImport = useServerFn(migrateHistoricalBatch);
+  const [historicalImportBusy,setHistoricalImportBusy] = useState(false);
+  const [historicalImportResult,setHistoricalImportResult] = useState("");
+  const importHistorical = async () => {
+    if(!window.confirm("Import identifiable YouTube and reviewed creators only? Existing records and manual decisions will not be changed. Archive and ambiguous matches remain for review."))return;
+    setHistoricalImportBusy(true);
+    try {
+      for(const table of ["youtube_candidates","reviewed_creators"]){
+        const storageKey="historical-merge-offset-"+table;
+        let offset=Number(window.localStorage.getItem(storageKey)||"0")||0;
+        let inserted=0,existing=0,review=0;
+        for(let i=0;i<30;i++){
+          const result=await historicalImport({data:{table,offset,limit:50,confirm:true}});
+          inserted+=result.inserted;existing+=result.existing;review+=result.review;
+          if(result.errors.length)throw new Error(table+" at "+offset+": "+result.errors.join("; "));
+          offset+=result.scanned;
+          window.localStorage.setItem(storageKey,String(offset));
+          setHistoricalImportResult(table+": offset "+offset+", inserted "+inserted+", existing "+existing+", review "+review+" — checkpoint saved");
+          if(result.scanned<50)break;
+        }
+      }
+      setHistoricalImportResult(prev=>prev+"\\nHistorical import pass finished. Run preview again to verify.");
+      void loadCounts().then(setMasterCounts);
+    }catch(error){setHistoricalImportResult(prev=>prev+"\\nStopped; saved checkpoints retained: "+String(error));}
+    finally{setHistoricalImportBusy(false);}
+  };
   const [historicalResult,setHistoricalResult] = useState("");
   const [historicalBusy,setHistoricalBusy] = useState(false);
   const runHistoricalPreview = async () => {
@@ -353,7 +380,12 @@ function InfluencerHome() {
         <button type="button" disabled={historicalBusy} onClick={() => void runHistoricalPreview()} className="mt-2 rounded-lg border px-4 py-3 font-semibold disabled:opacity-50">
           {historicalBusy ? "Checking historical tables..." : "Preview Historical Merge"}
         </button>
-        {historicalResult && <pre className="mt-3 whitespace-pre-wrap break-words text-sm">{historicalResult}</pre>}
+        {historicalResult && <pre className="mt-3 whitespace-pre-wrap break-words text-sm">{historicalResult.replace(/\\\\n/g,"\\n")}</pre>}
+        <button type="button" disabled={historicalImportBusy} onClick={() => void importHistorical()} className="mt-3 rounded-lg border px-4 py-3 font-semibold disabled:opacity-50">
+          {historicalImportBusy ? "Importing historical batches..." : "Import Identifiable Historical Creators"}
+        </button>
+        <p className="mt-1 text-xs">Only YouTube and reviewed tables. Ambiguous records and archive stay untouched.</p>
+        {historicalImportResult && <pre className="mt-2 whitespace-pre-wrap break-words text-sm">{historicalImportResult}</pre>}
       </div>
       <div className="mt-3 flex flex-wrap gap-2">
         <button type="button" disabled={migrationBusy} onClick={() => void runMigration(false)} className="rounded-lg border px-4 py-3 font-semibold disabled:opacity-50">Preview Next 50</button>
