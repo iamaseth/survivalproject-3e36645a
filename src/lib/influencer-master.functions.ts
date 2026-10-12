@@ -24,6 +24,13 @@ export const getInfluencerMasterCounts = createServerFn({ method: "GET" })
       .select("profile_url").in("profile_url", (batch ?? []).map(c => c.tiktok).filter(Boolean));
     if (matchError) throw new Error(matchError.message);
     const completedInQueue = (queueMatches ?? []).filter(r => completedUrls.has((r.profile_url || "").trim().toLowerCase().replace(/\/$/, ""))).length;
+    // Completed profile research is independent from AI-screening status.
+    const researchIds = new Set((batch ?? []).map(row => row.id));
+    const { data: researched, error: researchError } = await context.supabase.from("creators")
+      .select("id").not("verification_evidence", "is", null);
+    if (researchError) throw new Error(researchError.message);
+    for (const row of researched ?? []) researchIds.add(row.id);
+    const profileResearchCount = researchIds.size;
     // A single mutually-exclusive workflow count from the full master inventory.
     const workflowStatuses = ["research", "ai_screened", "approved", "sent", "second_look", "rejected"] as const;
     const workflowPairs = await Promise.all(workflowStatuses.map(async status => {
@@ -33,7 +40,7 @@ export const getInfluencerMasterCounts = createServerFn({ method: "GET" })
       return [status, count ?? 0] as const;
     }));
     const workflowCounts = Object.fromEntries(workflowPairs) as Record<(typeof workflowStatuses)[number], number>;
-    return { sources, workflowCounts, total: Object.values(workflowCounts).reduce((a, b) => a + b, 0),
+    return { sources, workflowCounts, profileResearchCount, total: Object.values(workflowCounts).reduce((a, b) => a + b, 0),
       boboQueueCount: Math.max(0, (boboQueueCount ?? 0) - completedInQueue),
       aiScreenedCount: (batch ?? []).filter(c => c.qualification_status === "Qualified" && !c.seth_approval_status).length,
       aiRejectedCount: (batch ?? []).filter(c => c.qualification_status === "Not Relevant" && !c.seth_approval_status).length };
