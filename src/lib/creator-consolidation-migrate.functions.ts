@@ -18,6 +18,9 @@ export const migrateStagedResearch = createServerFn({ method: "POST" })
   })
   .handler(async ({ context, data }) => {
     const limit = data.limit ?? 50;
+    const { count: totalCount, error: countError } = await context.supabase
+      .from("influencer_research_staging").select("id", { count: "exact", head: true });
+    if (countError || totalCount === null) throw new Error("Unable to count staging records: " + (countError?.message || "unknown error"));
     const { data: staged, error: stageError } = await context.supabase
       .from("influencer_research_staging")
       .select("id,handle,profile_url,md_content,evidence,source")
@@ -38,7 +41,7 @@ export const migrateStagedResearch = createServerFn({ method: "POST" })
       const key = normalize(creator.tiktok_handle || creator.tiktok || "");
       if (key) existing.set(key, creator);
     }
-    const summary = { offset: data.offset, scanned: records.length, new: 0, existing: 0, inserted: 0, updated: 0, skipped: 0, errors: [] as string[], dryRun: !data.confirm };
+    const summary = { totalCount, offset: data.offset, scanned: records.length, new: 0, existing: 0, inserted: 0, updated: 0, skipped: 0, errors: [] as string[], dryRun: !data.confirm };
     for (let i = 0; i < records.length; i++) {
       const row = records[i], handle = handles[i], previous = existing.get(handle);
       const research = [row.md_content || "", row.evidence ? "Research evidence:\n" + JSON.stringify(row.evidence) : ""].filter(Boolean).join("\n\n");
