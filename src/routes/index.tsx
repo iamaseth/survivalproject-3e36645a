@@ -89,7 +89,7 @@ function InfluencerHome() {
   const [contactFilter, setContactFilter] = useState("All");
   const [batch, setBatch] = useState<Array<{id:string;name:string;tiktok:string|null;youtube:string|null;instagram:string|null;facebook:string|null;email:string|null;contact_route:string|null;followers_signal:string|null;segment:string|null;target_audience:string|null;other_platform:string|null;personalized_dm:string|null;qualification_status:string|null;seth_approval_status:string|null;outreach_second_look_at:string|null;verification_evidence:string|null}>>([]);
   useEffect(() => { void loadBatch().then(setBatch).catch(console.error); }, [loadBatch]);
-  const [masterCounts, setMasterCounts] = useState<{ total: number; boboQueueCount: number; sources: Record<string,number>; aiScreenedCount:number; aiRejectedCount:number; workflowCounts:Record<"research"|"ai_screened"|"approved"|"sent"|"second_look"|"rejected",number> } | null>(null);
+  const [masterCounts, setMasterCounts] = useState<{ total: number; boboQueueCount: number; profileResearchCount:number; sources: Record<string,number>; aiScreenedCount:number; aiRejectedCount:number; workflowCounts:Record<"research"|"ai_screened"|"approved"|"sent"|"second_look"|"rejected",number> } | null>(null);
   useEffect(() => { void loadCounts().then(setMasterCounts).catch(console.error); }, [loadCounts]);
   useEffect(() => { void hydrateCreatorsFromDB(); }, []);
   const categories = useMemo(() => {
@@ -123,7 +123,7 @@ function InfluencerHome() {
     const forNow = rows.filter(c => !rejected(c) && !approved(c) && !secondLook(c) && !moreResearch(c));
     return [
       { name: "Keyword Search", count: masterCounts?.workflowCounts?.research ?? forNow.length, to: "/bobo-queue" },
-      { name: "Profile Research", count: masterCounts?.workflowCounts?.ai_screened ?? 0, to: "/ai-screened" },
+      { name: "Profile Research", count: masterCounts?.profileResearchCount ?? 0, to: "/ai-screened" },
       { name: "Ready to Contact", count: masterCounts?.workflowCounts?.approved ?? 0, to: "/creators" },
       { name: "Sent", count: masterCounts?.workflowCounts?.sent ?? 0, to: "/creators" },
       { name: "Second Look", count: masterCounts?.workflowCounts?.second_look ?? 0, to: "/creators" },
