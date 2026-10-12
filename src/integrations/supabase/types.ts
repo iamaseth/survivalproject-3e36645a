@@ -457,6 +457,15 @@ export type Database = {
       }
       creators: {
         Row: {
+          affiliate_links: Json
+          ai_confidence: number | null
+          ai_evidence: Json
+          ai_model: string | null
+          ai_reasoning: string | null
+          ai_recommendation: string | null
+          ai_review_history: Json
+          ai_reviewed_at: string | null
+          ai_rubric_version: string | null
           amazon: string | null
           amazon_confidence: string | null
           amazon_content_analysis: string | null
@@ -466,23 +475,42 @@ export type Database = {
           amazon_shoppable_video: boolean | null
           amazon_storefront_url: string | null
           amazon_video_url: string | null
+          audience_demographics: Json
+          brand_mentions: Json
+          capture_quality: string | null
+          capture_type: string | null
           code: string | null
           contact_confidence: string | null
           contact_method: string | null
           contact_route: string | null
           contacted_date: string | null
+          content_categories: Json
+          content_links: Json | null
+          content_samples: Json
           created_at: string
           creator_code: string | null
+          custom_attributes: Json
           email: string | null
+          evidence_notes: Json | null
           facebook: string | null
+          facebook_page_id: string | null
           followers_signal: string | null
           full_verification: string | null
           geography: string | null
           geography_confidence: string | null
+          hashtags: Json
           id: string
           imported_by: string | null
           instagram: string | null
+          instagram_handle: string | null
+          language_codes: Json
           last_researched: string | null
+          latest_capture_at: string | null
+          legacy_status_archive: Json
+          link_in_bio_url: string | null
+          linkedin: string | null
+          match_tiktok_handle: string | null
+          match_tiktok_url: string | null
           monetization: string | null
           name: string
           normalized_domain: string | null
@@ -503,15 +531,31 @@ export type Database = {
           personalized_dm: string | null
           personalized_email_body: string | null
           personalized_email_subject: string | null
+          pinterest: string | null
+          platform_metrics: Json
+          platform_profiles: Json
+          possible_commercial_signals: Json | null
           primary_platforms: string | null
           primary_source: string | null
           priority: string | null
+          public_business_email: string | null
+          public_emails_detected: Json | null
+          public_phone: string | null
+          qualification_reset_history: Json
           qualification_status: string | null
+          raw_capture_history: Json
+          raw_markdown: string | null
+          raw_markdown_sha256: string | null
           reach_signal: string | null
           recent_activity_check: string | null
+          recent_posts: Json
+          recent_videos: Json
           recommended_offer: string | null
+          record_provenance: Json
+          reddit: string | null
           rena_notes: string | null
           research_notes: string | null
+          research_sources: Json
           research_status: string | null
           response_followup: string | null
           sample_status: string | null
@@ -522,19 +566,52 @@ export type Database = {
           seth_approved_at: string | null
           seth_approved_by: string | null
           seth_next_action: string | null
+          snapchat: string | null
+          source_file: string | null
+          source_url: string | null
+          sponsorship_evidence: Json
           subscriber_count: number | null
+          tagged_accounts: Json | null
           target_audience: string | null
           technical_notes: string | null
+          threads: string | null
+          threads_handle: string | null
           tiktok: string | null
+          tiktok_bio: string | null
+          tiktok_caption_count: number | null
+          tiktok_caption_only_count: number | null
+          tiktok_display_name: string | null
+          tiktok_followers: number | null
+          tiktok_following: number | null
+          tiktok_handle: string | null
+          tiktok_likes: number | null
+          tiktok_video_count: number | null
           tuan_affiliate_status: string | null
+          twitch: string | null
           updated_at: string
+          upload_action: string | null
           verification_date: string | null
           verification_evidence: string | null
+          video_captions_full: Json | null
+          video_raw_labels: Json | null
+          video_thumbnails: Json | null
+          website_url: string | null
           workflow_status: string | null
+          x_twitter: string | null
           youtube: string | null
           youtube_channel_id: string | null
+          youtube_handle: string | null
         }
         Insert: {
+          affiliate_links?: Json
+          ai_confidence?: number | null
+          ai_evidence?: Json
+          ai_model?: string | null
+          ai_reasoning?: string | null
+          ai_recommendation?: string | null
+          ai_review_history?: Json
+          ai_reviewed_at?: string | null
+          ai_rubric_version?: string | null
           amazon?: string | null
           amazon_confidence?: string | null
           amazon_content_analysis?: string | null
@@ -544,23 +621,42 @@ export type Database = {
           amazon_shoppable_video?: boolean | null
           amazon_storefront_url?: string | null
           amazon_video_url?: string | null
+          audience_demographics?: Json
+          brand_mentions?: Json
+          capture_quality?: string | null
+          capture_type?: string | null
           code?: string | null
           contact_confidence?: string | null
           contact_method?: string | null
           contact_route?: string | null
           contacted_date?: string | null
+          content_categories?: Json
+          content_links?: Json | null
+          content_samples?: Json
           created_at?: string
           creator_code?: string | null
+          custom_attributes?: Json
           email?: string | null
+          evidence_notes?: Json | null
           facebook?: string | null
+          facebook_page_id?: string | null
           followers_signal?: string | null
           full_verification?: string | null
           geography?: string | null
           geography_confidence?: string | null
+          hashtags?: Json
           id: string
           imported_by?: string | null
           instagram?: string | null
+          instagram_handle?: string | null
+          language_codes?: Json
           last_researched?: string | null
+          latest_capture_at?: string | null
+          legacy_status_archive?: Json
+          link_in_bio_url?: string | null
+          linkedin?: string | null
+          match_tiktok_handle?: string | null
+          match_tiktok_url?: string | null
           monetization?: string | null
           name: string
           normalized_domain?: string | null
@@ -581,15 +677,31 @@ export type Database = {
           personalized_dm?: string | null
           personalized_email_body?: string | null
           personalized_email_subject?: string | null
+          pinterest?: string | null
+          platform_metrics?: Json
+          platform_profiles?: Json
+          possible_commercial_signals?: Json | null
           primary_platforms?: string | null
           primary_source?: string | null
           priority?: string | null
+          public_business_email?: string | null
+          public_emails_detected?: Json | null
+          public_phone?: string | null
+          qualification_reset_history?: Json
           qualification_status?: string | null
+          raw_capture_history?: Json
+          raw_markdown?: string | null
+          raw_markdown_sha256?: string | null
           reach_signal?: string | null
           recent_activity_check?: string | null
+          recent_posts?: Json
+          recent_videos?: Json
           recommended_offer?: string | null
+          record_provenance?: Json
+          reddit?: string | null
           rena_notes?: string | null
           research_notes?: string | null
+          research_sources?: Json
           research_status?: string | null
           response_followup?: string | null
           sample_status?: string | null
@@ -600,19 +712,52 @@ export type Database = {
           seth_approved_at?: string | null
           seth_approved_by?: string | null
           seth_next_action?: string | null
+          snapchat?: string | null
+          source_file?: string | null
+          source_url?: string | null
+          sponsorship_evidence?: Json
           subscriber_count?: number | null
+          tagged_accounts?: Json | null
           target_audience?: string | null
           technical_notes?: string | null
+          threads?: string | null
+          threads_handle?: string | null
           tiktok?: string | null
+          tiktok_bio?: string | null
+          tiktok_caption_count?: number | null
+          tiktok_caption_only_count?: number | null
+          tiktok_display_name?: string | null
+          tiktok_followers?: number | null
+          tiktok_following?: number | null
+          tiktok_handle?: string | null
+          tiktok_likes?: number | null
+          tiktok_video_count?: number | null
           tuan_affiliate_status?: string | null
+          twitch?: string | null
           updated_at?: string
+          upload_action?: string | null
           verification_date?: string | null
           verification_evidence?: string | null
+          video_captions_full?: Json | null
+          video_raw_labels?: Json | null
+          video_thumbnails?: Json | null
+          website_url?: string | null
           workflow_status?: string | null
+          x_twitter?: string | null
           youtube?: string | null
           youtube_channel_id?: string | null
+          youtube_handle?: string | null
         }
         Update: {
+          affiliate_links?: Json
+          ai_confidence?: number | null
+          ai_evidence?: Json
+          ai_model?: string | null
+          ai_reasoning?: string | null
+          ai_recommendation?: string | null
+          ai_review_history?: Json
+          ai_reviewed_at?: string | null
+          ai_rubric_version?: string | null
           amazon?: string | null
           amazon_confidence?: string | null
           amazon_content_analysis?: string | null
@@ -622,23 +767,42 @@ export type Database = {
           amazon_shoppable_video?: boolean | null
           amazon_storefront_url?: string | null
           amazon_video_url?: string | null
+          audience_demographics?: Json
+          brand_mentions?: Json
+          capture_quality?: string | null
+          capture_type?: string | null
           code?: string | null
           contact_confidence?: string | null
           contact_method?: string | null
           contact_route?: string | null
           contacted_date?: string | null
+          content_categories?: Json
+          content_links?: Json | null
+          content_samples?: Json
           created_at?: string
           creator_code?: string | null
+          custom_attributes?: Json
           email?: string | null
+          evidence_notes?: Json | null
           facebook?: string | null
+          facebook_page_id?: string | null
           followers_signal?: string | null
           full_verification?: string | null
           geography?: string | null
           geography_confidence?: string | null
+          hashtags?: Json
           id?: string
           imported_by?: string | null
           instagram?: string | null
+          instagram_handle?: string | null
+          language_codes?: Json
           last_researched?: string | null
+          latest_capture_at?: string | null
+          legacy_status_archive?: Json
+          link_in_bio_url?: string | null
+          linkedin?: string | null
+          match_tiktok_handle?: string | null
+          match_tiktok_url?: string | null
           monetization?: string | null
           name?: string
           normalized_domain?: string | null
@@ -659,15 +823,31 @@ export type Database = {
           personalized_dm?: string | null
           personalized_email_body?: string | null
           personalized_email_subject?: string | null
+          pinterest?: string | null
+          platform_metrics?: Json
+          platform_profiles?: Json
+          possible_commercial_signals?: Json | null
           primary_platforms?: string | null
           primary_source?: string | null
           priority?: string | null
+          public_business_email?: string | null
+          public_emails_detected?: Json | null
+          public_phone?: string | null
+          qualification_reset_history?: Json
           qualification_status?: string | null
+          raw_capture_history?: Json
+          raw_markdown?: string | null
+          raw_markdown_sha256?: string | null
           reach_signal?: string | null
           recent_activity_check?: string | null
+          recent_posts?: Json
+          recent_videos?: Json
           recommended_offer?: string | null
+          record_provenance?: Json
+          reddit?: string | null
           rena_notes?: string | null
           research_notes?: string | null
+          research_sources?: Json
           research_status?: string | null
           response_followup?: string | null
           sample_status?: string | null
@@ -678,17 +858,41 @@ export type Database = {
           seth_approved_at?: string | null
           seth_approved_by?: string | null
           seth_next_action?: string | null
+          snapchat?: string | null
+          source_file?: string | null
+          source_url?: string | null
+          sponsorship_evidence?: Json
           subscriber_count?: number | null
+          tagged_accounts?: Json | null
           target_audience?: string | null
           technical_notes?: string | null
+          threads?: string | null
+          threads_handle?: string | null
           tiktok?: string | null
+          tiktok_bio?: string | null
+          tiktok_caption_count?: number | null
+          tiktok_caption_only_count?: number | null
+          tiktok_display_name?: string | null
+          tiktok_followers?: number | null
+          tiktok_following?: number | null
+          tiktok_handle?: string | null
+          tiktok_likes?: number | null
+          tiktok_video_count?: number | null
           tuan_affiliate_status?: string | null
+          twitch?: string | null
           updated_at?: string
+          upload_action?: string | null
           verification_date?: string | null
           verification_evidence?: string | null
+          video_captions_full?: Json | null
+          video_raw_labels?: Json | null
+          video_thumbnails?: Json | null
+          website_url?: string | null
           workflow_status?: string | null
+          x_twitter?: string | null
           youtube?: string | null
           youtube_channel_id?: string | null
+          youtube_handle?: string | null
         }
         Relationships: []
       }

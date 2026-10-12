@@ -23,7 +23,7 @@ export const migrateHistoricalBatch=createServerFn({method:"POST"})
     if(!TABLES.includes(d?.table as typeof TABLES[number]) || !Number.isInteger(d.offset) || d.offset<0 ||
       (d.limit!==undefined && (!Number.isInteger(d.limit)||d.limit<1||d.limit>50)) || typeof d.confirm!=="boolean")
       throw new Error("Invalid historical import request");
-    return d;
+    return { ...d, table: d.table as (typeof TABLES)[number] };
   })
   .handler(async ({context,data})=>{
     const limit=data.limit??50;
