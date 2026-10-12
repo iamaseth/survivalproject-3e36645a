@@ -202,7 +202,7 @@ function InfluencerHome() {
             finally{setReconcileBusy(false);}
           }}>{reconcileBusy?"Updating…":"Sync researched profiles into Section 2"}</button>
           {reconcileResult&&<p role="status" className="mt-2 text-sm">{reconcileResult}</p>}
-        </div>
+        </div>}
         {i === 2 && <p className="mb-3 text-sm text-muted-foreground">Manually approved creators ready for personalized outreach.</p>}
         {i === 0 && <Link to={c.to} className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-3 font-semibold text-primary-foreground">Open full list <ExternalLink className="h-4 w-4" /></Link>}
         {<>
