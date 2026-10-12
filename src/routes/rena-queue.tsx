@@ -83,7 +83,7 @@ export function DmQueue({ sender = "Rena" }: { sender?: "Rena" | "Seth" }) {
   const onTap = (c: CreatorRow) => {
     if (lock.current || c.outreachSentAt) return;
     lock.current = true; setSavingId(c.id);
-    if (!canCopyDm(c)) { setNotice({ kind: "warn", text: isBlockedFollowup(c.responseFollowup) ? "Contact restricted for this creator." : "No DM draft saved yet. Creator remains in Ready to Contact." }); return; }
+    if (!canCopyDm(c)) { setNotice({ kind: "warn", text: isBlockedFollowup(c.responseFollowup) ? "Contact restricted for this creator." : "No DM draft saved yet. Creator remains in Ready to Contact." }); lock.current = false; setSavingId(null); return; }
     const dm = c.personalizedDm!.trim();
     const copy = navigator.clipboard?.writeText(dm) ?? Promise.reject(new Error("no clipboard"));
     void (async () => {
