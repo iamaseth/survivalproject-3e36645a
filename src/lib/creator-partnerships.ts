@@ -476,38 +476,67 @@ function rowToCreator(r: Record<string, unknown>): CreatorRow {
   return base;
 }
 
+// Cache only non-sensitive queue display fields. Never cache DM text, contact details,
+// or approval mutations. The server remains authoritative for every action.
+const ROSTER_CACHE_KEY = "survival-tabs:creator-roster-preview:v1";
+const PREVIEW_TTL_MS = 24 * 60 * 60 * 1000;
+let rosterLoading: Promise<void> | null = null;
+function restoreRosterPreview(): void {
+  if (typeof window === "undefined" || CREATORS.length) return;
+  try {
+    const raw = window.localStorage.getItem(ROSTER_CACHE_KEY);
+    if (!raw) return;
+    const parsed = JSON.parse(raw) as { at: number; rows: Record<string, unknown>[] };
+    if (!Array.isArray(parsed.rows) || Date.now() - parsed.at > PREVIEW_TTL_MS) return;
+    CREATORS.splice(0, CREATORS.length, ...parsed.rows.map(rowToCreator));
+    bumpRoster();
+  } catch { /* unavailable storage must not prevent loading */ }
+}
+function saveRosterPreview(rows: Record<string, unknown>[]): void {
+  if (typeof window === "undefined") return;
+  try {
+    const preview = rows.map(r => ({
+      id: r.id, name: r.name, tiktok: r.tiktok, followers_signal: r.followers_signal,
+      workflow_status: r.workflow_status, qualification_status: r.qualification_status,
+      seth_approval_status: r.seth_approval_status, outreach_assignee: r.outreach_assignee,
+      outreach_sent_at: r.outreach_sent_at, contacted_date: r.contacted_date,
+      response_followup: r.response_followup,
+    }));
+    window.localStorage.setItem(ROSTER_CACHE_KEY, JSON.stringify({ at: Date.now(), rows: preview }));
+  } catch { /* storage quota / private browsing */ }
+}
+
 let creatorsHydrated = false;
 export async function refreshCreatorsFromDB(): Promise<number> {
   const { listCreators } = await import("./creators.functions");
   const { rows } = await listCreators();
   const fresh = rows.map((r) => rowToCreator(r as Record<string, unknown>));
   CREATORS.splice(0, CREATORS.length, ...fresh);
+  saveRosterPreview(rows as Record<string, unknown>[]);
   creatorsHydrated = true;
   bumpRoster();
   return fresh.length;
 }
 
 export async function hydrateCreatorsFromDB(): Promise<void> {
-  if (creatorsHydrated || typeof window === "undefined") return;
-  creatorsHydrated = true;
-  try {
-    const { listCreators } = await import("./creators.functions");
-    // NOTE: no static seeding here — the database is the only source of truth.
-    const { rows } = await listCreators();
-    const existingIds = new Set(CREATORS.map((c) => c.id));
-    let added = 0;
-    for (const r of rows) {
-      const id = (r as Record<string, unknown>).id as string;
-      if (existingIds.has(id)) continue;
-      CREATORS.push(rowToCreator(r as Record<string, unknown>));
-      existingIds.add(id);
-      added++;
-    }
-    if (added > 0) bumpRoster();
-
-  } catch (e) {
-    console.error("[creators] hydrateCreatorsFromDB failed", e);
-    creatorsHydrated = false; // allow a retry instead of staying empty forever
-  }
+  if (typeof window === "undefined") return;
+  if (creatorsHydrated) return;
+  if (rosterLoading) return rosterLoading;
+  // Immediately show last-known names while fetching current authoritative data.
+  restoreRosterPreview();
+  rosterLoading = (async () => {
+    try {
+      const { listCreators } = await import("./creators.functions");
+      const { rows } = await listCreators();
+      const fresh = rows.map(r => rowToCreator(r as Record<string, unknown>));
+      CREATORS.splice(0, CREATORS.length, ...fresh);
+      saveRosterPreview(rows as Record<string, unknown>[]);
+      creatorsHydrated = true;
+      bumpRoster();
+    } catch (e) {
+      console.error("[creators] hydrateCreatorsFromDB failed", e);
+      // Keep the cached preview visible and allow retry when online.
+    } finally { rosterLoading = null; }
+  })();
+  return rosterLoading;
 }
-
