@@ -111,6 +111,35 @@ export const moveAiScreenedToSecondLook = createServerFn({ method: "POST" })
   });
 
 /** Page the same master workflow view used for homepage counters. */
+export const listProfileResearch = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: { page?: number }) => data ?? {})
+  .handler(async ({ context, data }) => {
+    const page = Math.max(0, Math.floor(data.page ?? 0));
+    const { data: batch, error: batchError } = await context.supabase.from("creators")
+      .select("id").like("id", "bobo-md-20261010-%");
+    if (batchError) throw new Error(batchError.message);
+    const ids = new Set((batch ?? []).map(r => r.id));
+    const { data: evidence, error: evidenceError } = await context.supabase.from("creators")
+      .select("id").not("verification_evidence", "is", null);
+    if (evidenceError) throw new Error(evidenceError.message);
+    for (const row of evidence ?? []) ids.add(row.id);
+    const sortedIds = [...ids].sort();
+    const selected = sortedIds.slice(page * 100, page * 100 + 100);
+    if (!selected.length) return { rows: [], count: sortedIds.length, page };
+    const { data: creators, error } = await context.supabase.from("creators")
+      .select("id,name,tiktok,youtube,instagram,facebook,workflow_status")
+      .in("id", selected);
+    if (error) throw new Error(error.message);
+    const byId = new Map((creators ?? []).map(c => [c.id, c]));
+    return { rows: selected.map(id => byId.get(id)).filter((c): c is NonNullable<typeof c> => Boolean(c)).map(c => ({
+      source_table: "creators", source_id: c.id, display_name: c.name,
+      tiktok_url: c.tiktok, youtube_url: c.youtube,
+      instagram_url: c.instagram, facebook_url: c.facebook,
+      workflow_status: c.workflow_status
+    })), count: sortedIds.length, page };
+  });
+
 export const listWorkflowSection = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .inputValidator((data: { status: "research"|"ai_screened"|"approved"|"sent"|"second_look"|"rejected"; page?: number }) => data)
