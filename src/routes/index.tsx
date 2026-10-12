@@ -11,6 +11,7 @@ import { migrateStagedResearch } from "@/lib/creator-consolidation-migrate.funct
 import { previewHistoricalMerge } from "@/lib/creator-historical-preview.functions";
 import { migrateHistoricalBatch } from "@/lib/creator-historical-migrate.functions";
 import { listHistoricalReviewQueue } from "@/lib/creator-historical-review.functions";
+import { compareYoutubeDiscovery } from "@/lib/youtube-discovery-compare.functions";
 
 
 function parseResearchCsv(text: string): Array<Record<string, string>> {
@@ -144,6 +145,26 @@ function InfluencerHome() {
       setReviewRows(result.rows);setReviewTotal(result.total);
     }catch(error){setReviewError(String(error));}
     finally{setReviewBusy(false);}
+  };
+  const compareYouTube=useServerFn(compareYoutubeDiscovery);
+  const [youtubeBusy,setYoutubeBusy]=useState(false);
+  const [youtubeSummary,setYoutubeSummary]=useState("");
+  const runYoutubeComparison=async(confirm:boolean)=>{
+    if(confirm&&!window.confirm("Import only missing YouTube channels into creators? Existing records and manual decisions will remain unchanged."))return;
+    setYoutubeBusy(true);
+    let existing=0,possible=0,missing=0,inserted=0;
+    try{
+      for(let offset=0;offset<540;offset+=50){
+        const r=await compareYouTube({data:{confirm,offset}});
+        existing+=r.existing;possible+=r.possibleNameMatches;missing+=r.missing;inserted+=r.inserted;
+        if(r.errors.length)throw new Error(r.errors.join("; "));
+        setYoutubeSummary((confirm?"IMPORT":"PREVIEW")+" — checked "+(offset+r.scanned)+"/"+r.total+
+          "; exact matches "+existing+"; possible name matches "+possible+
+          "; missing "+missing+"; inserted "+inserted);
+      }
+      if(confirm)void loadCounts().then(setMasterCounts);
+    }catch(e){setYoutubeSummary(prev=>prev+" — stopped: "+String(e));}
+    finally{setYoutubeBusy(false);}
   };
   const historicalPreview = useServerFn(previewHistoricalMerge);
   const historicalImport = useServerFn(migrateHistoricalBatch);
@@ -409,6 +430,15 @@ function InfluencerHome() {
         </button>
         <p className="mt-1 text-xs">Only YouTube and reviewed tables. Ambiguous records and archive stay untouched.</p>
         {historicalImportResult && <pre className="mt-2 whitespace-pre-wrap break-words text-sm">{historicalImportResult}</pre>}
+      </div>
+      <div className="mt-4 border-t pt-4">
+        <h3 className="font-semibold">Original YouTube API Sheet — 540 Channels</h3>
+        <p className="text-sm">Compare channel IDs with the existing creators database. Exact matches are skipped, possible name matches are held, and only missing creators can be imported.</p>
+        <div className="mt-2 flex flex-wrap gap-2">
+          <button type="button" disabled={youtubeBusy} onClick={()=>void runYoutubeComparison(false)} className="rounded-lg border px-4 py-3 font-semibold">Compare YouTube Sheet</button>
+          <button type="button" disabled={youtubeBusy} onClick={()=>void runYoutubeComparison(true)} className="rounded-lg border px-4 py-3 font-semibold">Import Missing YouTube Creators</button>
+        </div>
+        {youtubeSummary&&<p className="mt-2 text-sm">{youtubeSummary}</p>}
       </div>
       <div className="mt-4 border-t pt-4">
         <h3 className="font-semibold">Historical Creator Review Queue</h3>
