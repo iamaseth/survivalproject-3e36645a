@@ -131,7 +131,10 @@ function InfluencerHome() {
         "Master unique TikTok handles: " + result.masterUniqueHandles + "\n" +
         result.report.map(r => r.table + ": " + r.rows + " rows; " + r.handles +
           " TikTok handles; " + r.newHandles + " not in master; " + r.missingHandle +
-          " missing handles; " + r.duplicateWithin + " duplicates" +
+          " missing handles; " + r.duplicateWithin + " duplicates; " +
+          r.youtubeIdentifiers + " YouTube identifiers; " + r.matchedYouTubeRows + " YouTube matches; " +
+          r.nameOnlyPossibleMatches + " possible name matches (review only); " +
+          r.unmatchedByStrongId + " rows unmatched by TikTok/YouTube" +
           (r.incomplete ? " — INCOMPLETE: " + (r.error || "scan limit") : "")).join("\n"));
     } catch (error) { setAuditResult("Audit failed: " + String(error)); }
     finally { setAuditBusy(false); }
