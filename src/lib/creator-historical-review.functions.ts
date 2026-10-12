@@ -30,7 +30,7 @@ export const listHistoricalReviewQueue=createServerFn({method:"GET"})
      const candidateIds=masterNames.get(normalize(displayName))||[];
      return {id:String(r.id),name:displayName||"(unnamed)",urls:[...new Set(urls)],
        possibleNameMatches:candidateIds.slice(0,5),
-       details:Object.fromEntries(Object.entries(r).filter(([k,v])=>!/(password|token|secret|credential|auth)/i.test(k)&&v!==null&&v!==undefined).slice(0,30))};
+       details:Object.fromEntries(Object.entries(r).filter(([k,v])=>!/(password|token|secret|credential|auth)/i.test(k)&&v!==null&&v!==undefined).slice(0,30).map(([k,v])=>[k,typeof v==="string"?v:JSON.stringify(v)??String(v)]))};
    });
    return {source:data.source,page:data.page,total:count??0,rows,readOnly:true};
  });
