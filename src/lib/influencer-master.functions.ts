@@ -79,7 +79,10 @@ export const saveInfluencerDmDraft = createServerFn({ method: "POST" })
   .inputValidator((data: { id: string; dm: string }) => data)
   .handler(async ({ context, data }) => {
     if (!/^bobo-md-20261010-[a-z0-9_]+$/.test(data.id)) throw new Error("Invalid creator");
-    const dm = data.dm.trim();
+    const cleaned = data.dm.split(/\r?\n/).filter(line => !/^\s*(?:Outreach Status|Draft Status)\s*:/i.test(line)).join("\n").trim();
+    const dm = cleaned && !/\bno obligation\b|\bno requirement to (?:post|review)\b|\bnot required to (?:post|review)\b/i.test(cleaned)
+      ? cleaned + "\n\nThere's no obligation to post or review anything."
+      : cleaned;
     if (!dm || dm.length > 5000) throw new Error("Draft must be 1–5000 characters");
     const { data: saved, error } = await context.supabase.from("creators")
       .update({ personalized_dm: dm })
