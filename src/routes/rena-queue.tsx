@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { CREATORS, hydrateCreatorsFromDB, useCreatorsVersion, type CreatorRow } from "@/lib/creator-partnerships";
 import { getMyOutreachSender, outreachPoolAction, senderRejectAssigned, secondLookAction, getOutreachTodayActivity, type OutreachActivityRow } from "@/lib/creators.functions";
-import { inRenaPool, isBlockedFollowup } from "@/lib/rena-queue-eligibility";
+import { inRenaPool, isBlockedFollowup, canOpenTikTok, canCopyDm } from "@/lib/rena-queue-eligibility";
 
 export const Route = createFileRoute("/rena-queue")({
   head: () => ({
@@ -83,6 +83,7 @@ export function DmQueue({ sender = "Rena" }: { sender?: "Rena" | "Seth" }) {
   const onTap = (c: CreatorRow) => {
     if (lock.current || c.outreachSentAt) return;
     lock.current = true; setSavingId(c.id);
+    if (!canCopyDm(c)) { setNotice({ kind: "warn", text: isBlockedFollowup(c.responseFollowup) ? "Contact restricted for this creator." : "No DM draft saved yet. Creator remains in Ready to Contact." }); return; }
     const dm = c.personalizedDm!.trim();
     const copy = navigator.clipboard?.writeText(dm) ?? Promise.reject(new Error("no clipboard"));
     void (async () => {
@@ -170,8 +171,8 @@ export function DmQueue({ sender = "Rena" }: { sender?: "Rena" | "Seth" }) {
           const sent = Boolean(c.outreachSentAt);
           return (
             <li key={c.id} className="flex flex-wrap items-stretch gap-2" onTouchStart={e=>{if(finished)return;const t=e.touches[0];touchStart.current={id:c.id,x:t.clientX,y:t.clientY};}} onTouchEnd={e=>{if(finished)return;const t=e.changedTouches[0];swipeReject(c,t.clientX,t.clientY);}}>
-              <a href={finished ? undefined : c.tiktok!} target="_blank" rel="noopener noreferrer" aria-disabled={finished || savingId === c.id}
-                onClick={(e) => { if (finished || lock.current || swipingId===c.id) { e.preventDefault(); return; } onTap(c); }}
+              <a href={finished || !canOpenTikTok(c) ? undefined : c.tiktok!} target="_blank" rel="noopener noreferrer" aria-disabled={finished || savingId === c.id}
+                onClick={(e) => { if (finished || !canOpenTikTok(c) || lock.current || swipingId===c.id) { e.preventDefault(); return; } onTap(c); }}
                 className={`flex min-h-[76px] flex-1 flex-col justify-center rounded-xl border-2 px-4 py-3 ${completedAction==="sent" ? "border-emerald-600 bg-emerald-100 text-emerald-950" : completedAction==="rejected" ? "border-red-600 bg-red-100 text-red-950" : completedAction==="later" ? "border-amber-600 bg-amber-100 text-amber-950" : "border-border bg-card text-foreground active:bg-secondary"}`}>
                 <span className="text-base font-semibold">{finished ? "✓ " : ""}{c.name}</span>
                 <span className="text-xs opacity-75">{c.followersSignal?.trim() ? `${c.followersSignal.trim()} followers` : "Followers not recorded"}{savingId === c.id ? " · saving…" : finished ? ` · ${completedAction==="sent"?"Sent":completedAction==="rejected"?"Rejected — Not Relevant":"Later — Seth Review"}` : ""}</span>
