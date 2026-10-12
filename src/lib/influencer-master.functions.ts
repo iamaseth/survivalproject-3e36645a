@@ -24,13 +24,6 @@ export const getInfluencerMasterCounts = createServerFn({ method: "GET" })
       .select("profile_url").in("profile_url", (batch ?? []).map(c => c.tiktok).filter(Boolean));
     if (matchError) throw new Error(matchError.message);
     const completedInQueue = (queueMatches ?? []).filter(r => completedUrls.has((r.profile_url || "").trim().toLowerCase().replace(/\/$/, ""))).length;
-    // Completed profile research is independent from AI-screening status.
-    const researchIds = new Set((batch ?? []).map(row => row.id));
-    const { data: researched, error: researchError } = await context.supabase.from("creators")
-      .select("id").not("verification_evidence", "is", null);
-    if (researchError) throw new Error(researchError.message);
-    for (const row of researched ?? []) researchIds.add(row.id);
-    const profileResearchCount = researchIds.size;
     // A single mutually-exclusive workflow count from the full master inventory.
     const workflowStatuses = ["research", "ai_screened", "approved", "sent", "second_look", "rejected"] as const;
     const workflowPairs = await Promise.all(workflowStatuses.map(async status => {
@@ -40,7 +33,7 @@ export const getInfluencerMasterCounts = createServerFn({ method: "GET" })
       return [status, count ?? 0] as const;
     }));
     const workflowCounts = Object.fromEntries(workflowPairs) as Record<(typeof workflowStatuses)[number], number>;
-    return { sources, workflowCounts, profileResearchCount, total: Object.values(workflowCounts).reduce((a, b) => a + b, 0),
+    return { sources, workflowCounts, total: Object.values(workflowCounts).reduce((a, b) => a + b, 0),
       boboQueueCount: Math.max(0, (boboQueueCount ?? 0) - completedInQueue),
       aiScreenedCount: (batch ?? []).filter(c => c.qualification_status === "Qualified" && !c.seth_approval_status).length,
       aiRejectedCount: (batch ?? []).filter(c => c.qualification_status === "Not Relevant" && !c.seth_approval_status).length };
@@ -111,33 +104,31 @@ export const moveAiScreenedToSecondLook = createServerFn({ method: "POST" })
   });
 
 /** Page the same master workflow view used for homepage counters. */
-export const listProfileResearch = createServerFn({ method: "GET" })
+// One-time, idempotent migration. Only unreviewed "research" records with
+// documented evidence move to Section 2. Manual decisions are never changed.
+export const reconcileProfileResearchStatus = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: { page?: number }) => data ?? {})
-  .handler(async ({ context, data }) => {
-    const page = Math.max(0, Math.floor(data.page ?? 0));
-    const { data: batch, error: batchError } = await context.supabase.from("creators")
-      .select("id").like("id", "bobo-md-20261010-%");
-    if (batchError) throw new Error(batchError.message);
-    const ids = new Set((batch ?? []).map(r => r.id));
+  .handler(async ({ context }) => {
     const { data: evidence, error: evidenceError } = await context.supabase.from("creators")
-      .select("id").not("verification_evidence", "is", null);
+      .select("id").eq("workflow_status", "research")
+      .not("verification_evidence", "is", null).neq("verification_evidence", "");
     if (evidenceError) throw new Error(evidenceError.message);
-    for (const row of evidence ?? []) ids.add(row.id);
-    const sortedIds = [...ids].sort();
-    const selected = sortedIds.slice(page * 100, page * 100 + 100);
-    if (!selected.length) return { rows: [], count: sortedIds.length, page };
-    const { data: creators, error } = await context.supabase.from("creators")
-      .select("id,name,tiktok,youtube,instagram,facebook,workflow_status")
-      .in("id", selected);
-    if (error) throw new Error(error.message);
-    const byId = new Map((creators ?? []).map(c => [c.id, c]));
-    return { rows: selected.map(id => byId.get(id)).filter((c): c is NonNullable<typeof c> => Boolean(c)).map(c => ({
-      source_table: "creators", source_id: c.id, display_name: c.name,
-      tiktok_url: c.tiktok, youtube_url: c.youtube,
-      instagram_url: c.instagram, facebook_url: c.facebook,
-      workflow_status: c.workflow_status
-    })), count: sortedIds.length, page };
+    const { data: batch, error: batchError } = await context.supabase.from("creators")
+      .select("id").eq("workflow_status", "research").like("id", "bobo-md-20261010-%");
+    if (batchError) throw new Error(batchError.message);
+    const ids = [...new Set([...(evidence ?? []), ...(batch ?? [])].map(row => row.id))];
+    let moved = 0;
+    for (let i = 0; i < ids.length; i += 100) {
+      const { data: changed, error } = await context.supabase.from("creators")
+        .update({ workflow_status: "ai_screened" })
+        .in("id", ids.slice(i, i + 100))
+        .eq("workflow_status", "research")
+        .is("seth_approval_status", null)
+        .select("id");
+      if (error) throw new Error("Stopped after " + moved + " updates: " + error.message);
+      moved += changed?.length ?? 0;
+    }
+    return { moved, candidates: ids.length, complete: true };
   });
 
 export const listWorkflowSection = createServerFn({ method: "GET" })
