@@ -10,6 +10,7 @@ import { auditCreatorConsolidation } from "@/lib/creator-consolidation-audit.fun
 import { migrateStagedResearch } from "@/lib/creator-consolidation-migrate.functions";
 import { previewHistoricalMerge } from "@/lib/creator-historical-preview.functions";
 import { migrateHistoricalBatch } from "@/lib/creator-historical-migrate.functions";
+import { listHistoricalReviewQueue } from "@/lib/creator-historical-review.functions";
 
 
 function parseResearchCsv(text: string): Array<Record<string, string>> {
@@ -121,6 +122,28 @@ function InfluencerHome() {
       if (confirm) void loadCounts().then(setMasterCounts);
     } catch (error) { setMigrationOutput("Stopped; last completed checkpoint retained. " + String(error)); }
     finally { setMigrationBusy(false); }
+  };
+  const loadHistoricalQueue=useServerFn(listHistoricalReviewQueue);
+  const [reviewSource,setReviewSource]=useState<"creators_archive"|"reviewed_creators">("creators_archive");
+  const [reviewPage,setReviewPage]=useState(0);
+  const [reviewBusy,setReviewBusy]=useState(false);
+  const [reviewError,setReviewError]=useState("");
+  const [reviewTotal,setReviewTotal]=useState(0);
+  const [reviewRows,setReviewRows]=useState<Array<{id:string;name:string;urls:string[];possibleNameMatches:string[];details:Record<string,unknown>}>>([]);
+  const [reviewDecisions,setReviewDecisions]=useState<Record<string,string>>(()=>{try{return JSON.parse(window.localStorage.getItem("historical-review-decisions")||"{}")}catch{return {}}});
+  const setReviewDecision=(id:string,decision:string)=>{
+    const next={...reviewDecisions,[reviewSource+":"+id]:decision};
+    setReviewDecisions(next);
+    try{window.localStorage.setItem("historical-review-decisions",JSON.stringify(next));}catch{}
+  };
+  const openReviewPage=async(source:"creators_archive"|"reviewed_creators",page:number)=>{
+    setReviewSource(source);setReviewPage(page);setReviewBusy(true);setReviewError("");
+    try{
+      const result=await loadHistoricalQueue({data:{source,page}});
+      if(!result.readOnly)throw new Error("Expected read-only queue");
+      setReviewRows(result.rows);setReviewTotal(result.total);
+    }catch(error){setReviewError(String(error));}
+    finally{setReviewBusy(false);}
   };
   const historicalPreview = useServerFn(previewHistoricalMerge);
   const historicalImport = useServerFn(migrateHistoricalBatch);
@@ -386,6 +409,36 @@ function InfluencerHome() {
         </button>
         <p className="mt-1 text-xs">Only YouTube and reviewed tables. Ambiguous records and archive stay untouched.</p>
         {historicalImportResult && <pre className="mt-2 whitespace-pre-wrap break-words text-sm">{historicalImportResult}</pre>}
+      </div>
+      <div className="mt-4 border-t pt-4">
+        <h3 className="font-semibold">Historical Creator Review Queue</h3>
+        <p className="text-sm">Review notes are saved only in this browser until exported. No creator or source database records are changed.</p>
+        <div className="mt-2 flex flex-wrap gap-2">
+          <button type="button" className="rounded border px-3 py-2" disabled={reviewBusy} onClick={()=>void openReviewPage("creators_archive",0)}>Archive (250)</button>
+          <button type="button" className="rounded border px-3 py-2" disabled={reviewBusy} onClick={()=>void openReviewPage("reviewed_creators",0)}>Reviewed (11)</button>
+          <button type="button" className="rounded border px-3 py-2" onClick={()=>void navigator.clipboard.writeText(JSON.stringify(reviewDecisions,null,2))}>Copy review decisions</button>
+        </div>
+        {reviewError && <p className="text-sm text-red-600">{reviewError}</p>}
+        {reviewRows.length>0 && <div className="mt-3 space-y-3">
+          <p className="text-sm">{reviewSource} — page {reviewPage+1}, {reviewTotal} records</p>
+          {reviewRows.map(item=><div key={reviewSource+":"+item.id} className="rounded border p-3">
+            <p className="font-semibold">{item.name} <span className="text-xs font-normal">#{item.id}</span></p>
+            {item.urls.map(url=><p key={url} className="break-all text-sm">{url.startsWith("https://") ? <a href={url} target="_blank" rel="noopener noreferrer" className="underline">{url}</a>:url}</p>)}
+            {item.possibleNameMatches.length>0&&<p className="text-sm">Possible master name matches: {item.possibleNameMatches.join(", ")} (not verified)</p>}
+            <details className="text-xs"><summary>Original record fields</summary><pre className="whitespace-pre-wrap break-words">{JSON.stringify(item.details,null,2)}</pre></details>
+            <label className="mt-2 block text-sm">Review decision (local only)
+              <select className="ml-2 rounded border p-2" value={reviewDecisions[reviewSource+":"+item.id]||""} onChange={e=>setReviewDecision(item.id,e.target.value)}>
+                <option value="">Not reviewed</option><option value="new_candidate">New candidate — verify</option>
+                <option value="possible_duplicate">Possible duplicate</option><option value="needs_research">Needs research</option>
+                <option value="not_relevant">Not relevant</option>
+              </select>
+            </label>
+          </div>)}
+          <div className="flex gap-2">
+            <button type="button" disabled={reviewBusy||reviewPage===0} className="rounded border px-3 py-2" onClick={()=>void openReviewPage(reviewSource,reviewPage-1)}>Previous 25</button>
+            <button type="button" disabled={reviewBusy||(reviewPage+1)*25>=reviewTotal} className="rounded border px-3 py-2" onClick={()=>void openReviewPage(reviewSource,reviewPage+1)}>Next 25</button>
+          </div>
+        </div>}
       </div>
       <div className="mt-3 flex flex-wrap gap-2">
         <button type="button" disabled={migrationBusy} onClick={() => void runMigration(false)} className="rounded-lg border px-4 py-3 font-semibold disabled:opacity-50">Preview Next 50</button>
