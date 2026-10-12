@@ -25,7 +25,7 @@ export const Route = createFileRoute("/rena-queue")({
 });
 
 const handleOf = (url: string) => url.match(/@([A-Za-z0-9._-]+)/)?.[1] ?? null;
-const blocked = (c: CreatorRow) => isBlockedFollowup(c.responseFollowup) || c.qualificationStatus === "Not Relevant" || c.sethApprovalStatus === "rejected";
+const blocked = (c: CreatorRow) => isBlockedFollowup(c.responseFollowup) || c.qualificationStatus === "Not Relevant";
 const inPool = (c: CreatorRow) => inRenaPool(c);
 function statusOf(c: CreatorRow): "available" | "assigned" | "contacted" | "blocked" {
   if (c.outreachSentAt || c.contactedDate) return "contacted";
@@ -52,7 +52,7 @@ export function DmQueue({ sender = "Rena" }: { sender?: "Rena" | "Seth" }) {
   const [swipingId,setSwipingId] = useState<string|null>(null);
   const [actionsId,setActionsId] = useState<string|null>(null);
   
-  const deferCreator = async (id: string) => { if (lock.current) return; lock.current=true; setSavingId(id); try { const result=await secondLookAct({data:{id,action:"later"}}); if(!result?.ok) throw new Error("Could not save Later"); await refresh(); setActionsId(null); setNotice({kind:"ok",text:"Moved to Seth’s Second Look list."}); } catch(e) { setNotice({kind:"err",text:e instanceof Error?e.message:"Could not save Later"}); } finally {lock.current=false;setSavingId(null);} };
+  const deferCreator = async (id: string) => { if (lock.current) return; lock.current=true; setSavingId(id); try { const result=await secondLookAct({data:{id,action:"later"}}); if(!result?.ok) throw new Error("Could not save Later"); await refresh(); setActionsId(null); setNotice({kind:"ok",text:"Moved to Second Look."}); } catch(e) { setNotice({kind:"err",text:e instanceof Error?e.message:"Could not save Later"}); } finally {lock.current=false;setSavingId(null);} };
   const activityFn = useServerFn(getOutreachTodayActivity);
   const [activity,setActivity] = useState<OutreachActivityRow[]>([]);
   const [activityError,setActivityError] = useState<string|null>(null);
@@ -175,7 +175,7 @@ export function DmQueue({ sender = "Rena" }: { sender?: "Rena" | "Seth" }) {
                 onClick={(e) => { if (finished || !canOpenTikTok(c) || lock.current || swipingId===c.id) { e.preventDefault(); return; } onTap(c); }}
                 className={`flex min-h-[76px] flex-1 flex-col justify-center rounded-xl border-2 px-4 py-3 ${completedAction==="sent" ? "border-emerald-600 bg-emerald-100 text-emerald-950" : completedAction==="rejected" ? "border-red-600 bg-red-100 text-red-950" : completedAction==="later" ? "border-amber-600 bg-amber-100 text-amber-950" : "border-border bg-card text-foreground active:bg-secondary"}`}>
                 <span className="text-base font-semibold">{finished ? "✓ " : ""}{c.name}</span>
-                <span className="text-xs opacity-75">{c.followersSignal?.trim() ? `${c.followersSignal.trim()} followers` : "Followers not recorded"}{savingId === c.id ? " · saving…" : finished ? ` · ${completedAction==="sent"?"Sent":completedAction==="rejected"?"Rejected — Not Relevant":"Later — Seth Review"}` : ""}</span>
+                <span className="text-xs opacity-75">{c.followersSignal?.trim() ? `${c.followersSignal.trim()} followers` : "Followers not recorded"}{savingId === c.id ? " · saving…" : finished ? ` · ${completedAction==="sent"?"Sent":completedAction==="rejected"?"Rejected — Not Relevant":"Later — Second Look"}` : ""}</span>
               </a>
               {!finished && !readOnlyPreview && <button type="button" disabled={savingId===c.id} onClick={()=>void simple(c,"sent")} className="rounded-xl bg-emerald-700 px-3 text-sm font-semibold text-white">Sent</button>}
               {!finished && <button type="button" onClick={()=>setActionsId(v=>v===c.id?null:c.id)} className="rounded-xl border border-border px-3 text-sm" aria-label={`Actions for ${c.name}`}>•••</button>}
