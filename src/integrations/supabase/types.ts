@@ -2047,6 +2047,10 @@ export type Database = {
         Args: { p_checked_profile: boolean; p_id: string; p_reason: string }
         Returns: Json
       }
+      set_creator_workflow_stage: {
+        Args: { p_id: string; p_stage: string }
+        Returns: Json
+      }
       seth_review_creator: {
         Args: {
           p_checked_profile: boolean

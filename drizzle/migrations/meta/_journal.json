@@ -43,6 +43,13 @@
       "when": 1791692461740,
       "tag": "0005_secure_research_staging",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1791781542068,
+      "tag": "0006_creator_workflow_stage_rpc",
+      "breakpoints": true
     }
   ]
 }

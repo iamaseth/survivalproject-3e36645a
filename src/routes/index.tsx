@@ -2,8 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { ChevronDown, ExternalLink } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { manualQualificationOverride, secondLookAction } from "@/lib/creators.functions";
-import { reconcileProfileResearchStatus, getInfluencerMasterCounts, listWorkflowSection, listBatchOneResults, moveAiScreenedToSecondLook, saveInfluencerDmDraft, setInfluencerWorkflowStatus } from "@/lib/influencer-master.functions";
+import { reconcileProfileResearchStatus, getInfluencerMasterCounts, listWorkflowSection, listBatchOneResults, saveInfluencerDmDraft, setInfluencerWorkflowStatus } from "@/lib/influencer-master.functions";
 import { CREATORS, hydrateCreatorsFromDB, useCreatorsVersion } from "@/lib/creator-partnerships";
 import { importCreatorResearch } from "@/lib/creator-research-import.functions";
 
@@ -48,11 +47,7 @@ export const Route = createFileRoute("/")({
 
 function InfluencerHome() {
   const saveDraft = useServerFn(saveInfluencerDmDraft);
-  const rejectCreator = useServerFn(manualQualificationOverride);
-  const approveCreator = useServerFn(manualQualificationOverride);
-  const approvedSecondLook = useServerFn(secondLookAction);
-  const secondLookCreator = useServerFn(moveAiScreenedToSecondLook);
-  const [secondLookIds, setSecondLookIds] = useState<string[]>([]);
+  const [secondLookIds] = useState<string[]>([]);
   const [rejectBusy, setRejectBusy] = useState<string | null>(null);
   const [draftEdits, setDraftEdits] = useState<Record<string,string>>({});
   const [draftBusy, setDraftBusy] = useState<string | null>(null);
@@ -149,6 +144,24 @@ function InfluencerHome() {
     id:c.id, name:c.name, note:c.verification_evidence, tiktok:c.tiktok, youtube:c.youtube,
     instagram:c.instagram, facebook:c.facebook, email:c.email, contact:c.contact_route, followers:c.followers_signal, segment:c.segment || c.verification_evidence, audience:c.target_audience, geography:null, source:"BoBo Markdown Batch 1", reach:null, confidence:null, researched:"2026-10-10", status:c.qualification_status, priority:null, evidence:c.verification_evidence, offer:null, offerReason:null, owner:null, outreach:null, response:null, next:null, approval:c.seth_approval_status, platforms:"TikTok", contactPage:c.other_platform, dm:c.personalized_dm
   });
+  // Every homepage section action changes ONLY workflow_status via the audited stage RPC,
+  // then reloads the open section and counts from the database.
+  const runStage = async (id: string, stage: "approved"|"second_look"|"rejected"|"ai_screened") => {
+    if (rejectBusy !== null || expanded === null) return;
+    setRejectBusy(id);
+    try {
+      const result = await setWorkflowStatus({data:{id,status:stage}});
+      if (!result?.ok) throw new Error("Not saved");
+      setWorkflowRows(prev => prev.filter(row => row.source_id !== id));
+      const [fresh, counts] = await Promise.all([fetchSection({data:{status:workflowStatuses[expanded],page:workflowPage}}), loadCounts()]);
+      setWorkflowRows(fresh.rows as Parameters<typeof setWorkflowRows>[0] & unknown[]);
+      setMasterCounts(counts);
+    } catch (err) { window.alert("Could not update: " + (err instanceof Error ? err.message : String(err))); }
+    finally { setRejectBusy(null); }
+  };
+  const toneClass = { green: "border-green-300 text-green-800 hover:bg-green-50", amber: "border-amber-300 text-amber-800 hover:bg-amber-50", red: "border-red-300 text-red-700 hover:bg-red-50", neutral: "hover:bg-muted" } as const;
+  const StageButton = ({label,tone,stage,id,confirmText}:{label:string;tone:keyof typeof toneClass;stage:"approved"|"second_look"|"rejected"|"ai_screened";id:string;confirmText?:string}) =>
+    <button type="button" disabled={rejectBusy !== null} onClick={e => { e.preventDefault(); e.stopPropagation(); if (confirmText && !window.confirm(confirmText)) return; void runStage(id, stage); }} className={"rounded-md border px-2 py-1 text-xs font-semibold disabled:opacity-50 " + toneClass[tone]}>{rejectBusy === id ? "Saving…" : label}</button>;
   const groups = categories.map(category => ({ ...category, rows: [] as ReturnType<typeof fromCreator>[], visibleCount: 0 }));
   return <main className="mx-auto max-w-3xl space-y-3 p-4 sm:p-8">
     <h1 className="mb-4 text-2xl font-bold">Influencers</h1>
@@ -225,11 +238,10 @@ function InfluencerHome() {
                 {person.followers && <span className="shrink-0 rounded-full bg-muted px-2 py-1 text-xs font-medium tabular-nums">{person.followers} followers</span>}
                 {normalize(person.tiktok || person.youtube || person.instagram || person.facebook) && <a href={normalize(person.tiktok || person.youtube || person.instagram || person.facebook)!} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs font-medium hover:bg-muted" title="Open social profile">Profile <ExternalLink className="h-3 w-3" /></a>}
                 {person.email && <a href={`mailto:${person.email}`} onClick={e => e.stopPropagation()} className="rounded-md border px-2 py-1 text-xs font-semibold hover:bg-muted" title={person.email}>E</a>}
-                {i === 1 && w.source_table === "creators" && <button type="button" disabled={rejectBusy !== null} onClick={async e => { e.preventDefault(); e.stopPropagation(); if (rejectBusy !== null) return; if (!window.confirm(`Approve ${person.name} and assign to Rena?`)) return; setRejectBusy(person.id); try { const result = await approveCreator({data:{id:person.id,decision:"approved",checkedProfile:true,assignee:"Rena",evidence:"Manual approval from AI Screened"}}); if (!result?.ok) throw new Error("Approval not confirmed"); setBatch(prev => prev.map(c => c.id === person.id ? {...c,seth_approval_status:"approved"} : c)); await hydrateCreatorsFromDB(); } catch(err) { window.alert("Could not approve: "+String(err)); } finally { setRejectBusy(null); } }} className="rounded-md border border-green-300 px-2 py-1 text-xs font-semibold text-green-800 hover:bg-green-50 disabled:opacity-50">Approve</button>}
-                {i === 1 && <button type="button" disabled={rejectBusy !== null || secondLookIds.includes(person.id) || Boolean(batch.find(c => c.id === person.id)?.outreach_second_look_at)} onClick={async e => { e.preventDefault(); e.stopPropagation(); if (rejectBusy !== null || secondLookIds.includes(person.id)) return; setRejectBusy(person.id); try { const result = await secondLookCreator({data:{id:person.id}}); if (!result?.ok) throw new Error("Not confirmed"); setSecondLookIds(prev => [...prev,person.id]); setBatch(prev => prev.map(c => c.id === person.id ? {...c,outreach_second_look_at:new Date().toISOString()} : c)); await hydrateCreatorsFromDB(); } catch(err) { window.alert("Could not move to Second Look: "+String(err)); } finally { setRejectBusy(null); } }} className="rounded-md border border-amber-300 px-2 py-1 text-xs font-semibold text-amber-800 hover:bg-amber-50 disabled:opacity-50">Second Look</button>}
-                {i === 1 && <button type="button" disabled={rejectBusy !== null} onClick={async e => { e.preventDefault(); e.stopPropagation(); if (rejectBusy !== null) return; setRejectBusy(person.id); try { const result = await setWorkflowStatus({data:{id:person.id,status:"rejected"}}); if (!result?.ok) throw new Error("Rejection not saved"); setWorkflowRows(prev => prev.filter(row => row.source_id !== person.id)); setBatch(prev => prev.map(c => c.id === person.id ? {...c,seth_approval_status:"rejected"} : c)); const fresh = await fetchSection({data:{status:"ai_screened",page:workflowPage}}); setWorkflowRows(fresh.rows as Parameters<typeof setWorkflowRows>[0] & unknown[]); void loadCounts().then(setMasterCounts); } catch(err) { window.alert("Could not reject: "+String(err)); } finally { setRejectBusy(null); } }} className="rounded-md border border-red-300 px-2 py-1 text-xs font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50">{rejectBusy === person.id ? "Saving…" : "Reject"}</button>}
-                {i === 2 && w.source_table === "creators" && <button type="button" disabled={rejectBusy !== null} onClick={async e => { e.preventDefault(); e.stopPropagation(); if (rejectBusy !== null) return; setRejectBusy(person.id); try { const result = await approvedSecondLook({data:{id:person.id,action:"later"}}); if (!result?.ok) throw new Error("Move not confirmed"); setSecondLookIds(prev => [...prev,person.id]); setBatch(prev => prev.map(c => c.id === person.id ? {...c,outreach_second_look_at:new Date().toISOString()} : c)); await hydrateCreatorsFromDB(); } catch(err) { window.alert("Could not move to Second Look: "+String(err)); } finally { setRejectBusy(null); } }} className="rounded-md border border-amber-300 px-2 py-1 text-xs font-semibold text-amber-800 hover:bg-amber-50 disabled:opacity-50">Second Look</button>}
-                {i === 2 && <button type="button" disabled={rejectBusy !== null} onClick={async e => { e.preventDefault(); e.stopPropagation(); if (rejectBusy !== null) return; if (!window.confirm(`Reject approved creator ${person.name}?`)) return; setRejectBusy(person.id); try { const result = await rejectCreator({data:{id:person.id,decision:"rejected",checkedProfile:true,evidence:"Manual rejection from Already Manually Approved"}}); if (!result?.ok) throw new Error("Rejection not confirmed"); setBatch(prev => prev.map(c => c.id === person.id ? {...c,seth_approval_status:"rejected"} : c)); await hydrateCreatorsFromDB(); } catch(err) { window.alert("Could not reject: "+String(err)); } finally { setRejectBusy(null); } }} className="rounded-md border border-red-300 px-2 py-1 text-xs font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50">Reject</button>}
+                {w.source_table === "creators" && (i === 1 || i === 4) && <StageButton label="Approve" tone="green" stage="approved" id={person.id} />}
+                {w.source_table === "creators" && (i === 1 || i === 2) && <StageButton label="Second Look" tone="amber" stage="second_look" id={person.id} />}
+                {w.source_table === "creators" && (i === 1 || i === 2 || i === 4) && <StageButton label="Reject" tone="red" stage="rejected" id={person.id} confirmText={i === 2 ? `Reject approved creator ${person.name}?` : undefined} />}
+                {w.source_table === "creators" && (i === 4 || i === 5) && <StageButton label="Restore to Section 2" tone="neutral" stage="ai_screened" id={person.id} />}
                 {i !== 1 && person.dm && <button type="button" onClick={e => { e.preventDefault(); e.stopPropagation(); void navigator.clipboard.writeText(influencerFacingDm(draftEdits[person.id] ?? person.dm!)); setDraftNotice(prev => ({...prev,[person.id]:"DM copied"})); }} className="rounded-md border border-primary/30 bg-primary/10 px-2 py-1 text-xs font-semibold text-foreground hover:bg-primary/20" title="Copy personalized DM without opening details">Copy DM</button>}
               </summary>
               <div className="space-y-2 pt-2 text-sm">
