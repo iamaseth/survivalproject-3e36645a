@@ -8,6 +8,7 @@ import { CREATORS, hydrateCreatorsFromDB, useCreatorsVersion } from "@/lib/creat
 import { importCreatorResearch } from "@/lib/creator-research-import.functions";
 import { auditCreatorConsolidation } from "@/lib/creator-consolidation-audit.functions";
 import { migrateStagedResearch } from "@/lib/creator-consolidation-migrate.functions";
+import { previewHistoricalMerge } from "@/lib/creator-historical-preview.functions";
 
 
 function parseResearchCsv(text: string): Array<Record<string, string>> {
@@ -119,6 +120,23 @@ function InfluencerHome() {
       if (confirm) void loadCounts().then(setMasterCounts);
     } catch (error) { setMigrationOutput("Stopped; last completed checkpoint retained. " + String(error)); }
     finally { setMigrationBusy(false); }
+  };
+  const historicalPreview = useServerFn(previewHistoricalMerge);
+  const [historicalResult,setHistoricalResult] = useState("");
+  const [historicalBusy,setHistoricalBusy] = useState(false);
+  const runHistoricalPreview = async () => {
+    setHistoricalBusy(true);
+    try {
+      const result = await historicalPreview();
+      if (!result.readOnly) throw new Error("Expected read-only result");
+      setHistoricalResult("HISTORICAL MERGE PREVIEW — no records changed\\n" +
+        result.report.map(r => r.table + ": " + r.rows + " rows; " +
+          r.exactTikTok + " TikTok matches; " + r.exactYouTube + " YouTube matches; " +
+          r.nameReview + " possible name matches; " + r.newIdentified + " new identified candidates; " +
+          r.needsIdentity + " need identity review; " + r.duplicateWithinSource +
+          " repeated identifiers within source").join("\\n") + "\\n" + result.warning);
+    } catch(error) {setHistoricalResult("Historical preview failed: " + String(error));}
+    finally {setHistoricalBusy(false);}
   };
   const [auditResult, setAuditResult] = useState("");
   const [auditBusy, setAuditBusy] = useState(false);
@@ -330,6 +348,13 @@ function InfluencerHome() {
         {auditBusy ? "Auditing..." : "Run Safe Audit"}
       </button>
       {auditResult && <pre className="mt-3 whitespace-pre-wrap break-words text-sm">{auditResult}</pre>}
+      <div className="mt-4 border-t pt-4">
+        <p className="text-sm">Historical tables: preview possible merges without writing or changing approvals.</p>
+        <button type="button" disabled={historicalBusy} onClick={() => void runHistoricalPreview()} className="mt-2 rounded-lg border px-4 py-3 font-semibold disabled:opacity-50">
+          {historicalBusy ? "Checking historical tables..." : "Preview Historical Merge"}
+        </button>
+        {historicalResult && <pre className="mt-3 whitespace-pre-wrap break-words text-sm">{historicalResult}</pre>}
+      </div>
       <div className="mt-3 flex flex-wrap gap-2">
         <button type="button" disabled={migrationBusy} onClick={() => void runMigration(false)} className="rounded-lg border px-4 py-3 font-semibold disabled:opacity-50">Preview Next 50</button>
         <button type="button" disabled={migrationBusy} onClick={() => void runMigration(true)} className="rounded-lg border px-4 py-3 font-semibold disabled:opacity-50">Import Remaining (resumable)</button>
