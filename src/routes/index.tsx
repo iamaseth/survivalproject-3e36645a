@@ -3,7 +3,7 @@ import { ChevronDown, ExternalLink } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { manualQualificationOverride, secondLookAction } from "@/lib/creators.functions";
-import { listProfileResearch, getInfluencerMasterCounts, listWorkflowSection, listBatchOneResults, moveAiScreenedToSecondLook, saveInfluencerDmDraft, setInfluencerWorkflowStatus } from "@/lib/influencer-master.functions";
+import { reconcileProfileResearchStatus, getInfluencerMasterCounts, listWorkflowSection, listBatchOneResults, moveAiScreenedToSecondLook, saveInfluencerDmDraft, setInfluencerWorkflowStatus } from "@/lib/influencer-master.functions";
 import { CREATORS, hydrateCreatorsFromDB, useCreatorsVersion } from "@/lib/creator-partnerships";
 import { importCreatorResearch } from "@/lib/creator-research-import.functions";
 
@@ -61,7 +61,9 @@ function InfluencerHome() {
   const loadCounts = useServerFn(getInfluencerMasterCounts);
   const loadBatch = useServerFn(listBatchOneResults);
   const fetchSection = useServerFn(listWorkflowSection);
-  const fetchResearch = useServerFn(listProfileResearch);
+  const reconcileResearch = useServerFn(reconcileProfileResearchStatus);
+  const [reconcileBusy,setReconcileBusy] = useState(false);
+  const [reconcileResult,setReconcileResult] = useState("");
   const setWorkflowStatus = useServerFn(setInfluencerWorkflowStatus);
   const workflowStatuses = ["research","ai_screened","approved","sent","second_look","rejected"] as const;
   const [workflowPage,setWorkflowPage] = useState(0);
@@ -79,18 +81,18 @@ function InfluencerHome() {
     if (expanded === null || expanded > 5) return;
     let active = true;
     setWorkflowLoading(true); setWorkflowError(""); setWorkflowRows([]);
-    void (expanded === 1 ? fetchResearch({data:{page:workflowPage}}) : fetchSection({data:{status:workflowStatuses[expanded],page:workflowPage}}))
+    void fetchSection({data:{status:workflowStatuses[expanded],page:workflowPage}})
       .then(result => { if(active) setWorkflowRows(result.rows as Parameters<typeof setWorkflowRows>[0] & unknown[]); })
       .catch(error => { if(active) setWorkflowError(String(error)); })
       .finally(() => { if(active) setWorkflowLoading(false); });
     return () => {active=false;};
-  },[expanded,workflowPage,fetchSection,fetchResearch,useCreatorsVersionValue]);
+  },[expanded,workflowPage,fetchSection,useCreatorsVersionValue]);
 
   const [platform, setPlatform] = useState("All");
   const [contactFilter, setContactFilter] = useState("All");
   const [batch, setBatch] = useState<Array<{id:string;name:string;tiktok:string|null;youtube:string|null;instagram:string|null;facebook:string|null;email:string|null;contact_route:string|null;followers_signal:string|null;segment:string|null;target_audience:string|null;other_platform:string|null;personalized_dm:string|null;qualification_status:string|null;seth_approval_status:string|null;outreach_second_look_at:string|null;verification_evidence:string|null}>>([]);
   useEffect(() => { void loadBatch().then(setBatch).catch(console.error); }, [loadBatch]);
-  const [masterCounts, setMasterCounts] = useState<{ total: number; boboQueueCount: number; profileResearchCount:number; sources: Record<string,number>; aiScreenedCount:number; aiRejectedCount:number; workflowCounts:Record<"research"|"ai_screened"|"approved"|"sent"|"second_look"|"rejected",number> } | null>(null);
+  const [masterCounts, setMasterCounts] = useState<{ total: number; boboQueueCount: number; sources: Record<string,number>; aiScreenedCount:number; aiRejectedCount:number; workflowCounts:Record<"research"|"ai_screened"|"approved"|"sent"|"second_look"|"rejected",number> } | null>(null);
   useEffect(() => { void loadCounts().then(setMasterCounts).catch(console.error); }, [loadCounts]);
   useEffect(() => { void hydrateCreatorsFromDB(); }, []);
   const categories = useMemo(() => {
@@ -124,7 +126,7 @@ function InfluencerHome() {
     const forNow = rows.filter(c => !rejected(c) && !approved(c) && !secondLook(c) && !moreResearch(c));
     return [
       { name: "Keyword Search", count: masterCounts?.workflowCounts?.research ?? forNow.length, to: "/bobo-queue" },
-      { name: "Profile Research", count: masterCounts?.profileResearchCount ?? 0, to: "/ai-screened" },
+      { name: "Profile Research", count: masterCounts?.workflowCounts?.ai_screened ?? 0, to: "/ai-screened" },
       { name: "Ready to Contact", count: masterCounts?.workflowCounts?.approved ?? 0, to: "/creators" },
       { name: "Sent", count: masterCounts?.workflowCounts?.sent ?? 0, to: "/creators" },
       { name: "Second Look", count: masterCounts?.workflowCounts?.second_look ?? 0, to: "/creators" },
@@ -184,7 +186,23 @@ function InfluencerHome() {
       {expanded === i && <div className="border-t px-4 py-3">
         {i === 0 && <p className="mb-3 text-sm text-muted-foreground">BoBo's collected TikTok handles and research queue. The count reflects creators awaiting screening, not the number of keywords.</p>}
 
-        {i === 1 && <p className="mb-3 text-sm text-muted-foreground">Profiles with saved research evidence, including BoBo’s imported Markdown research. AI screening is a separate step.</p>}
+        {i === 1 && <p className="mb-3 text-sm text-muted-foreground">Profiles with completed research, awaiting your manual review. Each creator belongs to one section only.</p>}
+        {i === 1 && <div className="mb-3">
+          <button type="button" disabled={reconcileBusy} className="rounded-lg border px-4 py-2 font-semibold disabled:opacity-50" onClick={async()=>{
+            if(!window.confirm("Move researched profiles from Keyword Search to Profile Research? Existing manual decisions will not be changed."))return;
+            setReconcileBusy(true);setReconcileResult("");
+            try{
+              const result=await reconcileResearch();
+              setReconcileResult(result.moved+" researched profiles moved to Section 2.");
+              setWorkflowPage(0);
+              const [fresh,counts]=await Promise.all([fetchSection({data:{status:"ai_screened",page:0}}),loadCounts()]);
+              setWorkflowRows(fresh.rows as Parameters<typeof setWorkflowRows>[0] & unknown[]);
+              setMasterCounts(counts);
+            }catch(error){setReconcileResult("Reconciliation failed: "+String(error));}
+            finally{setReconcileBusy(false);}
+          }}>{reconcileBusy?"Updating…":"Sync researched profiles into Section 2"}</button>
+          {reconcileResult&&<p role="status" className="mt-2 text-sm">{reconcileResult}</p>}
+        </div>
         {i === 2 && <p className="mb-3 text-sm text-muted-foreground">Manually approved creators ready for personalized outreach.</p>}
         {i === 0 && <Link to={c.to} className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-3 font-semibold text-primary-foreground">Open full list <ExternalLink className="h-4 w-4" /></Link>}
         {<>
@@ -209,7 +227,7 @@ function InfluencerHome() {
                 {person.email && <a href={`mailto:${person.email}`} onClick={e => e.stopPropagation()} className="rounded-md border px-2 py-1 text-xs font-semibold hover:bg-muted" title={person.email}>E</a>}
                 {i === 1 && w.source_table === "creators" && <button type="button" disabled={rejectBusy !== null} onClick={async e => { e.preventDefault(); e.stopPropagation(); if (rejectBusy !== null) return; if (!window.confirm(`Approve ${person.name} and assign to Rena?`)) return; setRejectBusy(person.id); try { const result = await approveCreator({data:{id:person.id,decision:"approved",checkedProfile:true,assignee:"Rena",evidence:"Manual approval from AI Screened"}}); if (!result?.ok) throw new Error("Approval not confirmed"); setBatch(prev => prev.map(c => c.id === person.id ? {...c,seth_approval_status:"approved"} : c)); await hydrateCreatorsFromDB(); } catch(err) { window.alert("Could not approve: "+String(err)); } finally { setRejectBusy(null); } }} className="rounded-md border border-green-300 px-2 py-1 text-xs font-semibold text-green-800 hover:bg-green-50 disabled:opacity-50">Approve</button>}
                 {i === 1 && <button type="button" disabled={rejectBusy !== null || secondLookIds.includes(person.id) || Boolean(batch.find(c => c.id === person.id)?.outreach_second_look_at)} onClick={async e => { e.preventDefault(); e.stopPropagation(); if (rejectBusy !== null || secondLookIds.includes(person.id)) return; setRejectBusy(person.id); try { const result = await secondLookCreator({data:{id:person.id}}); if (!result?.ok) throw new Error("Not confirmed"); setSecondLookIds(prev => [...prev,person.id]); setBatch(prev => prev.map(c => c.id === person.id ? {...c,outreach_second_look_at:new Date().toISOString()} : c)); await hydrateCreatorsFromDB(); } catch(err) { window.alert("Could not move to Second Look: "+String(err)); } finally { setRejectBusy(null); } }} className="rounded-md border border-amber-300 px-2 py-1 text-xs font-semibold text-amber-800 hover:bg-amber-50 disabled:opacity-50">Second Look</button>}
-                {i === 1 && <button type="button" disabled={rejectBusy !== null} onClick={async e => { e.preventDefault(); e.stopPropagation(); if (rejectBusy !== null) return; setRejectBusy(person.id); try { const result = await setWorkflowStatus({data:{id:person.id,status:"rejected"}}); if (!result?.ok) throw new Error("Rejection not saved"); setWorkflowRows(prev => prev.filter(row => row.source_id !== person.id)); setBatch(prev => prev.map(c => c.id === person.id ? {...c,seth_approval_status:"rejected"} : c)); const fresh = await fetchResearch({data:{page:workflowPage}}); setWorkflowRows(fresh.rows as Parameters<typeof setWorkflowRows>[0] & unknown[]); void loadCounts().then(setMasterCounts); } catch(err) { window.alert("Could not reject: "+String(err)); } finally { setRejectBusy(null); } }} className="rounded-md border border-red-300 px-2 py-1 text-xs font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50">{rejectBusy === person.id ? "Saving…" : "Reject"}</button>}
+                {i === 1 && <button type="button" disabled={rejectBusy !== null} onClick={async e => { e.preventDefault(); e.stopPropagation(); if (rejectBusy !== null) return; setRejectBusy(person.id); try { const result = await setWorkflowStatus({data:{id:person.id,status:"rejected"}}); if (!result?.ok) throw new Error("Rejection not saved"); setWorkflowRows(prev => prev.filter(row => row.source_id !== person.id)); setBatch(prev => prev.map(c => c.id === person.id ? {...c,seth_approval_status:"rejected"} : c)); const fresh = await fetchSection({data:{status:"ai_screened",page:workflowPage}}); setWorkflowRows(fresh.rows as Parameters<typeof setWorkflowRows>[0] & unknown[]); void loadCounts().then(setMasterCounts); } catch(err) { window.alert("Could not reject: "+String(err)); } finally { setRejectBusy(null); } }} className="rounded-md border border-red-300 px-2 py-1 text-xs font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50">{rejectBusy === person.id ? "Saving…" : "Reject"}</button>}
                 {i === 2 && w.source_table === "creators" && <button type="button" disabled={rejectBusy !== null} onClick={async e => { e.preventDefault(); e.stopPropagation(); if (rejectBusy !== null) return; setRejectBusy(person.id); try { const result = await approvedSecondLook({data:{id:person.id,action:"later"}}); if (!result?.ok) throw new Error("Move not confirmed"); setSecondLookIds(prev => [...prev,person.id]); setBatch(prev => prev.map(c => c.id === person.id ? {...c,outreach_second_look_at:new Date().toISOString()} : c)); await hydrateCreatorsFromDB(); } catch(err) { window.alert("Could not move to Second Look: "+String(err)); } finally { setRejectBusy(null); } }} className="rounded-md border border-amber-300 px-2 py-1 text-xs font-semibold text-amber-800 hover:bg-amber-50 disabled:opacity-50">Second Look</button>}
                 {i === 2 && <button type="button" disabled={rejectBusy !== null} onClick={async e => { e.preventDefault(); e.stopPropagation(); if (rejectBusy !== null) return; if (!window.confirm(`Reject approved creator ${person.name}?`)) return; setRejectBusy(person.id); try { const result = await rejectCreator({data:{id:person.id,decision:"rejected",checkedProfile:true,evidence:"Manual rejection from Already Manually Approved"}}); if (!result?.ok) throw new Error("Rejection not confirmed"); setBatch(prev => prev.map(c => c.id === person.id ? {...c,seth_approval_status:"rejected"} : c)); await hydrateCreatorsFromDB(); } catch(err) { window.alert("Could not reject: "+String(err)); } finally { setRejectBusy(null); } }} className="rounded-md border border-red-300 px-2 py-1 text-xs font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50">Reject</button>}
                 {i !== 1 && person.dm && <button type="button" onClick={e => { e.preventDefault(); e.stopPropagation(); void navigator.clipboard.writeText(influencerFacingDm(draftEdits[person.id] ?? person.dm!)); setDraftNotice(prev => ({...prev,[person.id]:"DM copied"})); }} className="rounded-md border border-primary/30 bg-primary/10 px-2 py-1 text-xs font-semibold text-foreground hover:bg-primary/20" title="Copy personalized DM without opening details">Copy DM</button>}
