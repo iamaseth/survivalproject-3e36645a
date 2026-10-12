@@ -150,18 +150,19 @@ export const listWorkflowSection = createServerFn({ method: "GET" })
     return { rows: rows ?? [], count: count ?? 0, page };
   });
 
-/** Set the single authoritative workflow status after an explicit manual review. */
+/** Move a creator between homepage sections (workflow_status only). This is a
+ * stage decision, NOT the evidence-backed Seth final outreach authorization.
+ * "sent" is never set here; it is derived from real send/contact records. */
 export const setInfluencerWorkflowStatus = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: { id: string; status: "approved"|"second_look"|"rejected" }) => {
-    if (!data?.id || !["approved","second_look","rejected"].includes(data.status)) throw new Error("Invalid decision");
+  .inputValidator((data: { id: string; status: "approved"|"second_look"|"rejected"|"ai_screened" }) => {
+    if (!data?.id || !["approved","second_look","rejected","ai_screened"].includes(data.status)) throw new Error("Invalid decision");
     return data;
   })
   .handler(async ({ context, data }) => {
-    const update = { workflow_status: data.status };
-    const { data: saved, error } = await context.supabase.from("creators")
-      .update(update).eq("id", data.id).select("id,workflow_status").single();
+    const { data: result, error } = await context.supabase.rpc("set_creator_workflow_stage", { p_id: data.id, p_stage: data.status });
     if (error) throw new Error(error.message);
-    if (saved.workflow_status !== data.status) throw new Error("Decision was not saved");
-    return { ok: true, status: saved.workflow_status };
+    const r = result as { ok?: boolean; status?: string } | null;
+    if (!r?.ok || r.status !== data.status) throw new Error("Decision was not saved");
+    return { ok: true, status: r.status };
   });
