@@ -79,32 +79,70 @@ function InfluencerHome() {
   const runStagingMigration = useServerFn(migrateStagedResearch);
   const [migrationOutput, setMigrationOutput] = useState("");
   const [migrationBusy, setMigrationBusy] = useState(false);
-  // Each click runs one small server batch. Progress survives Lovable preview reloads.
+  // Three fixed portions of the original remaining staging queue, not 1/3 of each new remainder.
+  // Progress is saved after every successful server chunk to allow interruption/resume.
+  type MigrationPlan = { start: number; total: number; ends: [number, number, number] };
   const [migrationOffset, setMigrationOffset] = useState(() => {
     try { return Number(window.localStorage.getItem("staging-migration-offset") || "0") || 0; }
     catch { return 0; }
   });
+  const [migrationPlan, setMigrationPlan] = useState<MigrationPlan | null>(() => {
+    try {
+      const saved = window.localStorage.getItem("staging-migration-three-part-plan");
+      return saved ? JSON.parse(saved) as MigrationPlan : null;
+    } catch { return null; }
+  });
   const runMigration = async (confirm: boolean) => {
-    if (confirm && !window.confirm("Import ONE batch of up to 50 staging records? Existing creators and statuses are preserved.")) return;
+    if (migrationBusy) return;
     setMigrationBusy(true);
     try {
-      const offset = migrationOffset;
-      const result = await runStagingMigration({ data: { confirm, offset, limit: 50 } });
-      if (!result || typeof result.scanned !== "number") throw new Error("Migration service returned no result");
-      setMigrationOutput((confirm ? "IMPORTED BATCH" : "PREVIEW BATCH") + " at offset " + offset +
-        ": scanned " + result.scanned + ", new " + result.new + ", existing " + result.existing +
-        ", inserted " + result.inserted + ", updated " + result.updated +
-        ", skipped " + result.skipped + ", errors " + result.errors.length +
-        (result.errors.length ? "\\n" + result.errors.join("; ") : ""));
-      if (result.errors.length) return;
-      if (confirm && result.scanned > 0) {
-        const next = offset + result.scanned;
-        setMigrationOffset(next);
-        try { window.localStorage.setItem("staging-migration-offset", String(next)); } catch {}
-        void loadCounts().then(setMasterCounts);
+      let plan = migrationPlan;
+      // A one-row read-only request obtains the live staging count before fixing the thirds.
+      const probe = await runStagingMigration({ data: { confirm: false, offset: migrationOffset, limit: 1 } });
+      if (!probe || !Number.isInteger(probe.totalCount)) throw new Error("Could not determine staging total");
+      if (!plan) {
+        const remaining = Math.max(0, probe.totalCount - migrationOffset);
+        const first = Math.ceil(remaining / 3);
+        const second = Math.ceil((remaining - first) / 2);
+        plan = {
+          start: migrationOffset, total: probe.totalCount,
+          ends: [migrationOffset + first, migrationOffset + first + second, probe.totalCount],
+        };
+        setMigrationPlan(plan);
+        window.localStorage.setItem("staging-migration-three-part-plan", JSON.stringify(plan));
       }
-    } catch (error) { setMigrationOutput("Stopped: " + String(error)); }
-    finally { setMigrationBusy(false); }
+      if (plan.total !== probe.totalCount) throw new Error("Staging row count changed since the three-batch plan was created. Stop and review before proceeding.");
+      const end = plan.ends.find(value => migrationOffset < value);
+      if (end === undefined) { setMigrationOutput("All three portions are complete."); return; }
+      const batchNumber = plan.ends.indexOf(end) + 1;
+      if (confirm && !window.confirm("Import portion " + batchNumber + " of 3 (" + (end - migrationOffset) +
+        " remaining rows in this portion)? Existing decisions will be preserved. Progress is saved every 100 rows.")) return;
+      let offset = migrationOffset;
+      let scanned = 0, inserted = 0, updated = 0, existing = 0, skipped = 0, fresh = 0;
+      while (offset < end) {
+        const limit = Math.min(100, end - offset);
+        const result = await runStagingMigration({ data: { confirm, offset, limit } });
+        if (!result || result.totalCount !== plan.total || result.scanned !== limit)
+          throw new Error("Incomplete or changed staging batch at offset " + offset);
+        if (result.errors.length) throw new Error("Stopped at offset " + offset + ": " + result.errors.join("; "));
+        scanned += result.scanned; inserted += result.inserted; updated += result.updated;
+        existing += result.existing; skipped += result.skipped; fresh += result.new;
+        offset += result.scanned;
+        setMigrationOutput((confirm ? "IMPORTING" : "PREVIEWING") + " portion " + batchNumber +
+          "/3: " + (offset - plan.start) + "/" + (plan.total - plan.start) + " original remaining rows processed");
+        if (confirm) {
+          setMigrationOffset(offset);
+          window.localStorage.setItem("staging-migration-offset", String(offset));
+        }
+      }
+      setMigrationOutput((confirm ? "IMPORTED" : "PREVIEWED") + " portion " + batchNumber +
+        "/3: scanned " + scanned + ", new " + fresh + ", existing " + existing +
+        ", inserted " + inserted + ", updated " + updated + ", skipped " + skipped +
+        ". " + (confirm ? "Checkpoint saved." : "No records changed."));
+      if (confirm) void loadCounts().then(setMasterCounts);
+    } catch (error) {
+      setMigrationOutput("Stopped safely: " + String(error) + ". Successful imported chunks remain checkpointed.");
+    } finally { setMigrationBusy(false); }
   };
   const [auditResult, setAuditResult] = useState("");
   const [auditBusy, setAuditBusy] = useState(false);
@@ -314,8 +352,8 @@ function InfluencerHome() {
       </button>
       {auditResult && <pre className="mt-3 whitespace-pre-wrap break-words text-sm">{auditResult}</pre>}
       <div className="mt-3 flex flex-wrap gap-2">
-        <button type="button" disabled={migrationBusy} onClick={() => void runMigration(false)} className="rounded-lg border px-4 py-3 font-semibold disabled:opacity-50">Preview Next 50</button>
-        <button type="button" disabled={migrationBusy} onClick={() => void runMigration(true)} className="rounded-lg border px-4 py-3 font-semibold disabled:opacity-50">Import Next 50</button>
+        <button type="button" disabled={migrationBusy} onClick={() => void runMigration(false)} className="rounded-lg border px-4 py-3 font-semibold disabled:opacity-50">Preview Next ⅓</button>
+        <button type="button" disabled={migrationBusy} onClick={() => void runMigration(true)} className="rounded-lg border px-4 py-3 font-semibold disabled:opacity-50">Import Next ⅓</button>
       </div>
       {migrationOutput && <pre className="mt-3 whitespace-pre-wrap break-words text-sm">{migrationOutput}</pre>}
     </section>
