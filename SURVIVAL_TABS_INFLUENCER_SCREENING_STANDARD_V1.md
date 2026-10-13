@@ -16,8 +16,8 @@ Commercial brands and competing retailers are not independent creator outreach c
 
 ## Decisions
 A PASS INITIAL SCREENING: specific bio or recurring caption evidence of core/conditional fit; account suitable for creator outreach. Prepare one unique grounded complimentary-sample DM, no obligation to post, signed — Rena, Survival Tabs. Do not send. Only A goes to Seth's active second-review queue.
-B NEEDS RESEARCH: a plausible but genuinely unresolved niche/identity issue. Name the exact unanswered question, automatically pursue accessible evidence, and retain in separate low-priority backlog if unresolved. Never put all B in Seth's active queue.
-C REJECT: documented unrelated niche, unsuitable brand account, or credible non-US base. Record exact evidence and preserve searchable record outside active queue.
+INCOMPLETE CAPTURE (technical exception, not a qualification decision): only demonstrably truncated, wrong-account, or extraction-failed Markdown. Record defect and send to BoBo for recapture. No missing email, captions, or US location alone constitutes a capture defect.
+C REJECT: available intact Markdown does not establish relevant niche, documented unrelated niche, unsuitable brand account, or credible non-US base. Ambiguity with a valid capture is a reject, not a research queue. Record exact evidence and preserve searchable record outside active queue.
 
 ## Quality assurance
 First review every C for overlooked outdoor/preparedness relevance and every A for unsupported broad inferences. Do not impose an approval quota or manipulate decisions to achieve target counts. Separate fit decision from DM readiness: an A with insufficient unique detail stays qualified but DM pending targeted enrichment, not rejected. Sample-based calibration across batches, monitor reversals and correct systemic errors only with versioned policy changes.
