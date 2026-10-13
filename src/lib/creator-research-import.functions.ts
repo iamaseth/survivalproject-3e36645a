@@ -3,7 +3,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 type ResearchRow = Record<string, string>;
 const HANDLE = /^[a-z0-9._]{2,30}$/;
-// One authoritative status field. Never overwrite an existing status on import.
+// One authoritative workflow status. Only advance untouched research-stage creators from explicit AI screening.
 const NON_RESEARCH = new Set([
   "id", "workflow_status", "created_at", "updated_at", "imported_by",
   "match_tiktok_handle", "match_tiktok_url", "upload_action",
@@ -50,6 +50,18 @@ const normalizeHandle = (raw: string) => {
   return handle && HANDLE.test(handle) ? handle : "";
 };
 const empty = (value: unknown) => value === null || value === undefined || value === "";
+// CSV decisions are not user approvals. Incomplete captures remain in research for recapture.
+function screeningDestination(value: unknown): "ai_screened" | "rejected" | null {
+  const decision = String(value ?? "").trim().toUpperCase();
+  if (["PASSED INITIAL SCREENING", "PASS", "A"].includes(decision)) return "ai_screened";
+  if (["REJECT", "REJECTED", "C"].includes(decision)) return "rejected";
+  return null;
+}
+function manualOrContacted(record: Record<string, unknown>): boolean {
+  return ["seth_approval_status", "seth_approved_at", "qualification_status",
+    "outreach_sent_at", "contacted_date", "outreach_claimed_at"]
+    .some(key => !empty(record[key]));
+}
 function prepare(input: ResearchRow) {
   const handle = normalizeHandle(input.tiktok_handle || input.match_tiktok_handle || input.match_tiktok_url || input.tiktok);
   if (!handle) throw new Error("Invalid TikTok handle");
@@ -122,24 +134,66 @@ export const importCreatorResearch = createServerFn({ method: "POST" })
     // Stop before any writes if an invalid row would otherwise cause a partial import.
     const invalid = prepared.filter(row => !row.handle);
     if (data.confirm && invalid.length) throw new Error("Import blocked: " + invalid.length + " invalid or duplicate handles in CSV");
-    const summary = { total: prepared.length, new: 0, existing: 0, inserted: 0, updated: 0, skipped: 0, failed: 0, errors: [] as string[] };
+    const summary = { total: prepared.length, new: 0, existing: 0, inserted: 0, updated: 0,
+      skipped: 0, failed: 0, statusMoved: 0, statusProtected: 0, recommendationConflicts: 0,
+      errors: [] as string[] };
     for (const row of prepared) {
       if (!row.handle) { summary.failed++; summary.errors.push("Row " + (row.index + 2) + ": " + ("error" in row ? row.error : "Invalid handle")); continue; }
       const previous = existing.get(row.handle);
       if (previous) summary.existing++; else summary.new++;
       if (!data.confirm) continue;
       if (previous) {
-        const patch = Object.fromEntries(Object.entries(row.safe).filter(([key, value]) => key !== "name" && empty(previous[key]) && !empty(value)));
-        if (!Object.keys(patch).length) { summary.skipped++; continue; }
-        const { error } = await context.supabase.from("creators").update(patch as never).eq("id", String(previous.id));
-        if (error) { summary.failed++; summary.errors.push("@" + row.handle + ": " + error.message); }
-        else summary.updated++;
+        const incomingDecision = row.safe.ai_recommendation;
+        const existingDecision = previous.ai_recommendation;
+        const conflict = !empty(incomingDecision) && !empty(existingDecision) &&
+          String(incomingDecision).trim().toUpperCase() !== String(existingDecision).trim().toUpperCase();
+        if (conflict) {
+          summary.recommendationConflicts++;
+          summary.errors.push("@" + row.handle + ": existing AI recommendation differs; preserved existing decision and workflow status");
+        }
+        // Existing nonempty fields (including manually edited DMs) are never overwritten.
+        // Do not fill screening recommendations on creators already manually reviewed or contacted.
+        const protectedRecord = String(previous.workflow_status ?? "") !== "research" || manualOrContacted(previous);
+        const patch = Object.fromEntries(Object.entries(row.safe).filter(([key, value]) =>
+          key !== "name" && empty(previous[key]) && !empty(value) &&
+          !(protectedRecord && ["ai_recommendation", "ai_reasoning", "ai_evidence", "personalized_dm"].includes(key))));
+        const destination = screeningDestination(incomingDecision);
+        const mayAdvance = !protectedRecord && !conflict && destination !== null &&
+          (empty(existingDecision) || screeningDestination(existingDecision) === destination);
+        if (protectedRecord && destination) summary.statusProtected++;
+        if (Object.keys(patch).length) {
+          // Guard against concurrent manual reviews: update only records still in their original stage.
+          let update = context.supabase.from("creators").update(patch as never)
+            .eq("id", String(previous.id)).eq("workflow_status", String(previous.workflow_status));
+          if (empty(previous.seth_approval_status)) update = update.is("seth_approval_status", null);
+          if (empty(previous.qualification_status)) update = update.is("qualification_status", null);
+          const { data: changed, error } = await update.select("id");
+          if (error) { summary.failed++; summary.errors.push("@" + row.handle + ": " + error.message); continue; }
+          if (!changed?.length) {
+            summary.skipped++;
+            summary.errors.push("@" + row.handle + ": changed concurrently; skipped for safety");
+            continue;
+          }
+          summary.updated++;
+        }
+        if (mayAdvance) {
+          // Separate guarded status update after research enrichment; never move a manual decision.
+          const { data: moved, error } = await context.supabase.from("creators")
+            .update({ workflow_status: destination })
+            .eq("id", String(previous.id)).eq("workflow_status", "research")
+            .is("seth_approval_status", null).is("qualification_status", null)
+            .is("outreach_sent_at", null).is("contacted_date", null)
+            .select("id");
+          if (error) { summary.failed++; summary.errors.push("@" + row.handle + " status: " + error.message); }
+          else if (moved?.length) summary.statusMoved++;
+          else summary.statusProtected++;
+        } else if (!Object.keys(patch).length) summary.skipped++;
       } else {
         const id = "BOBO-RESEARCH-" + row.handle.replace(/[^a-z0-9]/g, "-");
-        const record = { ...row.safe, id, workflow_status: "research", imported_by: context.userId };
+        const record = { ...row.safe, id, workflow_status: screeningDestination(row.safe.ai_recommendation) ?? "research", imported_by: context.userId };
         const { error } = await context.supabase.from("creators").insert(record as never);
         if (error) { summary.failed++; summary.errors.push("@" + row.handle + ": " + error.message); }
-        else summary.inserted++;
+        else { summary.inserted++; if (screeningDestination(row.safe.ai_recommendation)) summary.statusMoved++; }
       }
     }
     return summary;
