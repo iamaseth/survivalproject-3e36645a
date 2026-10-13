@@ -37,7 +37,18 @@ function statusOf(c: CreatorRow): "available" | "assigned" | "contacted" | "bloc
 export function DmQueue({ sender = "Rena" }: { sender?: "Rena" | "Seth" }) {
   const loadApproved = useServerFn(listApprovedTikTokOutreach);
   const [approvedRows, setApprovedRows] = useState<CreatorRow[]>([]);
-  const [queueLoading, setQueueLoading] = useState(true);
+  const [queueLoading, setQueueLoading] = useState(false);
+  const [hasQueue, setHasQueue] = useState(false);
+  const queueCacheKey = "survival-tabs:rena-approved-preview:v2";
+  const restoreQueue = () => {
+    try {
+      const cached = JSON.parse(window.localStorage.getItem(queueCacheKey) || "null");
+      if (cached?.rows && Array.isArray(cached.rows)) {
+        setApprovedRows(cached.rows as CreatorRow[]);
+        setHasQueue(true);
+      }
+    } catch { /* unavailable local storage */ }
+  };
   const who = useServerFn(getMyOutreachSender);
   const act = useServerFn(outreachPoolAction);
   const senderReject = useServerFn(senderRejectAssigned);
@@ -62,7 +73,7 @@ export function DmQueue({ sender = "Rena" }: { sender?: "Rena" | "Seth" }) {
   const refreshActivity = async () => { try { setActivity(await activityFn());setActivityError(null); } catch(e) { setActivityError(e instanceof Error?e.message:"Could not load activity"); } };
 
   useEffect(() => { if ("serviceWorker" in navigator) navigator.serviceWorker.register("/rena-sw.js").catch(() => {}); }, []);
-  useEffect(() => { who().then(setMe).catch(() => setMe({ sender: null, approver: false })); void refresh(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { restoreQueue(); who().then(setMe).catch(() => setMe({ sender: null, approver: false })); void refresh(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const pool = useMemo(() => approvedRows.filter(inPool).sort((a, b) => a.name.localeCompare(b.name)), [approvedRows]);
   const mine = pool;
@@ -80,7 +91,7 @@ export function DmQueue({ sender = "Rena" }: { sender?: "Rena" | "Seth" }) {
     try {
       setLoadError(null);
       const data = await loadApproved();
-      setApprovedRows(data.map(r => ({
+      const fresh = data.map(r => ({
         id: r.id, name: r.name, tiktok: r.tiktok,
         followersSignal: r.followers_signal,
         personalizedDm: r.personalized_dm,
@@ -90,7 +101,10 @@ export function DmQueue({ sender = "Rena" }: { sender?: "Rena" | "Seth" }) {
         contactedDate: r.contacted_date,
         responseFollowup: r.response_followup,
         qualificationStatus: r.qualification_status,
-      } as CreatorRow)));
+      } as CreatorRow));
+      setApprovedRows(fresh);
+      setHasQueue(true);
+      try { window.localStorage.setItem(queueCacheKey, JSON.stringify({ rows: fresh, at: Date.now() })); } catch { /* cache optional */ }
       await refreshActivity();
     } catch(e) { setLoadError(e instanceof Error ? e.message : "Could not refresh outreach queue"); }
     finally { setQueueLoading(false); }
@@ -185,7 +199,7 @@ export function DmQueue({ sender = "Rena" }: { sender?: "Rena" | "Seth" }) {
           {notice.dm ? <textarea readOnly value={notice.dm} rows={4} onFocus={(e) => e.currentTarget.select()} className="mt-2 w-full rounded border border-input bg-background p-2 text-sm text-foreground" /> : null}
         </div>
       ) : null}
-      {queueLoading ? <p className="text-center text-sm">Loading approved TikTok creators…</p> : null}
+      {queueLoading && !hasQueue ? <p className="text-center text-sm">Loading approved TikTok creators…</p> : null}
       {!queueLoading && tiles.length === 0 ? <div className="py-8 text-center text-sm text-muted-foreground"><div className="text-base font-semibold text-foreground">No pending creators</div>Approved creators will appear here.</div> : null}
       <ul className="space-y-2">
         {tiles.map((c) => {
