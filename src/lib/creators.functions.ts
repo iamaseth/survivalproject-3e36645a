@@ -6,6 +6,21 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 type Json = any;
 export type CreatorDBRow = { id: string; name: string; [k: string]: Json };
 
+
+/** Lightweight, authoritative Rena queue: exactly Section 3 TikTok creators.
+ * Avoid loading the entire 5k+ roster or stale offline preview for this queue. */
+export const listApprovedTikTokOutreach = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { data, error } = await context.supabase.from("creators")
+      .select("id,name,tiktok,followers_signal,personalized_dm,workflow_status,outreach_assignee,outreach_sent_at,contacted_date,response_followup,qualification_status")
+      .eq("workflow_status", "approved")
+      .not("tiktok", "is", null)
+      .order("name");
+    if (error) throw new Error(error.message);
+    return data ?? [];
+  });
+
 export const listCreators = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
