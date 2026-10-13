@@ -11,7 +11,7 @@ const NON_RESEARCH = new Set([
   "seth_approval_history", "qualification_status", "outreach_owner", "outreach_assignee",
   "outreach_claimed_at", "outreach_sent_by", "outreach_sent_at", "outreach_prev",
   "outreach_second_look_at", "contacted_date", "contact_method", "response_followup",
-  "sample_status", "rena_notes", "personalized_dm", "personalized_email_subject",
+  "sample_status", "rena_notes", "personalized_email_subject",
   "personalized_email_body", "personalization_status", "seth_next_action", "perry_comments"
 ]);
 const JSON_FIELDS = new Set([
@@ -59,6 +59,7 @@ function prepare(input: ResearchRow) {
     if (!/^[a-z][a-z0-9_]*$/.test(key) || NON_RESEARCH.has(key)) continue;
     if (typeof value === "string" && value.trim() !== "") safe[key] = convertField(key, value);
   }
+  // A research DM may fill an empty draft, but never replace an existing or manually edited draft.
   safe.tiktok_handle = handle;
   safe.tiktok = profile;
   if (!safe.name) safe.name = "@" + handle;
