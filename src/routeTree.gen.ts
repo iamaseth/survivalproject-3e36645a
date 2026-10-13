@@ -19,6 +19,7 @@ import { Route as ArchiveRouteImport } from './routes/archive'
 import { Route as AssetsRouteImport } from './routes/assets'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as BoboRouteImport } from './routes/bobo'
+import { Route as BoboQueRouteImport } from './routes/bobo-que'
 import { Route as BoboQueueRouteImport } from './routes/bobo-queue'
 import { Route as BoboResearchRouteImport } from './routes/bobo-research'
 import { Route as BoboSearchRouteImport } from './routes/bobo-search'
@@ -107,6 +108,11 @@ const AuthRoute = AuthRouteImport.update({
 const BoboRoute = BoboRouteImport.update({
   id: '/bobo',
   path: '/bobo',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const BoboQueRoute = BoboQueRouteImport.update({
+  id: '/bobo-que',
+  path: '/bobo-que',
   getParentRoute: () => rootRouteImport,
 } as any)
 const BoboQueueRoute = BoboQueueRouteImport.update({
@@ -321,6 +327,7 @@ export interface FileRoutesByFullPath {
   '/assets': typeof AssetsRouteWithChildren
   '/auth': typeof AuthRoute
   '/bobo': typeof BoboRoute
+  '/bobo-que': typeof BoboQueRoute
   '/bobo-queue': typeof BoboQueueRoute
   '/bobo-research': typeof BoboResearchRoute
   '/bobo-search': typeof BoboSearchRoute
@@ -372,6 +379,7 @@ export interface FileRoutesByTo {
   '/assets': typeof AssetsRouteWithChildren
   '/auth': typeof AuthRoute
   '/bobo': typeof BoboRoute
+  '/bobo-que': typeof BoboQueRoute
   '/bobo-queue': typeof BoboQueueRoute
   '/bobo-research': typeof BoboResearchRoute
   '/bobo-search': typeof BoboSearchRoute
@@ -424,6 +432,7 @@ export interface FileRoutesById {
   '/assets': typeof AssetsRouteWithChildren
   '/auth': typeof AuthRoute
   '/bobo': typeof BoboRoute
+  '/bobo-que': typeof BoboQueRoute
   '/bobo-queue': typeof BoboQueueRoute
   '/bobo-research': typeof BoboResearchRoute
   '/bobo-search': typeof BoboSearchRoute
@@ -477,6 +486,7 @@ export interface FileRouteTypes {
     | '/assets'
     | '/auth'
     | '/bobo'
+    | '/bobo-que'
     | '/bobo-queue'
     | '/bobo-research'
     | '/bobo-search'
@@ -528,6 +538,7 @@ export interface FileRouteTypes {
     | '/assets'
     | '/auth'
     | '/bobo'
+    | '/bobo-que'
     | '/bobo-queue'
     | '/bobo-research'
     | '/bobo-search'
@@ -579,6 +590,7 @@ export interface FileRouteTypes {
     | '/assets'
     | '/auth'
     | '/bobo'
+    | '/bobo-que'
     | '/bobo-queue'
     | '/bobo-research'
     | '/bobo-search'
@@ -631,6 +643,7 @@ export interface RootRouteChildren {
   AssetsRoute: typeof AssetsRouteWithChildren
   AuthRoute: typeof AuthRoute
   BoboRoute: typeof BoboRoute
+  BoboQueRoute: typeof BoboQueRoute
   BoboQueueRoute: typeof BoboQueueRoute
   BoboResearchRoute: typeof BoboResearchRoute
   BoboSearchRoute: typeof BoboSearchRoute
@@ -738,6 +751,13 @@ declare module '@tanstack/react-router' {
       path: '/bobo'
       fullPath: '/bobo'
       preLoaderRoute: typeof BoboRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/bobo-que': {
+      id: '/bobo-que'
+      path: '/bobo-que'
+      fullPath: '/bobo-que'
+      preLoaderRoute: typeof BoboQueRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/bobo-queue': {
@@ -1064,6 +1084,7 @@ const rootRouteChildren: RootRouteChildren = {
   AssetsRoute: AssetsRouteWithChildren,
   AuthRoute: AuthRoute,
   BoboRoute: BoboRoute,
+  BoboQueRoute: BoboQueRoute,
   BoboQueueRoute: BoboQueueRoute,
   BoboResearchRoute: BoboResearchRoute,
   BoboSearchRoute: BoboSearchRoute,

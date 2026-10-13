@@ -21,6 +21,8 @@ export const listApprovedTikTokOutreach = createServerFn({ method: "GET" })
     return data ?? [];
   });
 
+const CREATOR_LIST_COLUMNS = "ai_confidence,ai_model,ai_reasoning,ai_recommendation,ai_reviewed_at,ai_rubric_version,amazon,amazon_confidence,amazon_content_analysis,amazon_discovery_source,amazon_fit_score,amazon_reviewed_survival_tabs,amazon_shoppable_video,amazon_storefront_url,amazon_video_url,capture_quality,capture_type,code,contact_confidence,contact_method,contact_route,contacted_date,content_categories,created_at,creator_code,email,facebook,facebook_page_id,followers_signal,full_verification,geography,geography_confidence,id,imported_by,instagram,instagram_handle,language_codes,last_researched,latest_capture_at,link_in_bio_url,linkedin,match_tiktok_handle,match_tiktok_url,monetization,name,normalized_domain,offer_confidence,offer_reasoning,other_platform,outreach_assignee,outreach_claimed_at,outreach_owner,outreach_prev,outreach_second_look_at,outreach_sent_at,outreach_sent_by,partnership_tier,perry_comments,personalization_source,personalization_status,personalized_dm,personalized_email_body,personalized_email_subject,pinterest,primary_platforms,primary_source,priority,public_business_email,public_phone,qualification_status,raw_markdown_sha256,reach_signal,recent_activity_check,recommended_offer,reddit,rena_notes,research_notes,research_status,response_followup,sample_status,segment,seth_approval_history,seth_approval_note,seth_approval_status,seth_approved_at,seth_approved_by,seth_next_action,snapchat,source_file,source_url,subscriber_count,target_audience,technical_notes,threads,threads_handle,tiktok,tiktok_caption_count,tiktok_caption_only_count,tiktok_display_name,tiktok_followers,tiktok_following,tiktok_handle,tiktok_likes,tiktok_video_count,tuan_affiliate_status,twitch,updated_at,upload_action,verification_date,verification_evidence,website_url,workflow_status,x_twitter,youtube,youtube_channel_id,youtube_handle";
+
 export const listCreators = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
@@ -31,7 +33,9 @@ export const listCreators = createServerFn({ method: "GET" })
     for (let from = 0; ; from += pageSize) {
       const { data, error } = await context.supabase
         .from("creators")
-        .select("*")
+        // Large capture/history columns are excluded: the full table exceeded the
+        // server-function response size limit. Detail views load them separately.
+        .select(CREATOR_LIST_COLUMNS)
         .order("created_at", { ascending: true })
         .range(from, from + pageSize - 1);
       if (error) throw new Error(error.message);
