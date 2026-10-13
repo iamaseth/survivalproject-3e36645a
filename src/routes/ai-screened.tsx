@@ -12,7 +12,7 @@ type Creator = {
   youtube_url: string | null;
   instagram_url: string | null;
   facebook_url: string | null;
-  workflow_status: string;
+  workflow_status: string | null;
 };
 
 function AIScreened() {
