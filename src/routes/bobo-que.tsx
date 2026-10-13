@@ -44,11 +44,6 @@ function BoboQuickResearch() {
         page += 1;
       }
       setRows(all);
-      // When no TikTok creators are waiting, open the populated platform automatically.
-      // Do not invent or restore creators that were manually moved to another section.
-      const hasTikTok = all.some(row => Boolean(row.tiktok_url));
-      const hasYouTube = all.some(row => Boolean(row.youtube_url));
-      if (!hasTikTok && hasYouTube) setPlatform("YouTube");
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -86,7 +81,7 @@ function BoboQuickResearch() {
     <Link to="/" className="text-sm underline">← Influencers</Link>
     <header className="space-y-1">
       <h1 className="text-2xl font-bold">2. Profile Quick Research</h1>
-      <p className="text-sm text-muted-foreground">BoBo · ពិនិត្យប្រវត្តិអ្នកបង្កើតមាតិកា · {total} in Profile Research</p>
+      <p className="text-sm text-muted-foreground">BoBo · ពិនិត្យប្រវត្តិអ្នកបង្កើតមាតិកា · TikTok first · {total} total in Profile Research</p>
     </header>
     <div className="flex flex-wrap items-center gap-2">
       {(["TikTok", "YouTube"] as const).map(p => <button key={p} type="button" onClick={() => { setPlatform(p); setSelected(null); }} aria-pressed={platform === p}
@@ -106,7 +101,7 @@ function BoboQuickResearch() {
         <button type="button" disabled={busy} onClick={() => void decide("rejected")} className="rounded-xl border border-red-700 px-4 py-4 font-semibold disabled:opacity-50">Reject · បដិសេធ</button>
       </div>
       <p className="text-xs text-muted-foreground">A decision saves to the existing CRM and removes this creator from Profile Research. Opening a profile alone does not change its status. Approval here is a workflow-stage decision, not final outreach authorization.</p>
-    </section> : <p className="rounded-xl border p-6">No {platform} profiles in Profile Research. Select the other platform to check its queue.</p>}
+    </section> : <p className="rounded-xl border p-6">No verified TikTok profiles waiting in this section. YouTube-only creators stay under the separate YouTube tab; do not treat them as TikTok leads.</p>}
     <section className="space-y-2">
       <h2 className="text-lg font-semibold">All waiting profiles · បញ្ជីទាំងអស់ ({visible.length})</h2>
       <div className="divide-y rounded-xl border">
