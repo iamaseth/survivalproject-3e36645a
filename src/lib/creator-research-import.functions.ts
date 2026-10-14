@@ -53,8 +53,8 @@ const empty = (value: unknown) => value === null || value === undefined || value
 // CSV decisions are not user approvals. Incomplete captures remain in research for recapture.
 function screeningDestination(value: unknown): "ai_screened" | "rejected" | null {
   const decision = String(value ?? "").trim().toUpperCase();
-  if (["PASSED INITIAL SCREENING", "PASS", "A"].includes(decision)) return "ai_screened";
-  if (["REJECT", "REJECTED", "C"].includes(decision)) return "rejected";
+  if (["PASSED INITIAL SCREENING", "A PASSED INITIAL SCREENING", "PASS", "A"].includes(decision)) return "ai_screened";
+  if (["REJECT", "REJECTED", "C REJECT", "C"].includes(decision)) return "rejected";
   return null;
 }
 function manualOrContacted(record: Record<string, unknown>): boolean {
