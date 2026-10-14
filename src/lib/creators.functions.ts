@@ -30,18 +30,26 @@ export const listCreators = createServerFn({ method: "GET" })
     // Page explicitly so the CRM always hydrates the complete creators table.
     const rows: Array<Record<string, Json>> = [];
     const pageSize = 1000;
-    for (let from = 0; ; from += pageSize) {
-      const { data, error } = await context.supabase
-        .from("creators")
-        // Large capture/history columns are excluded: the full table exceeded the
-        // server-function response size limit. Detail views load them separately.
-        .select(CREATOR_LIST_COLUMNS)
-        .order("created_at", { ascending: true })
-        .range(from, from + pageSize - 1);
-      if (error) throw new Error(error.message);
-      const page = (data ?? []) as Array<Record<string, Json>>;
-      rows.push(...page);
-      if (page.length < pageSize) break;
+    // Fetch independent pages in bounded parallel batches rather than waiting
+    // for every 1,000-row round trip sequentially. Preserve stable page order.
+    const batchSize = 3;
+    for (let from = 0; ; from += pageSize * batchSize) {
+      const pages = await Promise.all(
+        Array.from({ length: batchSize }, (_, i) =>
+          context.supabase
+            .from("creators")
+            // Large capture/history columns stay excluded from roster responses.
+            .select(CREATOR_LIST_COLUMNS)
+            .order("created_at", { ascending: true })
+            .order("id", { ascending: true })
+            .range(from + i * pageSize, from + (i + 1) * pageSize - 1),
+        ),
+      );
+      for (const pageResult of pages) {
+        if (pageResult.error) throw new Error(pageResult.error.message);
+        rows.push(...((pageResult.data ?? []) as Array<Record<string, Json>>));
+      }
+      if (pages.some((page) => (page.data?.length ?? 0) < pageSize)) break;
     }
     return { rows };
   });
