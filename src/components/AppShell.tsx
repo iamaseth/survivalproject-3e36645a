@@ -24,6 +24,7 @@ import { hydrateCreatorsFromDB } from "@/lib/creator-partnerships";
 import { SignInCard } from "@/routes/auth";
 import { TestModeBanner } from "@/components/TestModeBanner";
 import { FloatingTeamHelp } from "@/components/FloatingTeamHelp";
+import { Button } from "@/components/ui/button";
 
 const brands = [
   { id: "survival-tabs", name: "Survival Tabs", status: "active" as const },
@@ -107,6 +108,10 @@ export function AppShell() {
         <div className="text-xs uppercase tracking-[0.22em] text-muted-foreground">Loading…</div>
       </div>
     );
+  }
+
+  if (auth.status === "error") {
+    return <div className="grid min-h-screen place-items-center bg-background px-4"><div className="space-y-4 text-center"><p role="alert" className="text-sm text-muted-foreground">{auth.error}</p><Button onClick={() => void auth.retry()}>Try again</Button></div></div>;
   }
 
   if (auth.status === "unauthenticated") {

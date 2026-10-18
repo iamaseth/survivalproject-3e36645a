@@ -104,7 +104,7 @@ export const importCreatorResearch = createServerFn({ method: "POST" })
         seen.add(result.handle);
         return { ...result, index };
       } catch (error) {
-        return { handle: "", safe: {}, index, error: String(error) };
+        return { handle: "", safe: {} as Record<string, unknown>, index, error: String(error) };
       }
     });
     // Read-only lookup before every write. Preserve the one status field.
