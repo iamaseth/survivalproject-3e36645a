@@ -3,8 +3,9 @@
 // ask Supabase to repair the user's role, then read the profile/role normally.
 // A local roster fallback prevents the UI from locking out a known team member
 // during a brief DB-sync/migration gap; database RLS is separately roster-aware.
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { createAuthLoadGuard, signInReturnUrl } from "./auth-loading";
 import {
   ROLE_LABEL,
   can as roleCan,
@@ -46,6 +47,7 @@ function initialsFrom(name: string, email: string) {
 
 type State =
   | { status: "loading"; profile: null }
+  | { status: "error"; profile: null; error: string }
   | { status: "unauthenticated"; profile: null }
   | { status: "authenticated"; profile: AuthProfile };
 
@@ -102,39 +104,75 @@ async function fetchProfile(userId: string, email: string, meta: Record<string, 
 
 export function useAuth(): State & {
   can: (p: Permission) => boolean;
+  retry: () => Promise<void>;
   signIn: () => Promise<void>;
   signOut: () => Promise<void>;
 } {
   const [state, setState] = useState<State>({ status: "loading", profile: null });
+  const guard = useRef(createAuthLoadGuard());
 
   const load = useCallback(async () => {
-    const { data } = await supabase.auth.getUser();
-    if (!data.user) {
-      setState({ status: "unauthenticated", profile: null });
-      return;
+    const request = guard.current.begin();
+    try {
+      const { data, error } = await supabase.auth.getUser();
+      if (!guard.current.isCurrent(request)) return;
+      if (error && error.name !== "AuthSessionMissingError") throw error;
+      if (!data.user) {
+        setState({ status: "unauthenticated", profile: null });
+        return;
+      }
+      const profile = await fetchProfile(
+        data.user.id,
+        data.user.email ?? "",
+        (data.user.user_metadata ?? {}) as Record<string, unknown>,
+      );
+      if (guard.current.isCurrent(request)) setState({ status: "authenticated", profile });
+    } catch {
+      if (guard.current.isCurrent(request)) {
+        // A temporary network failure is not a logout. Server permissions still apply.
+        setState(previous => previous.status === "authenticated" ? previous : {
+          status: "error", profile: null, error: "Could not check your sign-in. Check your connection and try again.",
+        });
+      }
     }
-
-    const profile = await fetchProfile(
-      data.user.id,
-      data.user.email ?? "",
-      (data.user.user_metadata ?? {}) as Record<string, unknown>,
-    );
-    setState({ status: "authenticated", profile });
   }, []);
 
   useEffect(() => {
-    void load();
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const scheduleLoad = () => {
+      guard.current.invalidate();
+      clearTimeout(timer);
+      // Do not call auth APIs while an auth callback holds the session lock.
+      timer = setTimeout(() => { void load(); }, 0);
+    };
     const { data: sub } = supabase.auth.onAuthStateChange((event) => {
-      if (event === "SIGNED_IN" || event === "SIGNED_OUT" || event === "USER_UPDATED" || event === "TOKEN_REFRESHED") {
-        void load();
+      if (event === "SIGNED_OUT") {
+        guard.current.invalidate();
+        clearTimeout(timer);
+        setState({ status: "unauthenticated", profile: null });
+      } else if (["INITIAL_SESSION", "SIGNED_IN", "USER_UPDATED", "TOKEN_REFRESHED"].includes(event)) {
+        scheduleLoad();
       }
     });
-    return () => sub.subscription.unsubscribe();
+    scheduleLoad();
+    const onResume = () => { if (document.visibilityState === "visible") scheduleLoad(); };
+    window.addEventListener("pageshow", scheduleLoad);
+    document.addEventListener("visibilitychange", onResume);
+    return () => {
+      guard.current.invalidate();
+      clearTimeout(timer);
+      sub.subscription.unsubscribe();
+      window.removeEventListener("pageshow", scheduleLoad);
+      document.removeEventListener("visibilitychange", onResume);
+    };
   }, [load]);
 
   const signIn = useCallback(async () => {
     const { lovable } = await import("@/integrations/lovable");
-    await lovable.auth.signInWithOAuth("google", { redirect_uri: window.location.origin });
+    const result = await lovable.auth.signInWithOAuth("google", {
+      redirect_uri: signInReturnUrl(window.location.origin, window.location.pathname, window.location.search),
+    });
+    if (result.error) throw result.error;
   }, []);
 
   const signOut = useCallback(async () => {
@@ -145,6 +183,7 @@ export function useAuth(): State & {
   return {
     ...state,
     can: (p) => roleCan(state.profile?.role ?? null, p),
+    retry: load,
     signIn,
     signOut,
   };

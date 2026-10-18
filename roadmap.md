@@ -1,3 +1,5 @@
 - [x] Replace duplicate Seth review with Needs Final Approval accordion and preserve decision undo.
 - [x] Enforce direct evidence and specific DM approval eligibility without changing creator rows.
 - [ ] Audit current final-ready/research counts and test signed-in page without writes.
+- [ ] Fix Rena login race, retain queue OAuth return, and retire unused worker without changing permissions or creator data.
+- [ ] Test browser login/session resume and document installed-device limits.

@@ -72,7 +72,18 @@ export function DmQueue({ sender = "Rena" }: { sender?: "Rena" | "Seth" }) {
   const [activityError,setActivityError] = useState<string|null>(null);
   const refreshActivity = async () => { try { setActivity(await activityFn());setActivityError(null); } catch(e) { setActivityError(e instanceof Error?e.message:"Could not load activity"); } };
 
-  useEffect(() => { if ("serviceWorker" in navigator) navigator.serviceWorker.register("/rena-sw.js").catch(() => {}); }, []);
+  useEffect(() => {
+    // Home-screen support uses the manifest only. Remove the former no-cache worker.
+    if ("serviceWorker" in navigator) {
+      void navigator.serviceWorker.getRegistrations().then(registrations => Promise.all(
+        registrations.filter(registration => [registration.active, registration.waiting, registration.installing].some(worker => {
+          if (!worker) return false;
+          const url = new URL(worker.scriptURL);
+          return url.origin === window.location.origin && url.pathname === "/rena-sw.js";
+        })).map(registration => registration.unregister()),
+      )).catch(() => { /* retry on the next visit; never clear auth storage */ });
+    }
+  }, []);
   useEffect(() => { restoreQueue(); who().then(setMe).catch(() => setMe({ sender: null, approver: false })); void refresh(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const pool = useMemo(() => approvedRows.filter(inPool).sort((a, b) => a.name.localeCompare(b.name)), [approvedRows]);
