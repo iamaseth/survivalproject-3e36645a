@@ -116,7 +116,18 @@ export function useAuth(): State & {
     try {
       const { data, error } = await supabase.auth.getUser();
       if (!guard.current.isCurrent(request)) return;
-      if (error && error.name !== "AuthSessionMissingError") throw error;
+      if (error && error.name !== "AuthSessionMissingError") {
+        // iOS PWAs can briefly lose connectivity while resuming. An identity
+        // request failure is not proof that the stored session was revoked.
+        const { data: cached } = await supabase.auth.getSession();
+        if (cached.session?.user) {
+          const user = cached.session.user;
+          const profile = await fetchProfile(user.id, user.email ?? "", (user.user_metadata ?? {}) as Record<string, unknown>);
+          if (guard.current.isCurrent(request)) setState({ status: "authenticated", profile });
+          return;
+        }
+        throw error;
+      }
       if (!data.user) {
         setState({ status: "unauthenticated", profile: null });
         return;
@@ -140,10 +151,12 @@ export function useAuth(): State & {
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout> | undefined;
     const scheduleLoad = () => {
+      // Coalesce near-simultaneous INITIAL_SESSION/pageshow/visibility events.
+      // Otherwise each one invalidates the previous in-flight identity check.
       guard.current.invalidate();
       clearTimeout(timer);
       // Do not call auth APIs while an auth callback holds the session lock.
-      timer = setTimeout(() => { void load(); }, 0);
+      timer = setTimeout(() => { void load(); }, 120);
     };
     const { data: sub } = supabase.auth.onAuthStateChange((event) => {
       if (event === "SIGNED_OUT") {
