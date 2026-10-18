@@ -1,4 +1,4 @@
-// Sign-in page for team members. Google-only (email/password is disabled).
+// Sign-in page with password authentication and temporary Google fallback.
 // This route is public; the app-wide gate lives in AppShell so the URL
 // doesn't need to change after login.
 import { createFileRoute, useRouter } from "@tanstack/react-router";
@@ -26,6 +26,8 @@ function AuthPage() {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [email, setEmail] = useState("thenxyz@gmail.com");
+  const [password, setPassword] = useState("");
 
   useEffect(() => {
     if (auth.status === "authenticated") router.navigate({ to: "/" });
@@ -39,37 +41,50 @@ function AuthPage() {
     finally { setBusy(false); }
   };
 
-  return <SignInCard busy={busy} error={err} onGoogle={onGoogle} />;
+  const onPassword = async () => {
+    setErr(null);
+    setBusy(true);
+    try { await auth.signInWithPassword(email, password); }
+    catch (e) { setErr(e instanceof Error ? e.message : "Password sign-in failed"); }
+    finally { setBusy(false); }
+  };
+
+  return <SignInCard busy={busy} error={err} onGoogle={onGoogle} onPassword={onPassword} email={email} setEmail={setEmail} password={password} setPassword={setPassword} />;
 }
 
 export function SignInCard({
-  busy, error, onGoogle,
-}: { busy: boolean; error: string | null; onGoogle: () => void }) {
+  busy, error, onGoogle, onPassword, email, setEmail, password, setPassword,
+}: { busy: boolean; error: string | null; onGoogle: () => void; onPassword: () => void; email: string; setEmail: (value: string) => void; password: string; setPassword: (value: string) => void }) {
   return (
     <div className="grid min-h-screen place-items-center bg-background px-4">
       <div className="w-full max-w-md rounded-2xl border border-border bg-card p-8 shadow-sm">
         <div className="mb-1 text-[11px] uppercase tracking-[0.22em] text-[color:var(--gold)]">Survival Tabs</div>
         <h1 className="font-display text-3xl leading-tight text-foreground">Team Content Hub</h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          Private workspace for the Survival Tabs team. Sign in with your Survival Tabs Google account.
+          Private Survival Tabs workspace. Sign in with your email and password.
         </p>
+        <form onSubmit={(event) => { event.preventDefault(); void onPassword(); }} className="mt-6 space-y-3">
+          <label className="block text-sm">Email<input type="email" autoComplete="username" required value={email} onChange={(event) => setEmail(event.target.value)} className="mt-1 w-full rounded-md border border-border bg-background p-3" /></label>
+          <label className="block text-sm">Password<input type="password" autoComplete="current-password" required value={password} onChange={(event) => setPassword(event.target.value)} className="mt-1 w-full rounded-md border border-border bg-background p-3" /></label>
+          <button type="submit" disabled={busy} className="w-full rounded-md bg-foreground px-4 py-3 text-background disabled:opacity-60">{busy ? "Signing in…" : "Sign in"}</button>
+        </form>
         <button
           onClick={onGoogle}
           disabled={busy}
           className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-md border border-border bg-background px-4 py-2.5 text-sm font-medium transition hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-60"
         >
           <GoogleMark />
-          {busy ? "Opening Google…" : "Continue with Google"}
+          {busy ? "Please wait…" : "Google sign-in (temporary fallback)"}
         </button>
         {error ? (
           <p className="mt-3 text-xs text-red-600">{error}</p>
         ) : null}
         <p className="mt-6 text-[11px] text-muted-foreground">
-          Access is restricted. If your Google account isn't recognised, ask a team admin to add you to the team list.
+          Password sign-in requires an existing Supabase account with a password. No password is stored in this app.
         </p>
         <div className="mt-4 flex items-center justify-center gap-1 text-muted-foreground/70">
           <LogIn className="h-3 w-3" />
-          <span className="text-[10px] uppercase tracking-[0.22em]">Google sign-in</span>
+          <span className="text-[10px] uppercase tracking-[0.22em]">Private sign-in</span>
         </div>
       </div>
     </div>

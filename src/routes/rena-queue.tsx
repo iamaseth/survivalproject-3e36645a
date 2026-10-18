@@ -178,13 +178,6 @@ export function DmQueue({ sender = "Rena" }: { sender?: "Rena" | "Seth" }) {
   const tone = { ok: "border-emerald-600 bg-emerald-50 text-emerald-950", warn: "border-amber-500 bg-amber-50 text-amber-950", err: "border-red-600 bg-red-50 text-red-950" };
 
   if (me === null) return <div className="p-8 text-sm text-muted-foreground">Loading…</div>;
-  if (!me.sender && !me.approver) return (
-    <div className="mx-auto max-w-lg rounded-xl border border-border bg-card p-6 text-sm">
-      <h1 className="font-display text-2xl">TikTok DMs</h1>
-      <p className="mt-2">Your account isn't set up as a DM sender (Seth, BoBo or Rena). Ask Seth to add you.</p>
-      <p className="mt-2 text-muted-foreground">Shared pool: {available.length} available · {pool.filter((c) => statusOf(c) === "assigned").length} assigned · {pool.filter((c) => statusOf(c) === "contacted").length} contacted</p>
-    </div>
-  );
 
   return (
     <div className="mx-auto max-w-xl space-y-3 pb-16">
