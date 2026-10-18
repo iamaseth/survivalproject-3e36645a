@@ -5,3 +5,5 @@
 - [x] Test signed-out desktop/mobile navigation, login return URL, worker retirement and document installed-device limits.
 - [ ] Verify real authenticated session reload/resume. Blocked by Cloud connection pooler timeout preventing session minting.
 - [ ] Verify installed iPhone/Android OAuth round-trip and relaunch. Requires physical devices and publication approval.
+- [ ] Allow existing authorized team members to view all pages without depending on personal Gmail access; preserve privileged actions.
+- [ ] Investigate platform Gmail-client restriction, verify and publish if security checks permit.
