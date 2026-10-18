@@ -106,6 +106,7 @@ export function useAuth(): State & {
   can: (p: Permission) => boolean;
   retry: () => Promise<void>;
   signIn: () => Promise<void>;
+  signInWithPassword: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
 } {
   const [state, setState] = useState<State>({ status: "loading", profile: null });
@@ -175,6 +176,14 @@ export function useAuth(): State & {
     if (result.error) throw result.error;
   }, []);
 
+  const signInWithPassword = useCallback(async (email: string, password: string) => {
+    const normalizedEmail = email.trim().toLowerCase();
+    if (!PERMANENT_TEAM[normalizedEmail]) throw new Error("This account is not authorized.");
+    const { error } = await supabase.auth.signInWithPassword({ email: normalizedEmail, password });
+    if (error) throw error;
+    await load();
+  }, [load]);
+
   const signOut = useCallback(async () => {
     await supabase.auth.signOut();
     setState({ status: "unauthenticated", profile: null });
@@ -185,6 +194,7 @@ export function useAuth(): State & {
     can: (p) => roleCan(state.profile?.role ?? null, p),
     retry: load,
     signIn,
+    signInWithPassword,
     signOut,
   };
 }
