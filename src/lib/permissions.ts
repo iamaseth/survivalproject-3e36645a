@@ -64,12 +64,18 @@ const COORDINATOR: Permission[] = [
   "update_creator_records", "shipping_updates", "content_tracking",
 ];
 
+// All authenticated, existing team roles receive the same app feature permissions.
+// Server-side authorization and the explicit team roster must enforce this too.
+const ALL_TEAM_PERMISSIONS: ReadonlySet<Permission> = new Set<Permission>([
+  ...EXEC, ...RESEARCH, ...PM, ...COORDINATOR,
+]);
+
 export const ROLE_PERMISSIONS: Record<AppRole, ReadonlySet<Permission>> = {
-  executive:                new Set(EXEC),
-  research_manager:         new Set(RESEARCH),
-  partnership_manager:      new Set(PM),
-  partnership_coordinator:  new Set(COORDINATOR),
-  shopify_content_editor:   new Set<Permission>(),
+  executive: ALL_TEAM_PERMISSIONS,
+  research_manager: ALL_TEAM_PERMISSIONS,
+  partnership_manager: ALL_TEAM_PERMISSIONS,
+  partnership_coordinator: ALL_TEAM_PERMISSIONS,
+  shopify_content_editor: ALL_TEAM_PERMISSIONS,
 };
 
 export function can(role: AppRole | null, perm: Permission): boolean {
