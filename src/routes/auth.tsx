@@ -11,6 +11,10 @@ export const Route = createFileRoute("/auth")({
     meta: [
       { title: "Sign in — Survival Tabs Team Hub" },
       { name: "description", content: "Team-only sign-in for the Survival Tabs Content Hub." },
+      { property: "og:title", content: "Sign in — Survival Tabs Team Hub" },
+      { property: "og:description", content: "Private team sign-in for Survival Tabs." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
       { name: "robots", content: "noindex, nofollow" },
     ],
   }),

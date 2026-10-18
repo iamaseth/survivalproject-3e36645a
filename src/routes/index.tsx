@@ -42,7 +42,15 @@ function influencerFacingDm(raw: string): string {
 
 export const Route = createFileRoute("/")({
   component: InfluencerHome,
-  head: () => ({ meta: [{ title: "Influencer Research — Survival Tabs" }, { name: "robots", content: "noindex" }] }),
+  head: () => ({ meta: [
+    { title: "Influencer Research — Survival Tabs" },
+    { name: "description", content: "Private Survival Tabs creator research and partnership review." },
+    { property: "og:title", content: "Influencer Research — Survival Tabs" },
+    { property: "og:description", content: "Private creator research and partnership review for the Survival Tabs team." },
+    { property: "og:type", content: "website" },
+    { name: "twitter:card", content: "summary" },
+    { name: "robots", content: "noindex" },
+  ] }),
 });
 
 function InfluencerHome() {
