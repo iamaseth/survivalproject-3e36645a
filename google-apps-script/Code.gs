@@ -28,7 +28,8 @@ function rows_() {
     id:String(r[id]), name:String(r[headers.indexOf('Creator')]||''),
     tiktok:String(r[headers.indexOf('TikTok URL')]||''),
     email:String(r[headers.indexOf('Email')]||''),
-    draft:String(r[headers.indexOf('Draft DM - Do Not Send')]||''),
+    draft:String(r[headers.indexOf('Draft DM - Do Not Send')]||r[headers.indexOf('Personalized DM')]||''),
+    sentEvidence: Boolean(r[headers.indexOf('Contacted Date')]) || String(r[headers.indexOf('Outreach Stage')]||'').toLowerCase()==='contacted',
     screening:String(r[headers.indexOf('New Screening Decision')]||''),
     status:String(r[status]||'Needs Review')
   }));
