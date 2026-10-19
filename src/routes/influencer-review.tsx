@@ -7,7 +7,7 @@ export const Route = createFileRoute("/influencer-review")({
 
 function InfluencerReview() {
   // Apps Script hosts the protected UI; do not put access tokens or influencer records in browser code.
-  const url = "https://script.google.com/macros/s/AKfycbxYYTuO1b1nd_rpl0-yapfqxZl8-axUoErqH9tei1GMLGomc_bFv4UQpNk9rVkEqLaZ/exec";
+  const url = "https://script.google.com/macros/s/AKfycby_MjjXYWEHiC41tSYHTcfPWOwxuE_A7AbB2XniUsyMAXxq_f9d3mWvCj2l_eNNA0jL/exec";
   return (
     <main className="min-h-screen bg-[#f4f7f4] text-[#173c2c]">
       <div className="bg-white px-5 py-2 text-sm"><a className="underline" href={url} target="_blank" rel="noopener noreferrer">Open secure Google Sheets review directly ↗</a></div>
