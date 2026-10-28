@@ -1,10 +1,10 @@
 import { TIKTOK_PROFILE_RE } from "./tiktok-dm-verification";
-type Row = { workflowStatus?: string | null; sethApprovalStatus?: string | null; tiktok?: string | null; personalizedDm?: string | null; responseFollowup?: string | null };
+import { contactReady, type ContactRecord } from "./contact-workflow";
+type Row = ContactRecord;
 export const isBlockedFollowup = (f?: string | null) => /not relevant|dm blocked|do not contact|do not send/i.test(f || "");
-/** Section 3 and Rena's queue share the same single authoritative status.
- * Only workflowStatus controls membership. Missing DM/profile and contact restrictions affect actions, not visibility. */
+/** Contact queue requires verified fit and a grounded DM, not a stage-only approval. */
 export function inRenaPool(c: Row): boolean {
-  return c.workflowStatus === "approved";
+  return contactReady(c);
 }
 export function canOpenTikTok(c: Row): boolean {
   return Boolean(c.tiktok && TIKTOK_PROFILE_RE.test(c.tiktok));
