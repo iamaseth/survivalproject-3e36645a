@@ -1,9 +1,10 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { Link, createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { type CreatorRow } from "@/lib/creator-partnerships";
 import { listApprovedTikTokOutreach } from "@/lib/creators.functions";
 import { getMyOutreachSender, outreachPoolAction, senderRejectAssigned, secondLookAction, getOutreachTodayActivity, type OutreachActivityRow } from "@/lib/creators.functions";
+import { Button } from "@/components/ui/button";
 import { inRenaPool, isBlockedFollowup, canOpenTikTok, canCopyDm } from "@/lib/rena-queue-eligibility";
 
 export const Route = createFileRoute("/rena-queue")({
@@ -39,16 +40,8 @@ export function DmQueue({ sender = "Rena" }: { sender?: "Rena" | "Seth" }) {
   const [approvedRows, setApprovedRows] = useState<CreatorRow[]>([]);
   const [queueLoading, setQueueLoading] = useState(false);
   const [hasQueue, setHasQueue] = useState(false);
-  const queueCacheKey = "survival-tabs:rena-approved-preview:v2";
-  const restoreQueue = () => {
-    try {
-      const cached = JSON.parse(window.localStorage.getItem(queueCacheKey) || "null");
-      if (cached?.rows && Array.isArray(cached.rows)) {
-        setApprovedRows(cached.rows as CreatorRow[]);
-        setHasQueue(true);
-      }
-    } catch { /* unavailable local storage */ }
-  };
+  const [awaitingRows, setAwaitingRows] = useState<Array<{id:string;name:string;md:string}>>([]);
+  const queueCacheKey = "survival-tabs:rena-approved-preview:v3";
   const who = useServerFn(getMyOutreachSender);
   const act = useServerFn(outreachPoolAction);
   const senderReject = useServerFn(senderRejectAssigned);
@@ -66,7 +59,7 @@ export function DmQueue({ sender = "Rena" }: { sender?: "Rena" | "Seth" }) {
   const [swipingId,setSwipingId] = useState<string|null>(null);
   const [actionsId,setActionsId] = useState<string|null>(null);
   
-  const deferCreator = async (id: string) => { if (lock.current) return; lock.current=true; setSavingId(id); try { const result=await secondLookAct({data:{id,action:"later"}}); if(!result?.ok) throw new Error("Could not save Later"); await refresh(); setActionsId(null); setNotice({kind:"ok",text:"Moved to Second Look."}); } catch(e) { setNotice({kind:"err",text:e instanceof Error?e.message:"Could not save Later"}); } finally {lock.current=false;setSavingId(null);} };
+  const deferCreator = async (id: string) => { if (lock.current) return; lock.current=true; setSavingId(id); try { const result=await secondLookAct({data:{id,action:"later"}}); if(!result?.ok) throw new Error("Could not save Later"); setApprovedRows(rows=>rows.filter(r=>r.id!==id)); await refresh(); setActionsId(null); setNotice({kind:"ok",text:"Saved as Later."}); } catch(e) { setNotice({kind:"err",text:e instanceof Error?e.message:"Could not save Later"}); } finally {lock.current=false;setSavingId(null);} };
   const activityFn = useServerFn(getOutreachTodayActivity);
   const [activity,setActivity] = useState<OutreachActivityRow[]>([]);
   const [activityError,setActivityError] = useState<string|null>(null);
@@ -84,7 +77,7 @@ export function DmQueue({ sender = "Rena" }: { sender?: "Rena" | "Seth" }) {
       )).catch(() => { /* retry on the next visit; never clear auth storage */ });
     }
   }, []);
-  useEffect(() => { restoreQueue(); who().then(setMe).catch(() => setMe({ sender: null, approver: false })); void refresh(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { who().then(setMe).catch(() => setMe({ sender: null, approver: false })); void refresh(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const pool = useMemo(() => approvedRows.filter(inPool).sort((a, b) => a.name.localeCompare(b.name)), [approvedRows]);
   const mine = pool;
@@ -102,7 +95,8 @@ export function DmQueue({ sender = "Rena" }: { sender?: "Rena" | "Seth" }) {
     try {
       setLoadError(null);
       const data = await loadApproved();
-      const fresh = data.map(r => ({
+      setAwaitingRows(data.rows.filter(r=>!r.contact_ready).map(r=>({id:r.id,name:r.name,md:r.md_review_status})));
+      const fresh = data.rows.filter(r=>r.contact_ready).map(r => ({
         id: r.id, name: r.name, tiktok: r.tiktok,
         followersSignal: r.followers_signal,
         personalizedDm: r.personalized_dm,
@@ -112,6 +106,8 @@ export function DmQueue({ sender = "Rena" }: { sender?: "Rena" | "Seth" }) {
         contactedDate: r.contacted_date,
         responseFollowup: r.response_followup,
         qualificationStatus: r.qualification_status,
+        sethApprovalStatus: r.seth_approval_status, fullVerification: r.full_verification,
+        verificationEvidence: r.verification_evidence, verificationDate: r.verification_date,
       } as CreatorRow));
       setApprovedRows(fresh);
       setHasQueue(true);
@@ -124,6 +120,7 @@ export function DmQueue({ sender = "Rena" }: { sender?: "Rena" | "Seth" }) {
   const run = async (c: CreatorRow, action: "claim" | "release" | "sent" | "undo_sent") => {
     const result = await act({ data: { id: c.id, action } });
     if (!result?.ok) throw new Error("Server did not confirm the action.");
+    if (action === "sent") setApprovedRows(rows=>rows.filter(r=>r.id!==c.id));
     await refresh();
   };
 
@@ -131,7 +128,8 @@ export function DmQueue({ sender = "Rena" }: { sender?: "Rena" | "Seth" }) {
     if (lock.current || c.outreachSentAt) return;
     lock.current = true; setSavingId(c.id);
     if (!canCopyDm(c)) { setNotice({ kind: "warn", text: isBlockedFollowup(c.responseFollowup) ? "Contact restricted for this creator." : "No DM draft saved yet. Creator remains in Ready to Contact." }); lock.current = false; setSavingId(null); return; }
-    const dm = c.personalizedDm!.trim();
+    const dm = c.personalizedDm?.trim();
+    if (!dm) { lock.current=false;setSavingId(null);return; }
     const copy = navigator.clipboard?.writeText(dm) ?? Promise.reject(new Error("no clipboard"));
     void (async () => {
       let copied = true;
@@ -158,9 +156,9 @@ export function DmQueue({ sender = "Rena" }: { sender?: "Rena" | "Seth" }) {
 
   const reject = async (c:CreatorRow) => {
     if (readOnlyPreview || lock.current || c.outreachSentAt) return;
-    if (!confirm(`Reject ${c.name} as Not Relevant and remove from your queue?`)) return;
+    if (!confirm(`I reviewed the correct profile: reject ${c.name} as Not Relevant and remove from the shared queue?`)) return;
     lock.current=true;setSavingId(c.id);
-    try { const result = await senderReject({data:{id:c.id,reason:`Rena queue rejection by ${me?.sender ?? "sender"}: Not Relevant`,checkedProfile:true}}); if (!result?.ok) throw new Error("Server did not confirm rejection."); await refresh(); setActionsId(null); setNotice({kind:"ok",text:`${c.name} rejected as Not Relevant. History kept.`}); }
+    try { const result = await senderReject({data:{id:c.id,reason:`Rena queue rejection by ${me?.sender ?? "sender"}: Not Relevant`,checkedProfile:true}}); if (!result?.ok) throw new Error("Server did not confirm rejection."); setApprovedRows(rows=>rows.filter(r=>r.id!==c.id)); await refresh(); setActionsId(null); setNotice({kind:"ok",text:`${c.name} rejected as Not Relevant. History kept.`}); }
     catch(e){setNotice({kind:"err",text:e instanceof Error?e.message:"Could not reject creator"});}
     finally {lock.current=false;setSavingId(null);}
   };
@@ -178,30 +176,23 @@ export function DmQueue({ sender = "Rena" }: { sender?: "Rena" | "Seth" }) {
   const tone = { ok: "border-emerald-600 bg-emerald-50 text-emerald-950", warn: "border-amber-500 bg-amber-50 text-amber-950", err: "border-red-600 bg-red-50 text-red-950" };
 
   if (me === null) return <div className="p-8 text-sm text-muted-foreground">Loading…</div>;
-  if (!me.sender && !me.approver) return (
-    <div className="mx-auto max-w-lg rounded-xl border border-border bg-card p-6 text-sm">
-      <h1 className="font-display text-2xl">TikTok DMs</h1>
-      <p className="mt-2">Your account isn't set up as a DM sender (Seth, BoBo or Rena). Ask Seth to add you.</p>
-      <p className="mt-2 text-muted-foreground">Shared pool: {available.length} available · {pool.filter((c) => statusOf(c) === "assigned").length} assigned · {pool.filter((c) => statusOf(c) === "contacted").length} contacted</p>
-    </div>
-  );
 
   return (
     <div className="mx-auto max-w-xl space-y-3 pb-16">
       <div className="flex items-start justify-between gap-2">
         <div>
           <h1 className="font-display text-2xl text-foreground">{viewingSender === "Rena" ? "Rena’s Outreach Queue" : viewingSender === "Seth" ? "Seth’s Outreach Queue" : `${viewingSender ?? "Team"}’s TikTok DMs`}</h1>
-          <p className="text-sm text-muted-foreground">This queue mirrors Section 3: Manually Approved. Copy the DM, send it in TikTok, then tap Sent.</p>
+          <p className="text-sm text-muted-foreground">Approved for Contact</p>
           {readOnlyPreview ? <p className="text-xs text-muted-foreground">You must be signed in as an authorized team member to update CRM records.</p> : null}
         </div>
-        <button onClick={() => void refresh()} className="rounded-md border border-input px-3 py-2 text-sm">Refresh</button>
+        <Button variant="outline" onClick={() => void refresh()}>Refresh</Button>
       </div>
       <div className="sticky top-0 z-10 rounded-xl border border-border bg-card p-3">
         <div className="flex justify-between text-sm font-semibold"><span>{done} done today</span><span>{pending.filter(c=>!completedIds.has(c.id)).length} left</span></div>
         <div className="mt-2 h-2 overflow-hidden rounded-full bg-secondary">
           <div className="h-full bg-emerald-600 transition-all" style={{ width: `${mine.length ? (done / mine.length) * 100 : 0}%` }} />
         </div>
-        <p className="mt-2 text-[11px] text-muted-foreground">Finished tiles turn green (Sent), red (Rejected), or amber (Later). Completed work remains visible until tomorrow.</p>
+        
       </div>
       {loadError ? <p role="alert" className="rounded border border-red-600 p-3 text-sm">{loadError}</p> : null}
       {notice ? (
@@ -219,24 +210,28 @@ export function DmQueue({ sender = "Rena" }: { sender?: "Rena" | "Seth" }) {
           const sent = Boolean(c.outreachSentAt);
           return (
             <li key={c.id} className="flex flex-wrap items-stretch gap-2" onTouchStart={e=>{if(finished)return;const t=e.touches[0];touchStart.current={id:c.id,x:t.clientX,y:t.clientY};}} onTouchEnd={e=>{if(finished)return;const t=e.changedTouches[0];swipeReject(c,t.clientX,t.clientY);}}>
-              <a href={finished || !canOpenTikTok(c) ? undefined : c.tiktok!} target="_blank" rel="noopener noreferrer" aria-disabled={finished || savingId === c.id}
+              <a href={finished || !canOpenTikTok(c) ? undefined : c.tiktok ?? undefined} target="_blank" rel="noopener noreferrer" aria-disabled={finished || savingId === c.id}
                 onClick={(e) => { if (finished || !canOpenTikTok(c) || lock.current || swipingId===c.id) { e.preventDefault(); return; } onTap(c); }}
                 className={`flex min-h-[76px] flex-1 flex-col justify-center rounded-xl border-2 px-4 py-3 ${completedAction==="sent" ? "border-emerald-600 bg-emerald-100 text-emerald-950" : completedAction==="rejected" ? "border-red-600 bg-red-100 text-red-950" : completedAction==="later" ? "border-amber-600 bg-amber-100 text-amber-950" : "border-border bg-card text-foreground active:bg-secondary"}`}>
                 <span className="text-base font-semibold">{finished ? "✓ " : ""}{c.name}</span>
-                <span className="text-xs opacity-75">{c.followersSignal?.trim() ? `${c.followersSignal.trim()} followers` : "Followers not recorded"}{savingId === c.id ? " · saving…" : finished ? ` · ${completedAction==="sent"?"Sent":completedAction==="rejected"?"Rejected — Not Relevant":"Later — Second Look"}` : ""}</span>
+                <span className="text-xs opacity-75">{c.followersSignal?.trim() ? `${c.followersSignal.trim()} followers` : "Followers not recorded"}{savingId === c.id ? " · saving…" : finished ? ` · ${completedAction==="sent"?"Sent":completedAction==="rejected"?"Rejected — Not Relevant":"Later — Later"}` : ""}</span>
               </a>
-              {!finished && !readOnlyPreview && <button type="button" disabled={savingId===c.id} onClick={()=>void simple(c,"sent")} className="rounded-xl bg-emerald-700 px-3 text-sm font-semibold text-white">Sent</button>}
+              <Button variant="outline" disabled={savingId===c.id} onClick={()=>onTap(c)}>Copy DM</Button>
+              {!finished && !readOnlyPreview && <button type="button" disabled={savingId===c.id} onClick={()=>void simple(c,"sent","Confirm you actually sent this DM in TikTok?")} className="rounded-xl bg-emerald-700 px-3 text-sm font-semibold text-white">Sent</button>}
               {!finished && <button type="button" onClick={()=>setActionsId(v=>v===c.id?null:c.id)} className="rounded-xl border border-border px-3 text-sm" aria-label={`Actions for ${c.name}`}>•••</button>}
               {actionsId===c.id && <div className="basis-full grid w-full grid-cols-4 gap-1 rounded-xl border p-2 text-xs font-medium">
                 <button type="button" disabled={readOnlyPreview || !sent} onClick={()=>{setActionsId(null);void simple(c,"undo_sent");}} className="flex min-h-14 flex-col items-center justify-center rounded-lg bg-blue-100 text-blue-900 disabled:opacity-40"><span className="text-xl">↶</span>Undo</button>
-                <button type="button" disabled={readOnlyPreview || sent} onClick={()=>void reject(c)} className="flex min-h-14 flex-col items-center justify-center rounded-lg bg-red-100 text-red-900 disabled:opacity-40"><span className="text-xl">✕</span>Reject</button>
+                <button type="button" disabled={readOnlyPreview || sent} onClick={()=>void reject(c)} className="flex min-h-14 flex-col items-center justify-center rounded-lg bg-red-100 text-red-900 disabled:opacity-40"><span className="text-xl">✕</span>Rejected</button>
                 <button type="button" onClick={()=>{void deferCreator(c.id);}} className="flex min-h-14 flex-col items-center justify-center rounded-lg bg-amber-100 text-amber-900"><span className="text-xl">◷</span>Later</button>
-                <button type="button" disabled={readOnlyPreview || sent} onClick={()=>{setActionsId(null);void simple(c,"sent");}} className="flex min-h-14 flex-col items-center justify-center rounded-lg bg-green-100 text-green-900 disabled:opacity-40"><span className="text-xl">✓</span>Sent</button>
+                <button type="button" disabled={readOnlyPreview || sent} onClick={()=>{setActionsId(null);void simple(c,"sent","Confirm you actually sent this DM in TikTok?");}} className="flex min-h-14 flex-col items-center justify-center rounded-lg bg-green-100 text-green-900 disabled:opacity-40"><span className="text-xl">✓</span>Sent</button>
               </div>}
             </li>
           );
         })}
       </ul>
+      {completedToday.length > 0 && <details><summary className="cursor-pointer text-sm">Recent actions / Undo</summary><ul className="mt-2 space-y-2">{completedToday.map(entry=><li key={entry.creator_id} className="flex items-center justify-between gap-2 text-sm"><span>{entry.creator_name || entry.creator_id} · {entry.action}</span>{entry.action === "rejected" ? <Button variant="outline" asChild><Link to="/seth-approval" search={{history:true}}>Review / Undo</Link></Button> : <Button variant="outline" disabled={readOnlyPreview || Boolean(savingId)} onClick={async()=>{if(lock.current)return;lock.current=true;setSavingId(entry.creator_id);try{const result=entry.action==="sent" ? await act({data:{id:entry.creator_id,action:"undo_sent"}}) : await secondLookAct({data:{id:entry.creator_id,action:"restore"}});if(!result?.ok)throw new Error("Undo was not saved");await refresh();}catch(e){setNotice({kind:"err",text:e instanceof Error?e.message:"Undo failed"});}finally{lock.current=false;setSavingId(null);}}}>Undo</Button>}</li>)}</ul></details>}
+      {awaitingRows.length>0 && <details><summary className="cursor-pointer text-sm">Awaiting verification ({awaitingRows.length})</summary><ul className="mt-2 space-y-2 text-sm">{awaitingRows.map(r=><li key={r.id} className="flex justify-between gap-2"><span>{r.name}</span><span className="text-muted-foreground">{r.md}</span></li>)}</ul></details>}
+
 
 
     </div>
