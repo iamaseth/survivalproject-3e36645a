@@ -57,9 +57,9 @@ export function DmQueue({ sender = "Rena" }: { sender?: "Rena" | "Seth" }) {
   const lock = useRef(false);
   const touchStart = useRef<{id:string;x:number;y:number}|null>(null);
   const [swipingId,setSwipingId] = useState<string|null>(null);
-  const [actionsId,setActionsId] = useState<string|null>(null);
+  const [,setActionsId] = useState<string|null>(null);
   
-  const deferCreator = async (id: string) => { if (lock.current) return; lock.current=true; setSavingId(id); try { const result=await secondLookAct({data:{id,action:"later"}}); if(!result?.ok) throw new Error("Could not save Later"); setApprovedRows(rows=>rows.filter(r=>r.id!==id)); await refresh(); setActionsId(null); setNotice({kind:"ok",text:"Saved as Later."}); } catch(e) { setNotice({kind:"err",text:e instanceof Error?e.message:"Could not save Later"}); } finally {lock.current=false;setSavingId(null);} };
+  const deferCreator = async (id: string) => { if (readOnlyPreview || lock.current) return; lock.current=true; setSavingId(id); try { const result=await secondLookAct({data:{id,action:"later"}}); if(!result?.ok) throw new Error("Could not save Later"); setApprovedRows(rows=>rows.filter(r=>r.id!==id)); await refresh(); setActionsId(null); setNotice({kind:"ok",text:"Saved as Later."}); } catch(e) { setNotice({kind:"err",text:e instanceof Error?e.message:"Could not save Later"}); } finally {lock.current=false;setSavingId(null);} };
   const activityFn = useServerFn(getOutreachTodayActivity);
   const [activity,setActivity] = useState<OutreachActivityRow[]>([]);
   const [activityError,setActivityError] = useState<string|null>(null);
@@ -213,17 +213,14 @@ export function DmQueue({ sender = "Rena" }: { sender?: "Rena" | "Seth" }) {
               <a href={finished || !canOpenTikTok(c) ? undefined : c.tiktok ?? undefined} target="_blank" rel="noopener noreferrer" aria-disabled={finished || savingId === c.id}
                 onClick={(e) => { if (finished || !canOpenTikTok(c) || lock.current || swipingId===c.id) { e.preventDefault(); return; } onTap(c); }}
                 className={`flex min-h-[76px] flex-1 flex-col justify-center rounded-xl border-2 px-4 py-3 ${completedAction==="sent" ? "border-emerald-600 bg-emerald-100 text-emerald-950" : completedAction==="rejected" ? "border-red-600 bg-red-100 text-red-950" : completedAction==="later" ? "border-amber-600 bg-amber-100 text-amber-950" : "border-border bg-card text-foreground active:bg-secondary"}`}>
-                <span className="text-base font-semibold">{finished ? "✓ " : ""}{c.name}</span>
-                <span className="text-xs opacity-75">{c.followersSignal?.trim() ? `${c.followersSignal.trim()} followers` : "Followers not recorded"}{savingId === c.id ? " · saving…" : finished ? ` · ${completedAction==="sent"?"Sent":completedAction==="rejected"?"Rejected — Not Relevant":"Later — Later"}` : ""}</span>
+                <span className="text-base font-semibold">{finished ? "✓ " : ""}{c.name}</span><span className="text-xs underline">Open TikTok</span>
+                <span className="text-xs opacity-75">{c.followersSignal?.trim() ? `${c.followersSignal.trim()} followers` : "Followers not recorded"}{savingId === c.id ? " · saving…" : finished ? ` · ${completedAction==="sent"?"Sent":completedAction==="rejected"?"Rejected — Not Relevant":"Later"}` : ""}</span>
               </a>
               <Button variant="outline" disabled={savingId===c.id} onClick={()=>onTap(c)}>Copy DM</Button>
-              {!finished && !readOnlyPreview && <button type="button" disabled={savingId===c.id} onClick={()=>void simple(c,"sent","Confirm you actually sent this DM in TikTok?")} className="rounded-xl bg-emerald-700 px-3 text-sm font-semibold text-white">Sent</button>}
-              {!finished && <button type="button" onClick={()=>setActionsId(v=>v===c.id?null:c.id)} className="rounded-xl border border-border px-3 text-sm" aria-label={`Actions for ${c.name}`}>•••</button>}
-              {actionsId===c.id && <div className="basis-full grid w-full grid-cols-4 gap-1 rounded-xl border p-2 text-xs font-medium">
-                <button type="button" disabled={readOnlyPreview || !sent} onClick={()=>{setActionsId(null);void simple(c,"undo_sent");}} className="flex min-h-14 flex-col items-center justify-center rounded-lg bg-blue-100 text-blue-900 disabled:opacity-40"><span className="text-xl">↶</span>Undo</button>
-                <button type="button" disabled={readOnlyPreview || sent} onClick={()=>void reject(c)} className="flex min-h-14 flex-col items-center justify-center rounded-lg bg-red-100 text-red-900 disabled:opacity-40"><span className="text-xl">✕</span>Rejected</button>
-                <button type="button" onClick={()=>{void deferCreator(c.id);}} className="flex min-h-14 flex-col items-center justify-center rounded-lg bg-amber-100 text-amber-900"><span className="text-xl">◷</span>Later</button>
-                <button type="button" disabled={readOnlyPreview || sent} onClick={()=>{setActionsId(null);void simple(c,"sent","Confirm you actually sent this DM in TikTok?");}} className="flex min-h-14 flex-col items-center justify-center rounded-lg bg-green-100 text-green-900 disabled:opacity-40"><span className="text-xl">✓</span>Sent</button>
+              {!readOnlyPreview && <div className="flex basis-full gap-2">
+                <Button disabled={Boolean(savingId)} onClick={()=>void simple(c,"sent","Confirm you actually sent this DM in TikTok?")}>Sent</Button>
+                <Button variant="destructive" disabled={Boolean(savingId)} onClick={()=>void reject(c)}>Rejected</Button>
+                <Button variant="outline" disabled={Boolean(savingId)} onClick={()=>void deferCreator(c.id)}>Later</Button>
               </div>}
             </li>
           );
