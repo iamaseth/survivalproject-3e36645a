@@ -3,7 +3,11 @@
 - [ ] Audit current final-ready/research counts and test signed-in page without writes. Blocked by Cloud connection pooler timeout.
 - [x] Fix Rena login race, retain queue OAuth return, and retire unused worker without changing permissions or creator data.
 - [x] Test signed-out desktop/mobile navigation, login return URL, worker retirement and document installed-device limits.
-- [ ] Verify real authenticated session reload/resume. Blocked by Cloud connection pooler timeout preventing session minting.
+- [x] Verify real authenticated session reload on the shared Rena/Seth queues; long-lived resume remains unverified.
 - [ ] Verify installed iPhone/Android OAuth round-trip and relaunch. Requires physical devices and publication approval.
+- [x] Implement contact-status compatibility, safe personalized-DM filtering, immediate action removal and existing Undo; preserve database source.
+- [ ] Connect consolidated Google Sheet securely. Blocked: no accessible Google Sheets connection.
+- [ ] Verify persistent contact actions on an eligible real record. Blocked: zero directly verified contact-ready creators; no test creator writes authorized.
+- [ ] Provide full sender rejection Undo and confirmed-send audit semantics. Blocked: requires changing existing audited database functions, beyond display compatibility.
 - [ ] Allow existing authorized team members to view all pages without depending on personal Gmail access; preserve privileged actions.
 - [ ] Investigate platform Gmail-client restriction, verify and publish if security checks permit.

@@ -1,24 +1,34 @@
 // Creators roster — team-wide table replacing the hardcoded CREATORS array.
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { contactReady, mdReviewStatus } from "@/lib/contact-workflow";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Json = any;
 export type CreatorDBRow = { id: string; name: string; [k: string]: Json };
 
 
-/** Lightweight, authoritative Rena queue: exactly Section 3 TikTok creators.
- * Avoid loading the entire 5k+ roster or stale offline preview for this queue. */
+/** Keep the existing database source; legacy approvals remain visible for research,
+ * but only verified fit plus a grounded DM permits contact. */
 export const listApprovedTikTokOutreach = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const { data, error } = await context.supabase.from("creators")
-      .select("id,name,tiktok,followers_signal,personalized_dm,workflow_status,outreach_assignee,outreach_sent_at,contacted_date,response_followup,qualification_status")
-      .eq("workflow_status", "approved")
+      .select("id,name,tiktok,followers_signal,personalized_dm,workflow_status,outreach_assignee,outreach_sent_at,contacted_date,response_followup,qualification_status,seth_approval_status,full_verification,verification_evidence,verification_date,custom_attributes")
+      .in("workflow_status", ["approved", "Approved for Contact", "Manually Approved"])
       .not("tiktok", "is", null)
       .order("name");
     if (error) throw new Error(error.message);
-    return data ?? [];
+    const { data: restrictions, error: restrictionError } = await context.supabase.from("creator_workspace").select("creator_id").eq("do_not_contact", true);
+    if (restrictionError) throw new Error(restrictionError.message);
+    const blockedIds = new Set((restrictions ?? []).map(r => r.creator_id));
+    const rows = (data ?? []).map(r => ({ ...r, md_review_status: mdReviewStatus(r.custom_attributes), contact_ready: !blockedIds.has(r.id) && contactReady({
+      workflowStatus: r.workflow_status, tiktok: r.tiktok, personalizedDm: r.personalized_dm,
+      contactedDate: r.contacted_date, outreachSentAt: r.outreach_sent_at, responseFollowup: r.response_followup,
+      qualificationStatus: r.qualification_status, sethApprovalStatus: r.seth_approval_status,
+      fullVerification: r.full_verification, verificationEvidence: r.verification_evidence, verificationDate: r.verification_date,
+    }) }));
+    return { rows, source: "database" as const };
   });
 
 const CREATOR_LIST_COLUMNS = "ai_confidence,ai_model,ai_reasoning,ai_recommendation,ai_reviewed_at,ai_rubric_version,amazon,amazon_confidence,amazon_content_analysis,amazon_discovery_source,amazon_fit_score,amazon_reviewed_survival_tabs,amazon_shoppable_video,amazon_storefront_url,amazon_video_url,capture_quality,capture_type,code,contact_confidence,contact_method,contact_route,contacted_date,content_categories,created_at,creator_code,email,facebook,facebook_page_id,followers_signal,full_verification,geography,geography_confidence,id,imported_by,instagram,instagram_handle,language_codes,last_researched,latest_capture_at,link_in_bio_url,linkedin,match_tiktok_handle,match_tiktok_url,monetization,name,normalized_domain,offer_confidence,offer_reasoning,other_platform,outreach_assignee,outreach_claimed_at,outreach_owner,outreach_prev,outreach_second_look_at,outreach_sent_at,outreach_sent_by,partnership_tier,perry_comments,personalization_source,personalization_status,personalized_dm,personalized_email_body,personalized_email_subject,pinterest,primary_platforms,primary_source,priority,public_business_email,public_phone,qualification_status,raw_markdown_sha256,reach_signal,recent_activity_check,recommended_offer,reddit,rena_notes,research_notes,research_status,response_followup,sample_status,segment,seth_approval_history,seth_approval_note,seth_approval_status,seth_approved_at,seth_approved_by,seth_next_action,snapchat,source_file,source_url,subscriber_count,target_audience,technical_notes,threads,threads_handle,tiktok,tiktok_caption_count,tiktok_caption_only_count,tiktok_display_name,tiktok_followers,tiktok_following,tiktok_handle,tiktok_likes,tiktok_video_count,tuan_affiliate_status,twitch,updated_at,upload_action,verification_date,verification_evidence,website_url,workflow_status,x_twitter,youtube,youtube_channel_id,youtube_handle";

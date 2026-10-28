@@ -12,3 +12,4 @@
 - Influencers owns the single final-approval accordion; the former approval route redirects there and retains decision history via a search flag. The existing transactional review RPC enforces direct research, grounded saved DM, approver authorization and audit preservation.
 - Auth checks commit only the newest result and run outside auth callbacks; transient connectivity errors must not be treated as logout.
 - Rena home-screen support is manifest-only; keep the retirement worker at its original URL for returning installations without clearing auth storage.
+- Contact workflow labels are a read-only compatibility layer over existing database stages; queue eligibility is shared in contact-workflow and must not imply a Google Sheets connection or upgrade legacy approval. This preserves stored values and separates research review from contact authorization.
